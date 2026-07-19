@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>จัดการสต็อกสินค้า</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1a1d23;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --accent: #2563eb;
+    --accent-dark: #1d4ed8;
+    --danger: #dc2626;
+    --low: #f59e0b;
+    --low-bg: #fffbeb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1e2126;
+      --text: #e8eaed;
+      --muted: #9aa0a8;
+      --border: #2c3038;
+      --accent: #3b82f6;
+      --accent-dark: #60a5fa;
+      --danger: #f87171;
+      --low: #fbbf24;
+      --low-bg: #2a2410;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Noto Sans Thai", Tahoma, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+
+  .toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  input, select {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #search { flex: 1; min-width: 180px; }
+  button {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-dark); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-ghost:hover { background: var(--border); }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat .n { font-size: 22px; font-weight: 700; }
+  .stat .l { font-size: 12px; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  th, td { padding: 10px 12px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  tr:last-child td { border-bottom: none; }
+  tr.low-row { background: var(--low-bg); }
+  td.qty { font-weight: 600; text-align: center; width: 90px; }
+  td.actions { text-align: right; white-space: nowrap; width: 160px; }
+  .qty-btn {
+    width: 26px; height: 26px; border-radius: 6px; padding: 0;
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+    font-size: 15px; line-height: 1;
+  }
+  .qty-btn:hover { background: var(--border); }
+  .badge-low { color: var(--low); font-size: 11px; font-weight: 600; margin-left: 6px; }
+  .icon-btn { background: transparent; border: none; cursor: pointer; padding: 4px 6px; font-size: 15px; }
+  .icon-btn.del:hover { color: var(--danger); }
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 12px; padding: 20px;
+    width: 100%; max-width: 380px; border: 1px solid var(--border);
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 17px; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field select { width: 100%; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); display: block; background: var(--bg); }
+  td.thumb-cell { width: 46px; }
+  .import-row { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .import-row img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+  .import-row .import-fields { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .import-row input[type="text"] { width: 100%; font-size: 13px; padding: 6px 8px; }
+  .import-row input[type="number"] { width: 70px; font-size: 13px; padding: 6px 8px; }
+  .import-row .import-qty { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .status-rebuy { background: #e8f9f0; color: #16a34a; border: 1px solid #16a34a; }
+  .status-avoid { background: var(--low-bg); color: var(--danger); border: 1px solid var(--danger); }
+  .status-have { background: var(--low-bg); color: var(--low); border: 1px solid var(--low); }
+  .link-icon { margin-left: 6px; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📦 จัดการสต็อกสินค้า</h1>
+  <p class="sub">ข้อมูลถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น (localStorage)</p>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="statCount">0</div><div class="l">รายการทั้งหมด</div></div>
+    <div class="stat"><div class="n" id="statTotal">0</div><div class="l">จำนวนรวมทั้งหมด</div></div>
+    <div class="stat"><div class="n" id="statLow">0</div><div class="l">ใกล้หมด</div></div>
+    <div class="stat"><div class="n" id="statCats">0</div><div class="l">หมวดหมู่</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input id="search" type="text" placeholder="ค้นหาชื่อสินค้า...">
+    <select id="filterCat"><option value="">ทุกหมวดหมู่</option></select>
+    <button class="btn-primary" id="openAdd">+ เพิ่มสินค้า</button>
+    <button class="btn-ghost" id="openImport">นำเข้าจาก Shopee</button>
+    <button class="btn-ghost" id="exportBtn">ส่งออก CSV</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th></th><th>ชื่อสินค้า</th><th>หมวดหมู่</th><th>จำนวน</th><th>ขั้นต่ำ</th><th>หมายเหตุ</th><th>สถานะ</th><th></th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div id="emptyMsg" class="empty" style="display:none">ยังไม่มีสินค้าในสต็อก — กด "เพิ่มสินค้า" เพื่อเริ่มต้น</div>
+</div>
+
+<div class="modal-backdrop" id="modal">
+  <div class="modal">
+    <h2 id="modalTitle">เพิ่มสินค้า</h2>
+    <input type="hidden" id="editId">
+    <div class="field"><label>ชื่อสินค้า</label><input id="fName" type="text" placeholder="เช่น กระดาษ A4"></div>
+    <div class="field"><label>หมวดหมู่</label><input id="fCat" type="text" placeholder="เช่น เครื่องเขียน" list="catList"><datalist id="catList"></datalist></div>
+    <div class="field"><label>จำนวน</label><input id="fQty" type="number" value="0"></div>
+    <div class="field"><label>แจ้งเตือนเมื่อต่ำกว่า</label><input id="fMin" type="number" value="0"></div>
+    <div class="field"><label>หมายเหตุ</label><input id="fNote" type="text" placeholder="ไม่บังคับ"></div>
+    <div class="field"><label>รูปภาพ (URL)</label><input id="fImg" type="text" placeholder="วางลิงก์รูปภาพ (ไม่บังคับ)"></div>
+    <div class="field" id="fImgPreviewWrap" style="display:none"><img id="fImgPreview" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid var(--border)"></div>
+    <div class="field"><label>ลิงก์สินค้า</label><input id="fLink" type="text" placeholder="วางลิงก์หน้าสินค้า (ไม่บังคับ)"></div>
+    <div class="field">
+      <label>สถานะ</label>
+      <select id="fStatus">
+        <option value="">ไม่ระบุ</option>
+        <option value="rebuy">ซื้อซ้ำได้</option>
+        <option value="avoid">ไม่ควรซื้อ</option>
+        <option value="have">ได้ของอยู่แล้ว</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="cancelBtn">ยกเลิก</button>
+      <button class="btn-primary" id="saveBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="importModal">
+  <div class="modal" style="max-width:640px">
+    <h2>นำเข้ารายการจาก Shopee</h2>
+    <p class="sub" style="margin-top:-8px">
+      เปิดหน้า "คำสั่งซื้อของฉัน" ใน Shopee กด Ctrl+U หรือคลิกขวา &gt; "ดูซอร์สหน้าเว็บ" (View Page Source)
+      แล้วคัดลอกโค้ด HTML ทั้งหมดมาวางในกล่องด้านล่าง ระบบจะพยายามดึงชื่อสินค้า จำนวน และรูปภาพให้อัตโนมัติ —
+      กรุณาตรวจสอบและแก้ไขรายการก่อนนำเข้าจริง เพราะโครงสร้างหน้าเว็บของ Shopee อาจไม่แน่นอน
+    </p>
+    <div class="field">
+      <textarea id="importHtml" placeholder="วางโค้ด HTML ของหน้าออเดอร์ Shopee ที่นี่..." style="width:100%; min-height:120px; resize:vertical; font-family:monospace; font-size:12px; background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px;"></textarea>
+    </div>
+    <div class="modal-actions" style="margin-top:0; margin-bottom:12px; justify-content:flex-start;">
+      <button class="btn-primary" id="importParseBtn">แยกรายการ</button>
+    </div>
+    <div id="importList" style="max-height:340px; overflow:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:12px;"></div>
+    <div id="importEmpty" class="empty" style="display:none; padding:16px;">ยังไม่พบรายการสินค้า — วางโค้ด HTML แล้วกด "แยกรายการ"</div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="importCancelBtn">ยกเลิก</button>
+      <button class="btn-primary" id="importConfirmBtn">นำเข้ารายการที่เลือก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'stock_manager_items_v1';
+let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  render();
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+const rowsEl = document.getElementById('rows');
+const emptyMsg = document.getElementById('emptyMsg');
+const searchEl = document.getElementById('search');
+const filterCatEl = document.getElementById('filterCat');
+
+function render() {
+  const q = searchEl.value.trim().toLowerCase();
+  const cat = filterCatEl.value;
+
+  const cats = [...new Set(items.map(i => i.cat).filter(Boolean))].sort();
+  filterCatEl.innerHTML = '<option value="">ทุกหมวดหมู่</option>' + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  filterCatEl.value = cat;
+  document.getElementById('catList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+
+  const filtered = items.filter(i =>
+    (!q || i.name.toLowerCase().includes(q)) &&
+    (!cat || i.cat === cat)
+  ).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+
+  rowsEl.innerHTML = filtered.map(i => {
+    const low = i.min > 0 && i.qty <= i.min;
+    const statusLabels = { rebuy: 'ซื้อซ้ำได้', avoid: 'ไม่ควรซื้อ', have: 'ได้ของอยู่แล้ว' };
+    return `<tr class="${low ? 'low-row' : ''}" data-id="${i.id}">
+      <td class="thumb-cell">${i.img ? `<img class="thumb" src="${esc(i.img)}" alt="" onerror="this.style.visibility='hidden'">` : ''}</td>
+      <td>${esc(i.name)}${low ? '<span class="badge-low">ใกล้หมด</span>' : ''}${i.link ? `<a class="link-icon" href="${esc(i.link)}" target="_blank" rel="noopener noreferrer" title="เปิดลิงก์สินค้า">🔗</a>` : ''}</td>
+      <td>${esc(i.cat) || '-'}</td>
+      <td class="qty">
+        <button class="qty-btn" data-act="dec">−</button>
+        <span>${i.qty}</span>
+        <button class="qty-btn" data-act="inc">+</button>
+      </td>
+      <td>${i.min || 0}</td>
+      <td>${esc(i.note) || ''}</td>
+      <td>${i.status ? `<span class="status-badge status-${i.status}">${statusLabels[i.status]}</span>` : ''}</td>
+      <td class="actions">
+        <button class="icon-btn" data-act="edit" title="แก้ไข">✏️</button>
+        <button class="icon-btn del" data-act="del" title="ลบ">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  emptyMsg.style.display = items.length === 0 ? 'block' : 'none';
+
+  document.getElementById('statCount').textContent = items.length;
+  document.getElementById('statTotal').textContent = items.reduce((s, i) => s + Number(i.qty || 0), 0);
+  document.getElementById('statLow').textContent = items.filter(i => i.min > 0 && i.qty <= i.min).length;
+  document.getElementById('statCats').textContent = cats.length;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+rowsEl.addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const id = btn.closest('tr').dataset.id;
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  const act = btn.dataset.act;
+  if (act === 'inc') { item.qty++; save(); }
+  else if (act === 'dec') { item.qty = Math.max(0, item.qty - 1); save(); }
+  else if (act === 'del') { if (confirm(`ลบ "${item.name}" ออกจากสต็อก?`)) { items = items.filter(i => i.id !== id); save(); } }
+  else if (act === 'edit') { openModal(item); }
+});
+
+searchEl.addEventListener('input', render);
+filterCatEl.addEventListener('change', render);
+
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modalTitle');
+const editIdEl = document.getElementById('editId');
+const fName = document.getElementById('fName');
+const fCat = document.getElementById('fCat');
+const fQty = document.getElementById('fQty');
+const fMin = document.getElementById('fMin');
+const fNote = document.getElementById('fNote');
+const fImg = document.getElementById('fImg');
+const fImgPreviewWrap = document.getElementById('fImgPreviewWrap');
+const fImgPreview = document.getElementById('fImgPreview');
+const fLink = document.getElementById('fLink');
+const fStatus = document.getElementById('fStatus');
+
+function updateImgPreview() {
+  const url = fImg.value.trim();
+  if (url) {
+    fImgPreview.src = url;
+    fImgPreviewWrap.style.display = 'block';
+  } else {
+    fImgPreviewWrap.style.display = 'none';
+  }
+}
+fImg.addEventListener('input', updateImgPreview);
+
+function openModal(item) {
+  editIdEl.value = item ? item.id : '';
+  modalTitle.textContent = item ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
+  fName.value = item ? item.name : '';
+  fCat.value = item ? item.cat : '';
+  fQty.value = item ? item.qty : 0;
+  fMin.value = item ? item.min : 0;
+  fNote.value = item ? item.note : '';
+  fImg.value = item ? (item.img || '') : '';
+  fLink.value = item ? (item.link || '') : '';
+  fStatus.value = item ? (item.status || '') : '';
+  updateImgPreview();
+  modal.classList.add('open');
+  fName.focus();
+}
+function closeModal() { modal.classList.remove('open'); }
+
+document.getElementById('openAdd').addEventListener('click', () => openModal(null));
+document.getElementById('cancelBtn').addEventListener('click', closeModal);
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const name = fName.value.trim();
+  if (!name) { fName.focus(); return; }
+  const data = {
+    name,
+    cat: fCat.value.trim(),
+    qty: Math.max(0, parseInt(fQty.value) || 0),
+    min: Math.max(0, parseInt(fMin.value) || 0),
+    note: fNote.value.trim(),
+    img: fImg.value.trim(),
+    link: fLink.value.trim(),
+    status: fStatus.value
+  };
+  if (editIdEl.value) {
+    const item = items.find(i => i.id === editIdEl.value);
+    Object.assign(item, data);
+  } else {
+    items.push({ id: uid(), ...data });
+  }
+  save();
+  closeModal();
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const header = 'ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,หมายเหตุ\n';
+  const rows = items.map(i => [i.name, i.cat, i.qty, i.min, i.note].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `stock-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ---- นำเข้าจาก Shopee (วางโค้ด HTML ที่คัดลอกมา) ----
+const importModal = document.getElementById('importModal');
+const importHtmlEl = document.getElementById('importHtml');
+const importListEl = document.getElementById('importList');
+const importEmptyEl = document.getElementById('importEmpty');
+let importCandidates = [];
+
+document.getElementById('openImport').addEventListener('click', () => {
+  importCandidates = [];
+  importHtmlEl.value = '';
+  renderImportList();
+  importModal.classList.add('open');
+  importHtmlEl.focus();
+});
+document.getElementById('importCancelBtn').addEventListener('click', () => importModal.classList.remove('open'));
+importModal.addEventListener('click', e => { if (e.target === importModal) importModal.classList.remove('open'); });
+
+document.getElementById('importParseBtn').addEventListener('click', () => {
+  importCandidates = extractShopeeItems(importHtmlEl.value);
+  renderImportList();
+});
+
+function extractShopeeItems(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const skipHints = /icon|logo|sprite|avatar|badge|banner|placeholder|profile|qr[_-]?code/i;
+  const getImgSrc = img => {
+    const srcset = img.getAttribute('srcset') || img.getAttribute('data-srcset') || '';
+    const fromSrcset = srcset.split(',')[0].trim().split(/\s+/)[0];
+    return img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original')
+      || img.getAttribute('data-lazy-src') || fromSrcset || '';
+  };
+  const isProductImg = img => {
+    const src = getImgSrc(img);
+    const alt = img.getAttribute('alt') || '';
+    if (!src || /^data:/.test(src) || skipHints.test(src) || skipHints.test(alt)) return false;
+    const w = parseInt(img.getAttribute('width') || '0');
+    const h = parseInt(img.getAttribute('height') || '0');
+    if ((w && w < 40) || (h && h < 40)) return false;
+    return true;
+  };
+
+  // แต่ละรายการสินค้าใน Shopee มักอยู่ใน <a> ที่ครอบทั้งรูปภาพและชื่อสินค้า
+  const anchors = [...doc.querySelectorAll('a')].filter(a => {
+    const imgs = [...a.querySelectorAll('img')];
+    return imgs.length > 0 && imgs.some(isProductImg) && a.querySelector('span, div');
+  });
+
+  const seen = new Set();
+  const results = [];
+  for (const a of anchors) {
+    const img = [...a.querySelectorAll('img')].find(isProductImg);
+    const src = getImgSrc(img);
+    let absSrc = src;
+    try { absSrc = new URL(src, 'https://shopee.co.th/').href; } catch (e) {}
+    if (seen.has(absSrc)) continue;
+
+    // ชื่อสินค้า: ข้อความก้อนแรกที่ยาวพอ และไม่ใช่ตัวเลข/จำนวน/ราคา
+    let name = '';
+    let qty = 1;
+    for (const el of a.querySelectorAll('span, div')) {
+      if (el.children.length > 0) continue; // เอาเฉพาะ element ใบสุดท้าย
+      const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!t) continue;
+      if (/^x\s?\d+$/i.test(t)) { qty = parseInt(t.replace(/[^\d]/g, '')); continue; }
+      if (/^฿/.test(t) || /^\d+(\.\d+)?$/.test(t)) continue;
+      if (!name && t.length >= 4) name = t.slice(0, 150);
+    }
+    if (!name) continue;
+
+    let link = a.getAttribute('href') || '';
+    try { link = link ? new URL(link, 'https://shopee.co.th/').href : ''; } catch (e) {}
+
+    seen.add(absSrc);
+    results.push({ name, qty, img: absSrc, link, status: '', include: true });
+  }
+  return results;
+}
+
+function renderImportList() {
+  const statusOptions = [
+    { v: '', l: 'ไม่ระบุ' },
+    { v: 'rebuy', l: 'ซื้อซ้ำได้' },
+    { v: 'avoid', l: 'ไม่ควรซื้อ' },
+    { v: 'have', l: 'ได้ของอยู่แล้ว' }
+  ];
+  importListEl.innerHTML = importCandidates.map((c, idx) => `
+    <div class="import-row" data-idx="${idx}">
+      <input type="checkbox" data-f="include" ${c.include ? 'checked' : ''}>
+      <img src="${esc(c.img)}" alt="" onerror="this.style.visibility='hidden'">
+      <div class="import-fields">
+        <input type="text" data-f="name" value="${esc(c.name)}" placeholder="ชื่อสินค้า">
+        <div class="import-qty">จำนวน <input type="number" data-f="qty" value="${c.qty}" min="0">
+          <select data-f="status">${statusOptions.map(o => `<option value="${o.v}" ${c.status === o.v ? 'selected' : ''}>${o.l}</option>`).join('')}</select>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  importEmptyEl.style.display = importCandidates.length === 0 ? 'block' : 'none';
+}
+
+importListEl.addEventListener('input', e => {
+  const row = e.target.closest('.import-row');
+  if (!row) return;
+  const idx = Number(row.dataset.idx);
+  const field = e.target.dataset.f;
+  if (!field) return;
+  if (field === 'include') importCandidates[idx].include = e.target.checked;
+  else if (field === 'qty') importCandidates[idx].qty = Math.max(0, parseInt(e.target.value) || 0);
+  else if (field === 'name') importCandidates[idx].name = e.target.value;
+  else if (field === 'status') importCandidates[idx].status = e.target.value;
+});
+
+document.getElementById('importConfirmBtn').addEventListener('click', () => {
+  const chosen = importCandidates.filter(c => c.include && c.name.trim());
+  if (chosen.length === 0) { importModal.classList.remove('open'); return; }
+  for (const c of chosen) {
+    items.push({ id: uid(), name: c.name.trim(), cat: 'Shopee', qty: c.qty, min: 0, note: '', img: c.img, link: c.link, status: c.status });
+  }
+  save();
+  importModal.classList.remove('open');
+});
+
+render();
+</script>
+</body>
+</html>
