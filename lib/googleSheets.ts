@@ -1,3 +1,4 @@
+import { uid } from "./uid";
 import type { StockItem } from "./types";
 
 export const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
@@ -82,7 +83,7 @@ function itemsToRows(items: StockItem[]): string[][] {
 
 function rowsToItems(rows: string[][]): StockItem[] {
   return rows.slice(1).filter((r) => r[1]).map((r) => ({
-    id: r[0] || Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    id: r[0] || uid(),
     name: r[1] || "",
     cat: r[2] || "",
     qty: Number(r[3]) || 0,

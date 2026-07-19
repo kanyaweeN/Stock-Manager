@@ -1,11 +1,8 @@
 "use client";
 
 import type { StockDB } from "./db";
+import { uid } from "./uid";
 import type { ImportCandidate, StockItem } from "./types";
-
-function uid(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
 
 function exportCsv(items: StockItem[]) {
   const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,หมายเหตุ\n";

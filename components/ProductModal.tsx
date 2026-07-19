@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { STATUS_OPTIONS } from "@/lib/statusOptions";
+import CategoryDatalist from "@/components/CategoryDatalist";
 import type { ItemStatus, StockItem } from "@/lib/types";
 
 interface Props {
@@ -76,9 +78,7 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
             value={form.cat}
             onChange={(e) => setForm({ ...form, cat: e.target.value })}
           />
-          <datalist id="catList">
-            {categories.map((c) => <option key={c} value={c} />)}
-          </datalist>
+          <CategoryDatalist id="catList" categories={categories} />
         </div>
         <div className="field">
           <label>จำนวน</label>
@@ -119,10 +119,7 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
         <div className="field">
           <label>สถานะ</label>
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ItemStatus })}>
-            <option value="">ไม่ระบุ</option>
-            <option value="rebuy">ซื้อซ้ำได้</option>
-            <option value="avoid">ไม่ควรซื้อ</option>
-            <option value="have">ได้ของอยู่แล้ว</option>
+            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="modal-actions">

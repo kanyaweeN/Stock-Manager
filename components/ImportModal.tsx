@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { extractShopeeItems } from "@/lib/shopee";
+import { STATUS_OPTIONS } from "@/lib/statusOptions";
+import CategoryDatalist from "@/components/CategoryDatalist";
 import type { ImportCandidate, ItemStatus } from "@/lib/types";
 
 interface Props {
@@ -10,13 +12,6 @@ interface Props {
   onClose: () => void;
   onImport: (candidates: ImportCandidate[]) => void;
 }
-
-const STATUS_OPTIONS: { v: ItemStatus; l: string }[] = [
-  { v: "", l: "ไม่ระบุ" },
-  { v: "rebuy", l: "ซื้อซ้ำได้" },
-  { v: "avoid", l: "ไม่ควรซื้อ" },
-  { v: "have", l: "ได้ของอยู่แล้ว" },
-];
 
 export default function ImportModal({ open, categories, onClose, onImport }: Props) {
   const [html, setHtml] = useState("");
@@ -100,7 +95,7 @@ export default function ImportModal({ open, categories, onClose, onImport }: Pro
                     onChange={(e) => updateCandidate(idx, { qty: Math.max(0, parseInt(e.target.value) || 0) })}
                   />
                   <select value={c.status} onChange={(e) => updateCandidate(idx, { status: e.target.value as ItemStatus })}>
-                    {STATUS_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                    {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -110,9 +105,7 @@ export default function ImportModal({ open, categories, onClose, onImport }: Pro
         {candidates.length === 0 && (
           <div className="empty" style={{ padding: 16 }}>ยังไม่พบรายการสินค้า — วางโค้ด HTML แล้วกด &quot;แยกรายการ&quot;</div>
         )}
-        <datalist id="import-cat-list">
-          {categories.map((c) => <option key={c} value={c} />)}
-        </datalist>
+        <CategoryDatalist id="import-cat-list" categories={categories} />
 
         <div className="modal-actions">
           <button className="btn-ghost" onClick={handleClose}>ยกเลิก</button>

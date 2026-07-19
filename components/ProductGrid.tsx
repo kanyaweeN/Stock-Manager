@@ -1,10 +1,5 @@
-import type { ItemStatus, StockItem } from "@/lib/types";
-
-const STATUS_LABELS: Record<Exclude<ItemStatus, "">, string> = {
-  rebuy: "ซื้อซ้ำได้",
-  avoid: "ไม่ควรซื้อ",
-  have: "ได้ของอยู่แล้ว",
-};
+import type { StockItem } from "@/lib/types";
+import { STATUS_LABELS } from "@/lib/statusOptions";
 
 interface Props {
   items: StockItem[];
