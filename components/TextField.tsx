@@ -32,6 +32,7 @@ export default function TextField({ label, value, onChange, type = "text", place
       <label>{label}</label>
       <div className="field-with-actions">
         <input
+          className="field-with-actions__input"
           autoFocus={autoFocus}
           type={type}
           placeholder={placeholder}
@@ -40,9 +41,11 @@ export default function TextField({ label, value, onChange, type = "text", place
           onChange={(e) => onChange(e.target.value)}
         />
         <div className="field-actions">
-          <button type="button" className="icon-btn" title="คัดลอก" onClick={copy}>📋</button>
-          <button type="button" className="icon-btn" title="วาง" onClick={paste}>📥</button>
-          <button type="button" className="icon-btn" title="ล้าง" onClick={clear}>✖️</button>
+          <button type="button" className="field-actions__btn" title="คัดลอก" onClick={copy}>📋</button>
+          <button type="button" className="field-actions__btn" title="วาง" onClick={paste}>📥</button>
+          {value && (
+            <button type="button" className="field-actions__btn" title="ล้าง" onClick={clear}>✖️</button>
+          )}
         </div>
       </div>
     </div>

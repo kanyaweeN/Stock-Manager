@@ -119,10 +119,17 @@ td.actions { text-align: right; white-space: nowrap; width: 160px; }
 .field { margin-bottom: 12px; }
 .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .field input, .field select, .field textarea { width: 100%; }
-.field-with-actions { display: flex; align-items: center; gap: 4px; }
-.field-with-actions input { flex: 1; min-width: 0; }
-.field-actions { display: flex; gap: 2px; flex-shrink: 0; }
-.field-actions .icon-btn { padding: 4px 5px; font-size: 13px; }
+.field-with-actions { position: relative; display: block; }
+.field-with-actions__input { width: 100%; padding-right: 76px !important; }
+.field-actions {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  display: flex; gap: 2px;
+}
+.field-actions__btn {
+  background: transparent; border: none; cursor: pointer;
+  padding: 4px 5px; font-size: 13px; border-radius: 6px; color: var(--muted); line-height: 1;
+}
+.field-actions__btn:hover { background: var(--border); color: var(--text); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); display: block; background: var(--bg); }
 td.thumb-cell { width: 46px; }
