@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { STATUS_OPTIONS } from "@/lib/statusOptions";
 import CategoryDatalist from "@/components/CategoryDatalist";
+import TextField from "@/components/TextField";
 import type { ItemStatus, StockItem } from "@/lib/types";
 
 interface Props {
@@ -59,63 +60,65 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
     <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <h2>{item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</h2>
-        <div className="field">
-          <label>ชื่อสินค้า</label>
-          <input
-            autoFocus
-            type="text"
-            placeholder="เช่น กระดาษ A4"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-        </div>
-        <div className="field">
-          <label>หมวดหมู่</label>
-          <input
-            type="text"
-            placeholder="เช่น เครื่องเขียน"
-            list="catList"
-            value={form.cat}
-            onChange={(e) => setForm({ ...form, cat: e.target.value })}
-          />
-          <CategoryDatalist id="catList" categories={categories} />
-        </div>
-        <div className="field">
-          <label>จำนวน</label>
-          <input type="number" value={form.qty} onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })} />
-        </div>
-        <div className="field">
-          <label>แจ้งเตือนเมื่อต่ำกว่า</label>
-          <input type="number" value={form.min} onChange={(e) => setForm({ ...form, min: Number(e.target.value) })} />
-        </div>
-        <div className="field">
-          <label>หมายเหตุ</label>
-          <input type="text" placeholder="ไม่บังคับ" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
-        </div>
-        <div className="field">
-          <label>รูปภาพ (URL)</label>
-          <input
-            type="text"
-            placeholder="วางลิงก์รูปภาพ (ไม่บังคับ)"
-            value={form.img}
-            onChange={(e) => setForm({ ...form, img: e.target.value })}
-          />
-        </div>
+
+        <TextField
+          label="ชื่อสินค้า"
+          autoFocus
+          placeholder="เช่น กระดาษ A4"
+          value={form.name}
+          onChange={(v) => setForm({ ...form, name: v })}
+        />
+
+        <TextField
+          label="หมวดหมู่"
+          placeholder="เช่น เครื่องเขียน"
+          list="catList"
+          value={form.cat}
+          onChange={(v) => setForm({ ...form, cat: v })}
+        />
+        <CategoryDatalist id="catList" categories={categories} />
+
+        <TextField
+          label="จำนวน"
+          type="number"
+          value={String(form.qty)}
+          onChange={(v) => setForm({ ...form, qty: Number(v) || 0 })}
+        />
+
+        <TextField
+          label="แจ้งเตือนเมื่อต่ำกว่า"
+          type="number"
+          value={String(form.min)}
+          onChange={(v) => setForm({ ...form, min: Number(v) || 0 })}
+        />
+
+        <TextField
+          label="หมายเหตุ"
+          placeholder="ไม่บังคับ"
+          value={form.note}
+          onChange={(v) => setForm({ ...form, note: v })}
+        />
+
+        <TextField
+          label="รูปภาพ (URL)"
+          placeholder="วางลิงก์รูปภาพ (ไม่บังคับ)"
+          value={form.img}
+          onChange={(v) => setForm({ ...form, img: v })}
+        />
         {form.img && (
           <div className="field">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="img-preview" src={form.img} alt="" />
           </div>
         )}
-        <div className="field">
-          <label>ลิงก์สินค้า</label>
-          <input
-            type="text"
-            placeholder="วางลิงก์หน้าสินค้า (ไม่บังคับ)"
-            value={form.link}
-            onChange={(e) => setForm({ ...form, link: e.target.value })}
-          />
-        </div>
+
+        <TextField
+          label="ลิงก์สินค้า"
+          placeholder="วางลิงก์หน้าสินค้า (ไม่บังคับ)"
+          value={form.link}
+          onChange={(v) => setForm({ ...form, link: v })}
+        />
+
         <div className="field">
           <label>สถานะ</label>
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ItemStatus })}>
