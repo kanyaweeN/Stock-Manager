@@ -2,9 +2,9 @@ import { uid } from "./uid";
 import type { StockItem } from "./types";
 
 export const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-const HEADER = ["id", "name", "cat", "qty", "min", "note", "img", "link", "status"] as const;
-const ITEMS_RANGE = "A1:I100000";
-const PRESETS_CELL = "K1";
+const HEADER = ["id", "name", "cat", "qty", "min", "note", "img", "link", "status", "price", "size", "variant"] as const;
+const ITEMS_RANGE = "A1:L100000";
+const PRESETS_CELL = "N1";
 
 declare global {
   interface Window {
@@ -77,6 +77,9 @@ function itemsToRows(items: StockItem[]): string[][] {
       i.img || "",
       i.link || "",
       i.status || "",
+      i.price != null ? String(i.price) : "",
+      i.size || "",
+      i.variant || "",
     ]),
   ];
 }
@@ -92,6 +95,9 @@ function rowsToItems(rows: string[][]): StockItem[] {
     img: r[6] || "",
     link: r[7] || "",
     status: (r[8] as StockItem["status"]) || "",
+    price: r[9] ? Number(r[9]) : undefined,
+    size: r[10] || "",
+    variant: r[11] || "",
   }));
 }
 
@@ -122,7 +128,7 @@ export async function pushToSheet(
   await sheetsFetch(
     token,
     spreadsheetId,
-    `/values/A1:I${rows.length}?valueInputOption=RAW`,
+    `/values/A1:L${rows.length}?valueInputOption=RAW`,
     { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: rows }) }
   );
   await sheetsFetch(

@@ -17,9 +17,10 @@ export default function ProductGrid({ items, onInc, onDec, onEdit, onDelete }: P
   return (
     <div className="product-grid">
       {items.map((i) => {
-        const low = i.min > 0 && i.qty <= i.min;
+        const outOfStock = i.qty === 0;
+        const low = !outOfStock && i.min > 0 && i.qty <= i.min;
         return (
-          <div className={`product-card ${low ? "low-row" : ""}`} key={i.id}>
+          <div className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""}`} key={i.id}>
             <div className="product-card__img-wrap">
               {i.img ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -32,6 +33,7 @@ export default function ProductGrid({ items, onInc, onDec, onEdit, onDelete }: P
               ) : (
                 <div className="product-card__img-placeholder">📦</div>
               )}
+              {outOfStock && <span className="badge-out product-card__low-badge">หมดแล้ว</span>}
               {low && <span className="badge-low product-card__low-badge">ใกล้หมด</span>}
               {i.status && (
                 <span className={`status-badge status-${i.status} product-card__status-badge`}>
@@ -52,6 +54,11 @@ export default function ProductGrid({ items, onInc, onDec, onEdit, onDelete }: P
               <div className="product-card__meta">
                 {i.cat || "ไม่มีหมวดหมู่"}
                 {i.source === "shopee" && <span className="source-tag">Shopee</span>}
+                {i.variant && <span className="variant-tag">{i.variant}</span>}
+              </div>
+              <div className="product-card__price-row">
+                {i.price != null && <span className="product-card__price">฿{i.price.toLocaleString("th-TH")}</span>}
+                {i.size && <span className="product-card__size">ขนาด {i.size}</span>}
               </div>
               {i.note && <div className="product-card__note">{i.note}</div>}
 

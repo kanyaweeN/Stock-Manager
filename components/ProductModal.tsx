@@ -14,7 +14,9 @@ interface Props {
   onSave: (data: Omit<StockItem, "id">, editId: string | null) => void;
 }
 
-const emptyForm = { name: "", cat: "", qty: 0, min: 0, note: "", img: "", link: "", status: "" as ItemStatus };
+const emptyForm = {
+  name: "", cat: "", qty: 0, min: 0, price: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
+};
 
 export default function ProductModal({ open, item, categories, onClose, onSave }: Props) {
   const [form, setForm] = useState(emptyForm);
@@ -26,6 +28,8 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
         cat: item.cat,
         qty: item.qty,
         min: item.min,
+        price: item.price != null ? String(item.price) : "",
+        size: item.size || "",
         note: item.note,
         img: item.img || "",
         link: item.link || "",
@@ -47,6 +51,8 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
         cat: form.cat.trim(),
         qty: Math.max(0, Number(form.qty) || 0),
         min: Math.max(0, Number(form.min) || 0),
+        price: form.price.trim() ? Math.max(0, Number(form.price) || 0) : undefined,
+        size: form.size.trim(),
         note: form.note.trim(),
         img: form.img.trim(),
         link: form.link.trim(),
@@ -90,6 +96,21 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
           type="number"
           value={String(form.min)}
           onChange={(v) => setForm({ ...form, min: Number(v) || 0 })}
+        />
+
+        <TextField
+          label="ราคา (บาท)"
+          type="number"
+          placeholder="ไม่บังคับ"
+          value={form.price}
+          onChange={(v) => setForm({ ...form, price: v })}
+        />
+
+        <TextField
+          label="ขนาด"
+          placeholder="เช่น S, M, L หรือ 10x15 ซม. (ไม่บังคับ)"
+          value={form.size}
+          onChange={(v) => setForm({ ...form, size: v })}
         />
 
         <TextField

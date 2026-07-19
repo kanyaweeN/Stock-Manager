@@ -52,8 +52,10 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
     }
     if (seen.has(absSrc)) continue;
 
-    let name = "";
     let qty = 0; // ต้องเจอป้ายจำนวนจริงๆ ถึงจะถือว่าเป็นรายการสั่งซื้อ (กันลิงก์เมนู/บัญชีที่ไม่ใช่สินค้าหลุดเข้ามา)
+    const prices: number[] = [];
+    const textCandidates: string[] = [];
+
     for (const el of a.querySelectorAll("span, div")) {
       if (el.children.length > 0) continue; // เอาเฉพาะ element ใบสุดท้าย
       const t = (el.textContent || "").replace(/\s+/g, " ").trim();
@@ -63,10 +65,28 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
         qty = parseInt(qtyMatch[1], 10);
         continue;
       }
-      if (/^฿/.test(t) || /^\d+(\.\d+)?$/.test(t)) continue;
-      if (!name && t.length >= 4) name = t.slice(0, 150);
+      const priceMatch = t.match(/^฿\s?(\d+(?:\.\d+)?)/);
+      if (priceMatch) {
+        prices.push(parseFloat(priceMatch[1]));
+        continue;
+      }
+      if (/^\d+(\.\d+)?$/.test(t)) continue;
+      if (t.length >= 4) textCandidates.push(t);
     }
-    if (!name || !qty) continue;
+    if (!qty || textCandidates.length === 0) continue;
+
+    // ชื่อสินค้าจริงมักเป็นข้อความที่ยาวที่สุด (ป้ายอื่นๆ เช่น "Pre-Order" หรือตัวเลือกสินค้าจะสั้นกว่า)
+    let name = textCandidates[0];
+    for (const t of textCandidates) if (t.length > name.length) name = t;
+    name = name.slice(0, 150);
+
+    // ข้อความอื่นที่เหลือ (ไม่ใช่ชื่อ) เก็บไว้เป็นแท็กรอง เช่น ตัวเลือกสินค้า/รุ่น/สี
+    const GENERIC_BADGE = /^(pre-?order|พรีออเดอร์|พร้อมส่ง|in\s?stock)$/i;
+    const otherCandidates = textCandidates.filter((t) => t !== name && !GENERIC_BADGE.test(t));
+    const variant = otherCandidates[otherCandidates.length - 1]?.slice(0, 80);
+
+    // ราคาที่จ่ายจริงมักเป็นตัวสุดท้าย (ราคาเต็มมักโชว์ก่อนหน้าแบบขีดฆ่า)
+    const price = prices.length ? prices[prices.length - 1] : undefined;
 
     let link = a.getAttribute("href") || "";
     try {
@@ -76,7 +96,7 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
     }
 
     seen.add(absSrc);
-    results.push({ name, qty, img: absSrc, link, cat: "", status: "", include: true });
+    results.push({ name, qty, img: absSrc, link, cat: "", status: "", include: true, price, variant });
   }
 
   return results;

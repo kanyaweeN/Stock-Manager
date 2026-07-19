@@ -5,9 +5,10 @@ import { uid } from "./uid";
 import type { ImportCandidate, StockItem } from "./types";
 
 function exportCsv(items: StockItem[]) {
-  const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,หมายเหตุ\n";
+  const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,ราคา,ขนาด,หมายเหตุ\n";
   const rows = items
-    .map((i) => [i.name, i.cat, i.qty, i.min, i.note].map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
+    .map((i) => [i.name, i.cat, i.qty, i.min, i.price ?? "", i.size ?? "", i.note]
+      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
   const blob = new Blob(["﻿" + header + rows], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -56,6 +57,8 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
         link: c.link,
         status: c.status,
         source: "shopee" as const,
+        price: c.price,
+        variant: c.variant,
       })),
     ]);
   };

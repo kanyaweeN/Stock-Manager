@@ -86,6 +86,12 @@ export default function ImportModal({ open, categories, onClose, onImport }: Pro
                   value={c.cat}
                   onChange={(e) => updateCandidate(idx, { cat: e.target.value })}
                 />
+                <input
+                  type="text"
+                  placeholder="แท็กรอง เช่น ตัวเลือกสินค้า/สี/รุ่น (ไม่บังคับ)"
+                  value={c.variant || ""}
+                  onChange={(e) => updateCandidate(idx, { variant: e.target.value })}
+                />
                 <div className="import-qty">
                   จำนวน
                   <input
@@ -93,6 +99,14 @@ export default function ImportModal({ open, categories, onClose, onImport }: Pro
                     min={0}
                     value={c.qty}
                     onChange={(e) => updateCandidate(idx, { qty: Math.max(0, parseInt(e.target.value) || 0) })}
+                  />
+                  ราคา
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="฿"
+                    value={c.price ?? ""}
+                    onChange={(e) => updateCandidate(idx, { price: e.target.value ? Math.max(0, parseFloat(e.target.value)) : undefined })}
                   />
                   <select value={c.status} onChange={(e) => updateCandidate(idx, { status: e.target.value as ItemStatus })}>
                     {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
