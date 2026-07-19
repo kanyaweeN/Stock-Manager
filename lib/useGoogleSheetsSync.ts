@@ -18,8 +18,11 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
   const [origin, setOrigin] = useState("");
 
   useEffect(() => {
-    const savedClientId = localStorage.getItem(GS_CLIENT_ID_KEY) || "";
-    const savedSheetId = localStorage.getItem(GS_SHEET_ID_KEY) || "";
+    // ถ้าเคยตั้งค่าไว้ในเบราว์เซอร์นี้แล้วใช้ค่านั้นก่อน ไม่งั้น fallback ไปใช้ค่า default จาก env
+    // (ตั้งใน .env.local เป็น NEXT_PUBLIC_GOOGLE_CLIENT_ID / NEXT_PUBLIC_GOOGLE_SHEET_ID)
+    // เพื่อไม่ต้องกรอกเองทุกครั้งที่เปิดเบราว์เซอร์ใหม่/ล้าง localStorage
+    const savedClientId = localStorage.getItem(GS_CLIENT_ID_KEY) || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+    const savedSheetId = localStorage.getItem(GS_SHEET_ID_KEY) || process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID || "";
     setClientId(savedClientId);
     setSheetId(savedSheetId);
     setOrigin(window.location.origin);

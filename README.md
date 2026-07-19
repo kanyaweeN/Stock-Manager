@@ -76,6 +76,23 @@ lib/
 
 ระบบเชื่อมต่อผ่าน Google Identity Services ฝั่ง client ล้วนๆ ไม่มี backend และไม่มี client secret ฝังอยู่ในโค้ด
 
+### ตั้งค่าเริ่มต้นด้วย env (ไม่ต้องกรอกเองทุกครั้ง)
+
+Client ID และ Spreadsheet ID ไม่ใช่ความลับ (เปิดเผยได้อยู่แล้วตอนทำ OAuth) จึงตั้งเป็นค่าเริ่มต้นผ่าน environment variable ได้:
+
+```bash
+cp .env.local.example .env.local
+```
+
+แล้วแก้ค่าในไฟล์ `.env.local`:
+
+```
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+NEXT_PUBLIC_GOOGLE_SHEET_ID=your-spreadsheet-id
+```
+
+รีสตาร์ท `npm run dev` ครั้งเดียว หน้าตั้งค่าจะกรอกค่าให้อัตโนมัติทุกครั้งที่เปิดเบราว์เซอร์ใหม่ (ไม่ต้องพิมพ์เอง) — ถ้าเคยตั้งค่าไว้ในหน้าตั้งค่าด้วยตัวเองมาก่อน ค่านั้นจะยังคงมีสิทธิ์เหนือกว่า `.env.local` เสมอ ไฟล์ `.env.local` ไม่ถูก commit ขึ้น git
+
 ## เทคโนโลยีที่ใช้
 
 - [Next.js](https://nextjs.org/) 15 (App Router)
