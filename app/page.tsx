@@ -66,6 +66,7 @@ export default function Home() {
       <ImportModal
         open={importOpen}
         categories={categorySuggestions}
+        items={db.items}
         onClose={() => setImportOpen(false)}
         onImport={actions.importFromShopee}
       />

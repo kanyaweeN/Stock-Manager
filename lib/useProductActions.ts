@@ -44,9 +44,23 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
 
   const importFromShopee = (chosen: ImportCandidate[]) => {
     if (chosen.length === 0) return;
+    // ซื้อซ้ำ (มี existingId + mergeExisting) ให้บวกจำนวนเข้ารายการเดิมแทนสร้างใหม่
+    const toMerge = new Map(chosen.filter((c) => c.existingId && c.mergeExisting).map((c) => [c.existingId!, c]));
+    const toAdd = chosen.filter((c) => !(c.existingId && c.mergeExisting));
+
     setItems((prev) => [
-      ...prev,
-      ...chosen.map((c) => ({
+      ...prev.map((i) => {
+        const m = toMerge.get(i.id);
+        if (!m) return i;
+        return {
+          ...i,
+          qty: i.qty + m.qty,
+          price: m.price ?? i.price,
+          img: i.img || m.img,
+          variant: m.variant || i.variant,
+        };
+      }),
+      ...toAdd.map((c) => ({
         id: uid(),
         name: c.name.trim(),
         cat: c.cat.trim(),
