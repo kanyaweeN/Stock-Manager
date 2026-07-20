@@ -4,6 +4,7 @@ import { useState } from "react";
 import { extractShopeeItems } from "@/lib/shopee";
 import { STATUS_OPTIONS } from "@/lib/statusOptions";
 import CategoryDatalist from "@/components/CategoryDatalist";
+import { PasteIcon } from "@/components/icons";
 import type { ImportCandidate, ItemStatus, StockItem } from "@/lib/types";
 
 interface Props {
@@ -51,6 +52,15 @@ export default function ImportModal({ open, categories, items, onClose, onImport
     onClose();
   };
 
+  const pasteHtml = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setHtml(text);
+    } catch {
+      alert("วางจากคลิปบอร์ดไม่ได้ — เบราว์เซอร์ไม่อนุญาต ลองกด Ctrl+V ในกล่องข้อความแทน");
+    }
+  };
+
   const handleConfirm = () => {
     const chosen = candidates.filter((c) => c.include && c.name.trim());
     onImport(chosen);
@@ -75,6 +85,9 @@ export default function ImportModal({ open, categories, items, onClose, onImport
           />
         </div>
         <div className="modal-actions modal-actions-inline">
+          <button className="btn-ghost btn-icon-label" onClick={pasteHtml}>
+            <PasteIcon /> วาง
+          </button>
           <button className="btn-primary" onClick={handleParse}>แยกรายการ</button>
         </div>
 
