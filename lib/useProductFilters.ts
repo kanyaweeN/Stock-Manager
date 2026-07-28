@@ -3,13 +3,28 @@
 import { useMemo, useState } from "react";
 import type { StockItem } from "./types";
 
-/** จัดการ state และ logic การค้นหา/กรองหมวดหมู่ของรายการสินค้า */
+export type SortKey = "name-asc" | "name-desc" | "qty-asc" | "qty-desc" | "price-asc" | "price-desc";
+export type StockTab = "all" | "in-stock" | "out-of-stock" | "grouped";
+
+const SORTERS: Record<SortKey, (a: StockItem, b: StockItem) => number> = {
+  "name-asc": (a, b) => a.name.localeCompare(b.name, "th"),
+  "name-desc": (a, b) => b.name.localeCompare(a.name, "th"),
+  "qty-asc": (a, b) => a.qty - b.qty,
+  "qty-desc": (a, b) => b.qty - a.qty,
+  "price-asc": (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity),
+  "price-desc": (a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity),
+};
+
+/** จัดการ state และ logic การค้นหา/กรองหมวดหมู่/เรียงลำดับของรายการสินค้า */
 export function useProductFilters(items: StockItem[], presets: string[]) {
   const [search, setSearch] = useState("");
-  const [filterCat, setFilterCat] = useState("");
+  const [filterCats, setFilterCats] = useState<string[]>([]);
+  const [uncategorizedOnly, setUncategorizedOnly] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("name-asc");
+  const [stockTab, setStockTab] = useState<StockTab>("all");
 
   const categories = useMemo(
-    () => [...new Set(items.map((i) => i.cat).filter(Boolean))].sort(),
+    () => [...new Set(items.flatMap((i) => i.cats))].sort(),
     [items]
   );
 
@@ -21,9 +36,41 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return items
-      .filter((i) => (!q || i.name.toLowerCase().includes(q)) && (!filterCat || i.cat === filterCat))
-      .sort((a, b) => a.name.localeCompare(b.name, "th"));
-  }, [items, search, filterCat]);
+      .filter((i) =>
+        (!q || i.name.toLowerCase().includes(q)) &&
+        (uncategorizedOnly ? i.cats.length === 0 : filterCats.length === 0 || i.cats.some((c) => filterCats.includes(c))) &&
+        (stockTab === "all" || stockTab === "grouped" || (stockTab === "out-of-stock" ? i.qty === 0 : i.qty > 0)) &&
+        (stockTab !== "grouped" || !!i.groupId)
+      )
+      .sort(SORTERS[sortKey]);
+  }, [items, search, filterCats, uncategorizedOnly, stockTab, sortKey]);
 
-  return { search, setSearch, filterCat, setFilterCat, categorySuggestions, filtered };
+  const outOfStockCount = useMemo(() => items.filter((i) => i.qty === 0).length, [items]);
+  const uncategorizedCount = useMemo(() => items.filter((i) => i.cats.length === 0).length, [items]);
+  const groupedCount = useMemo(
+    () => new Set(items.filter((i) => i.groupId).map((i) => i.groupId)).size,
+    [items]
+  );
+
+  const setFilterCatsExclusive = (cats: string[]) => {
+    if (cats.length > 0) setUncategorizedOnly(false);
+    setFilterCats(cats);
+  };
+
+  const toggleUncategorizedOnly = () => {
+    setUncategorizedOnly((prev) => {
+      if (!prev) setFilterCats([]);
+      return !prev;
+    });
+  };
+
+  return {
+    search, setSearch,
+    filterCats, setFilterCats: setFilterCatsExclusive,
+    uncategorizedOnly, toggleUncategorizedOnly,
+    sortKey, setSortKey,
+    stockTab, setStockTab,
+    categorySuggestions, filtered,
+    outOfStockCount, uncategorizedCount, groupedCount,
+  };
 }

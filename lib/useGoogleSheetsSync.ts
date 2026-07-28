@@ -16,6 +16,7 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [origin, setOrigin] = useState("");
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     // ถ้าเคยตั้งค่าไว้ในเบราว์เซอร์นี้แล้วใช้ค่านั้นก่อน ไม่งั้น fallback ไปใช้ค่า default จาก env
@@ -29,14 +30,22 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
 
     // ถ้าเคยเชื่อมต่อสำเร็จมาก่อน ลองขอ token แบบเงียบๆ (ไม่เด้ง popup) — ถ้า session Google ยังอยู่จะไม่ต้อง login ใหม่
     if (savedClientId && localStorage.getItem(GS_REMEMBER_KEY) === "1") {
-      requestAccessToken(savedClientId, true)
-        .then((t) => {
-          setToken(t);
-          setMessage("✅ เชื่อมต่ออัตโนมัติสำเร็จ");
-        })
+      setChecking(true);
+      const onSuccess = (t: string) => {
+        setToken(t);
+        setMessage("✅ เชื่อมต่ออัตโนมัติสำเร็จ");
+      };
+      const silent = requestAccessToken(savedClientId, true);
+      // เผื่อ callback ไม่ยอมเรียกกลับเลย (เช่น browser บล็อก third-party cookie) — ไม่งั้นจะค้างที่ "กำลังตรวจสอบ" ตลอดไป
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000));
+      Promise.race([silent, timeout])
+        .then(onSuccess)
         .catch(() => {
-          // เงียบไว้ — ผู้ใช้กด "เชื่อมต่อ Google" เองได้ถ้าต้องการ
-        });
+          setMessage("⚠️ เชื่อมต่ออัตโนมัติไม่สำเร็จ (สิทธิ์อาจหมดอายุ) — กด \"เชื่อมต่อ Google\" เพื่อล็อกอินใหม่");
+        })
+        .finally(() => setChecking(false));
+      // ถ้า silent มาสำเร็จช้ากว่า timeout ก็ยังอัปเดตให้ภายหลังได้ ไม่ต้องรอ user กดใหม่
+      silent.then(onSuccess).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -110,5 +119,5 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
     setMessage("เลิกจำการเชื่อมต่อแล้ว");
   };
 
-  return { clientId, sheetId, token, message, busy, origin, saveSettings, connect, push, pull, forget };
+  return { clientId, sheetId, token, message, busy, checking, origin, saveSettings, connect, push, pull, forget };
 }

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { StockDB } from "@/lib/db";
-import { migrateDB } from "@/lib/db";
+import { DEFAULT_DB, migrateDB } from "@/lib/db";
 
 interface Props {
   db: StockDB;
@@ -39,6 +39,15 @@ export default function BackupTab({ db, onRestore }: Props) {
     reader.readAsText(file);
   };
 
+  const handleClearAll = () => {
+    const ok = confirm(
+      `ต้องการล้างข้อมูลสินค้าทั้งหมด (${db.items.length} รายการ) ทิ้งจริงหรือไม่? การกระทำนี้ย้อนกลับไม่ได้ — แนะนำให้กด "สำรองข้อมูล" ไว้ก่อน`
+    );
+    if (!ok) return;
+    onRestore(DEFAULT_DB);
+    setMessage("ล้างข้อมูลทั้งหมดแล้ว");
+  };
+
   return (
     <div className="field tab-panel">
       <p className="sub sub-tight">
@@ -60,6 +69,13 @@ export default function BackupTab({ db, onRestore }: Props) {
         }}
       />
       {message && <p className="sub">{message}</p>}
+
+      <div className="danger-zone">
+        <p className="sub sub-tight text-xs">
+          ลบข้อมูลสินค้าและหมวดหมู่ทั้งหมดทิ้ง (แนะนำให้สำรองข้อมูลไว้ก่อนกด)
+        </p>
+        <button className="btn-danger" onClick={handleClearAll}>🗑️ ล้างข้อมูลทั้งหมด</button>
+      </div>
     </div>
   );
 }

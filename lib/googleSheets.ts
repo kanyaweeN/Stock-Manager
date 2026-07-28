@@ -70,7 +70,7 @@ function itemsToRows(items: StockItem[]): string[][] {
     ...items.map((i) => [
       i.id,
       i.name,
-      i.cat,
+      i.cats.join("; "),
       String(i.qty),
       String(i.min),
       i.note,
@@ -88,7 +88,7 @@ function rowsToItems(rows: string[][]): StockItem[] {
   return rows.slice(1).filter((r) => r[1]).map((r) => ({
     id: r[0] || uid(),
     name: r[1] || "",
-    cat: r[2] || "",
+    cats: r[2] ? r[2].split(";").map((s) => s.trim()).filter(Boolean) : [],
     qty: Number(r[3]) || 0,
     min: Number(r[4]) || 0,
     note: r[5] || "",

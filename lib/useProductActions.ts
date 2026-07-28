@@ -7,7 +7,7 @@ import type { ImportCandidate, StockItem } from "./types";
 function exportCsv(items: StockItem[]) {
   const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,ราคา,ขนาด,หมายเหตุ\n";
   const rows = items
-    .map((i) => [i.name, i.cat, i.qty, i.min, i.price ?? "", i.size ?? "", i.note]
+    .map((i) => [i.name, i.cats.join("; "), i.qty, i.min, i.price ?? "", i.size ?? "", i.note]
       .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
   const blob = new Blob(["﻿" + header + rows], { type: "text/csv;charset=utf-8;" });
@@ -39,6 +39,17 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     }
   };
 
+  /** ผสาน sourceId เข้ากับ targetId — บวกจำนวนรวมกัน เก็บข้อมูลอื่นๆ ของ target ไว้ แล้วลบ source ทิ้ง */
+  /** จัดกลุ่มสินค้าหลายชิ้นที่เป็นตัวเดียวกันเข้าด้วยกัน โดยไม่ลบทิ้ง — แค่ติด groupId/groupName เดียวกันให้ทุกอัน */
+  const groupItems = (ids: string[], groupName: string) => {
+    const groupId = uid();
+    setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, groupId, groupName } : i)));
+  };
+
+  const ungroup = (id: string) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, groupId: undefined, groupName: undefined } : i)));
+  };
+
   const inc = (id: string) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i)));
   const dec = (id: string) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: Math.max(0, i.qty - 1) } : i)));
 
@@ -52,30 +63,35 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
       ...prev.map((i) => {
         const m = toMerge.get(i.id);
         if (!m) return i;
+        const use = (field: keyof NonNullable<ImportCandidate["mergeFields"]>) => m.mergeFields?.[field] !== false;
         return {
           ...i,
-          qty: i.qty + m.qty,
-          price: m.price ?? i.price,
-          img: i.img || m.img,
-          variant: m.variant || i.variant,
+          qty: use("qty") ? i.qty + m.qty : i.qty,
+          price: use("price") && m.price != null ? m.price : i.price,
+          img: use("img") && m.img ? m.img : i.img,
+          variant: use("variant") && m.variant ? m.variant : i.variant,
+          size: use("size") && m.size ? m.size : i.size,
+          note: use("note") && m.note ? m.note : i.note,
+          status: use("status") && m.status ? m.status : i.status,
         };
       }),
       ...toAdd.map((c) => ({
         id: uid(),
         name: c.name.trim(),
-        cat: c.cat.trim(),
+        cats: c.cats,
         qty: c.qty,
         min: 0,
-        note: "",
+        note: c.note || "",
         img: c.img,
         link: c.link,
         status: c.status,
         source: "shopee" as const,
         price: c.price,
+        size: c.size,
         variant: c.variant,
       })),
     ]);
   };
 
-  return { save, remove, inc, dec, importFromShopee, exportCsv };
+  return { save, remove, groupItems, ungroup, inc, dec, importFromShopee, exportCsv };
 }

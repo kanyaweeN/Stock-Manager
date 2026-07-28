@@ -2,6 +2,9 @@ import type { ImportCandidate } from "./types";
 
 const SKIP_HINTS = /icon|logo|sprite|avatar|badge|banner|placeholder|profile|qr[_-]?code/i;
 
+// ป้าย UI อื่นๆ ที่ไม่ใช่ข้อมูลสินค้า แต่ดันอยู่ใน <a> เดียวกับสินค้า (เช่น "เรตติ้งร้าน" ที่โผล่หลังราคา) — ต้องกรองทิ้งไม่งั้นจะหลุดไปเป็นชื่อ/ตัวเลือกสินค้าผิดๆ
+const NOISE_TEXT = /^(เรตติ้งร้าน|ดูร้านค้า|ดูเพิ่มเติม|ดูเพิ่มเติมเกี่ยวกับสินค้า|ร้านค้ามาใหม่|ต้องการสินค้าเพิ่มไหม)$/i;
+
 function getImgSrc(img: HTMLImageElement): string {
   const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || "";
   const fromSrcset = srcset.split(",")[0]?.trim().split(/\s+/)[0] || "";
@@ -71,6 +74,7 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
         continue;
       }
       if (/^\d+(\.\d+)?$/.test(t)) continue;
+      if (NOISE_TEXT.test(t)) continue;
       if (t.length >= 4) textCandidates.push(t);
     }
     if (!qty || textCandidates.length === 0) continue;
@@ -83,7 +87,27 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
     // ข้อความอื่นที่เหลือ (ไม่ใช่ชื่อ) เก็บไว้เป็นแท็กรอง เช่น ตัวเลือกสินค้า/รุ่น/สี
     const GENERIC_BADGE = /^(pre-?order|พรีออเดอร์|พร้อมส่ง|in\s?stock)$/i;
     const otherCandidates = textCandidates.filter((t) => t !== name && !GENERIC_BADGE.test(t));
-    const variant = otherCandidates[otherCandidates.length - 1]?.slice(0, 80);
+
+    // เดาไซส์จากข้อความตัวเลือกสินค้า เช่น "ไซส์ M", "ขนาด 10x15 ซม.", หรือแค่ "S"/"XL" เดี่ยวๆ
+    const UNIT = "ซม\\.?|เซนติเมตร|cm|มม\\.?|มิลลิเมตร|mm|มล\\.?|มิลลิลิตร|ml|ลิตร|l|กก\\.?|กิโลกรัม|kg|กรัม|g";
+    const DIM = "\\d+(?:\\.\\d+)?(?:\\s?[x×]\\s?\\d+(?:\\.\\d+)?)?";
+    const SIZE_HINT = new RegExp(
+      `(?:ไซส์|ไซซ์|ขนาด|size)[:\\s]*([a-zA-Z0-9x×.\\-]+(?:\\s?(?:${UNIT}))?)|^(XXS|XS|S|M|L|XL|XXL|XXXL|${DIM}\\s?(?:${UNIT}))$`,
+      "i"
+    );
+    let size: string | undefined;
+    const remaining: string[] = [];
+    for (const t of otherCandidates) {
+      const m = !size && t.match(SIZE_HINT);
+      if (m) size = (m[1] || m[2]).trim();
+      else remaining.push(t);
+    }
+    // ชื่อสินค้าเองก็มักฝังไซส์ไว้กลางข้อความ เช่น "...มาการอง 4มม. สำหรับ..." หรือ "จี้ 8x14 มิลลิเมตร..." — หาแบบไม่ยึดขอบข้อความ
+    if (!size) {
+      const inName = name.match(new RegExp(`(${DIM})\\s?(${UNIT})`, "i"));
+      if (inName) size = `${inName[1]}${inName[2]}`;
+    }
+    const variant = remaining[remaining.length - 1]?.slice(0, 80);
 
     // ราคาที่จ่ายจริงมักเป็นตัวสุดท้าย (ราคาเต็มมักโชว์ก่อนหน้าแบบขีดฆ่า)
     const price = prices.length ? prices[prices.length - 1] : undefined;
@@ -96,7 +120,7 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
     }
 
     seen.add(absSrc);
-    results.push({ name, qty, img: absSrc, link, cat: "", status: "", include: true, price, variant });
+    results.push({ name, qty, img: absSrc, link, cats: [], status: "", include: true, price, size, variant });
   }
 
   return results;

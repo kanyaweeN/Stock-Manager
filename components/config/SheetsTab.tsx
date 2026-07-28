@@ -3,10 +3,13 @@ import type { useGoogleSheetsSync } from "@/lib/useGoogleSheetsSync";
 type SheetsSync = ReturnType<typeof useGoogleSheetsSync>;
 
 export default function SheetsTab(sync: SheetsSync) {
-  const { clientId, sheetId, token, message, busy, origin, saveSettings, connect, push, pull, forget } = sync;
+  const { clientId, sheetId, token, message, busy, checking, origin, saveSettings, connect, push, pull, forget } = sync;
 
   return (
     <div className="field tab-panel">
+      <div className={`sync-status ${checking ? "sync-status--checking" : token ? "sync-status--on" : "sync-status--off"}`}>
+        {checking ? "🟡 กำลังตรวจสอบการเชื่อมต่อ..." : token ? "🟢 เชื่อมต่ออยู่" : "⚪ ยังไม่เชื่อมต่อ"}
+      </div>
       <p className="sub sub-tight text-xs">
         ต้องสร้าง OAuth Client ID จาก{" "}
         <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">
@@ -33,7 +36,7 @@ export default function SheetsTab(sync: SheetsSync) {
         />
       </div>
       <div className="toolbar">
-        <button className="btn-primary" onClick={connect} disabled={busy}>
+        <button className="btn-primary" onClick={connect} disabled={busy || checking}>
           🔑 {token ? "เชื่อมต่อใหม่" : "เชื่อมต่อ Google"}
         </button>
         {token && (

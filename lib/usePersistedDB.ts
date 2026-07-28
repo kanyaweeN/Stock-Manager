@@ -48,33 +48,44 @@ export function usePersistedStockDB() {
     async (data: StockDB) => {
       const withTimestamp = { ...data, updatedAt: new Date().toISOString() };
       const json = JSON.stringify(withTimestamp, null, 2);
+      const savedTo: string[] = [];
+      const failedTo: string[] = [];
+
       try {
         if (opfsHandleRef.current) {
           const w = await opfsHandleRef.current.createWritable();
           await w.write(json);
           await w.close();
+          savedTo.push("ไฟล์ OPFS ในเบราว์เซอร์");
         }
       } catch (e) {
         console.warn("OPFS write failed:", e);
+        failedTo.push("OPFS");
       }
       try {
         localStorage.setItem(LS_KEY, json);
+        savedTo.push("localStorage");
       } catch {
         // ignore — localStorage อาจเต็มหรือถูกปิดใช้งาน
+        failedTo.push("localStorage");
       }
       if (linkedFile) {
         try {
           const w = await linkedFile.createWritable();
           await w.write(json);
           await w.close();
+          savedTo.push(`ไฟล์ "${linkedFile.name}" บนเครื่อง`);
         } catch (e) {
           console.warn("FS write failed:", e);
+          failedTo.push(`ไฟล์ "${linkedFile.name}"`);
         }
       }
-      const fileTip = linkedFile ? ` · 💾 ${linkedFile.name}` : "";
+
+      const time = new Date().toLocaleTimeString("th-TH");
+      const failTip = failedTo.length ? ` · ⚠ บันทึกไม่สำเร็จ: ${failedTo.join(", ")}` : "";
       setStatus({
-        type: "ok",
-        msg: `✅ บันทึกแล้ว · ${withTimestamp.items.length} รายการ · ${new Date().toLocaleTimeString("th-TH")}${fileTip}`,
+        type: failedTo.length && savedTo.length === 0 ? "err" : "ok",
+        msg: `✅ บันทึกแล้วที่ ${savedTo.join(" + ") || "ไม่มีที่เก็บข้อมูลที่ใช้งานได้"} · ${withTimestamp.items.length} รายการ · ${time}${failTip}`,
       });
     },
     [linkedFile]

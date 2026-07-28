@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { STATUS_OPTIONS } from "@/lib/statusOptions";
-import CategoryDatalist from "@/components/CategoryDatalist";
+import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import TextField from "@/components/TextField";
 import type { ItemStatus, StockItem } from "@/lib/types";
 
@@ -12,20 +12,21 @@ interface Props {
   categories: string[];
   onClose: () => void;
   onSave: (data: Omit<StockItem, "id">, editId: string | null) => void;
+  onUngroup: (id: string) => void;
 }
 
 const emptyForm = {
-  name: "", cat: "", qty: 0, min: 0, price: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
+  name: "", cats: [] as string[], qty: 0, min: 0, price: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
 };
 
-export default function ProductModal({ open, item, categories, onClose, onSave }: Props) {
+export default function ProductModal({ open, item, categories, onClose, onSave, onUngroup }: Props) {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     if (item) {
       setForm({
         name: item.name,
-        cat: item.cat,
+        cats: item.cats,
         qty: item.qty,
         min: item.min,
         price: item.price != null ? String(item.price) : "",
@@ -40,6 +41,13 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
     }
   }, [item, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const handleSave = () => {
@@ -48,7 +56,7 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
     onSave(
       {
         name,
-        cat: form.cat.trim(),
+        cats: form.cats,
         qty: Math.max(0, Number(form.qty) || 0),
         min: Math.max(0, Number(form.min) || 0),
         price: form.price.trim() ? Math.max(0, Number(form.price) || 0) : undefined,
@@ -63,10 +71,14 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
   };
 
   return (
-    <div className="modal-backdrop open" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-backdrop open">
       <div className="modal">
-        <h2>{item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</h2>
+        <div className="modal-header">
+          <h2>{item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</h2>
+          <button className="modal-close" title="ปิด" onClick={onClose}>×</button>
+        </div>
 
+        <div className="modal-body">
         <TextField
           label="ชื่อสินค้า"
           autoFocus
@@ -75,14 +87,16 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
           onChange={(v) => setForm({ ...form, name: v })}
         />
 
-        <TextField
-          label="หมวดหมู่"
-          placeholder="เช่น เครื่องเขียน"
-          list="catList"
-          value={form.cat}
-          onChange={(v) => setForm({ ...form, cat: v })}
-        />
-        <CategoryDatalist id="catList" categories={categories} />
+        <div className="field">
+          <label>หมวดหมู่</label>
+          <CategoryMultiSelect
+            categories={categories}
+            selected={form.cats}
+            onChange={(cats) => setForm({ ...form, cats })}
+            allowCreate
+            emptyLabel="ไม่มีหมวดหมู่"
+          />
+        </div>
 
         <TextField
           label="จำนวน"
@@ -145,6 +159,18 @@ export default function ProductModal({ open, item, categories, onClose, onSave }
           <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ItemStatus })}>
             {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+        </div>
+
+        {item?.groupId && (
+          <div className="field">
+            <label>กลุ่มสินค้า</label>
+            <div className="category-row">
+              <span>👥 {item.groupName}</span>
+              <button className="icon-btn" onClick={() => onUngroup(item.id)}>ออกจากกลุ่ม</button>
+            </div>
+          </div>
+        )}
+
         </div>
         <div className="modal-actions">
           <button className="btn-ghost" onClick={onClose}>ยกเลิก</button>
