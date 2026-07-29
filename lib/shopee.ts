@@ -5,6 +5,9 @@ const SKIP_HINTS = /icon|logo|sprite|avatar|badge|banner|placeholder|profile|qr[
 // ป้าย UI อื่นๆ ที่ไม่ใช่ข้อมูลสินค้า แต่ดันอยู่ใน <a> เดียวกับสินค้า (เช่น "เรตติ้งร้าน" ที่โผล่หลังราคา) — ต้องกรองทิ้งไม่งั้นจะหลุดไปเป็นชื่อ/ตัวเลือกสินค้าผิดๆ
 const NOISE_TEXT = /^(เรตติ้งร้าน|ดูร้านค้า|ดูเพิ่มเติม|ดูเพิ่มเติมเกี่ยวกับสินค้า|ร้านค้ามาใหม่|ต้องการสินค้าเพิ่มไหม)$/i;
 
+// ถ้าออเดอร์นี้ถูกคืนเงิน/คืนสินค้าแล้ว ไม่ควรนำเข้ามาเป็นสต็อกจริง (ของไม่ได้อยู่กับเราแล้ว)
+const REFUND_BADGE = /^คืนเงิน\s*\/\s*คืนสินค้า$/i;
+
 function getImgSrc(img: HTMLImageElement): string {
   const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || "";
   const fromSrcset = srcset.split(",")[0]?.trim().split(/\s+/)[0] || "";
@@ -56,6 +59,7 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
     if (seen.has(absSrc)) continue;
 
     let qty = 0; // ต้องเจอป้ายจำนวนจริงๆ ถึงจะถือว่าเป็นรายการสั่งซื้อ (กันลิงก์เมนู/บัญชีที่ไม่ใช่สินค้าหลุดเข้ามา)
+    let isRefunded = false;
     const prices: number[] = [];
     const textCandidates: string[] = [];
 
@@ -63,6 +67,10 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
       if (el.children.length > 0) continue; // เอาเฉพาะ element ใบสุดท้าย
       const t = (el.textContent || "").replace(/\s+/g, " ").trim();
       if (!t) continue;
+      if (REFUND_BADGE.test(t)) {
+        isRefunded = true;
+        continue;
+      }
       const qtyMatch = t.match(/^x\s?(\d+)$/i) || t.match(/^จำนวน[:\s]*(\d+)$/);
       if (qtyMatch) {
         qty = parseInt(qtyMatch[1], 10);
@@ -77,6 +85,7 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
       if (NOISE_TEXT.test(t)) continue;
       if (t.length >= 4) textCandidates.push(t);
     }
+    if (isRefunded) continue; // คืนเงิน/คืนสินค้าแล้ว ไม่นับเป็นของที่ได้รับจริง
     if (!qty || textCandidates.length === 0) continue;
 
     // ชื่อสินค้าจริงมักเป็นข้อความที่ยาวที่สุด (ป้ายอื่นๆ เช่น "Pre-Order" หรือตัวเลือกสินค้าจะสั้นกว่า)

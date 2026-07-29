@@ -12,6 +12,7 @@ import { countUnits } from "@/lib/db";
 import { useProductFilters, type SortKey, type StockTab } from "@/lib/useProductFilters";
 import { useProductActions } from "@/lib/useProductActions";
 import type { StockItem } from "@/lib/types";
+import packageJson from "@/package.json";
 
 export default function Home() {
   const { db, setDb, status } = useStockDB();
@@ -75,6 +76,7 @@ export default function Home() {
     <div className={`wrap ${selectMode ? "wrap--with-select-bar" : ""}`}>
       <h1>📦 จัดการสต็อกสินค้า</h1>
       <p className="sub">{status.msg}</p>
+      <p className="sub sub-tight text-xs">เวอร์ชัน {packageJson.version}</p>
 
       <StatsBar items={db.items} />
 

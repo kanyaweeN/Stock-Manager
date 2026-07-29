@@ -8,6 +8,7 @@ import StorageTab from "@/components/config/StorageTab";
 import SheetsTab from "@/components/config/SheetsTab";
 import CategoriesTab from "@/components/config/CategoriesTab";
 import BackupTab from "@/components/config/BackupTab";
+import packageJson from "@/package.json";
 
 type Tab = "storage" | "sheets" | "categories" | "backup";
 
@@ -69,6 +70,7 @@ export default function ConfigPage() {
     <div className="wrap">
       <Link href="/" className="back-link">← กลับหน้าหลัก</Link>
       <h1>⚙️ ตั้งค่า</h1>
+      <p className="sub sub-tight text-xs">เวอร์ชัน {packageJson.version}</p>
 
       <div className="tabs">
         {TABS.map((t) => (
