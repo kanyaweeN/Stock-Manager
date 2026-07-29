@@ -19,6 +19,8 @@ export interface StockItem {
   /** จัดกลุ่มสินค้าหลายชิ้นที่เป็น "ตัวเดียวกัน" เข้าด้วยกันแบบไม่ลบทิ้ง (เช่น ซื้อจากคนละร้าน) — สินค้าที่ groupId เดียวกันถือว่าอยู่กลุ่มเดียวกัน */
   groupId?: string;
   groupName?: string;
+  /** วันที่ซื้อ (YYYY-MM-DD) — ใช้ทำสรุปยอดรายเดือน ของเก่าก่อนมีฟีลด์นี้จะไม่มีค่า (ไม่ทราบวันที่) */
+  purchasedAt?: string;
 }
 
 export interface ImportCandidate {

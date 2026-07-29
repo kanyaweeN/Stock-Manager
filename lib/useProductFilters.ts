@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 import type { StockItem } from "./types";
 
-export type SortKey = "name-asc" | "name-desc" | "qty-asc" | "qty-desc" | "price-asc" | "price-desc";
+export type SortKey = "name-asc" | "name-desc" | "qty-asc" | "qty-desc" | "price-asc" | "price-desc" | "cat-asc" | "cat-desc";
 export type StockTab = "all" | "in-stock" | "out-of-stock" | "grouped";
+
+// สินค้าไม่มีหมวดหมู่ให้ไปอยู่ท้ายสุดเสมอไม่ว่าจะเรียง ก-ฮ หรือ ฮ-ก
+const catKey = (i: StockItem) => i.cats.slice().sort().join(", ");
 
 const SORTERS: Record<SortKey, (a: StockItem, b: StockItem) => number> = {
   "name-asc": (a, b) => a.name.localeCompare(b.name, "th"),
@@ -13,6 +16,18 @@ const SORTERS: Record<SortKey, (a: StockItem, b: StockItem) => number> = {
   "qty-desc": (a, b) => b.qty - a.qty,
   "price-asc": (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity),
   "price-desc": (a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity),
+  "cat-asc": (a, b) => {
+    if (a.cats.length === 0 && b.cats.length === 0) return a.name.localeCompare(b.name, "th");
+    if (a.cats.length === 0) return 1;
+    if (b.cats.length === 0) return -1;
+    return catKey(a).localeCompare(catKey(b), "th") || a.name.localeCompare(b.name, "th");
+  },
+  "cat-desc": (a, b) => {
+    if (a.cats.length === 0 && b.cats.length === 0) return a.name.localeCompare(b.name, "th");
+    if (a.cats.length === 0) return 1;
+    if (b.cats.length === 0) return -1;
+    return catKey(b).localeCompare(catKey(a), "th") || a.name.localeCompare(b.name, "th");
+  },
 };
 
 /** จัดการ state และ logic การค้นหา/กรองหมวดหมู่/เรียงลำดับของรายการสินค้า */

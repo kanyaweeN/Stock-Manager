@@ -34,6 +34,8 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [groupNameOpen, setGroupNameOpen] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState("");
+  const [moveCatOpen, setMoveCatOpen] = useState(false);
+  const [moveCatValue, setMoveCatValue] = useState<string[]>([]);
 
   const openAdd = () => { setModalItem(null); setModalOpen(true); };
   const openEdit = (item: StockItem) => { setModalItem(item); setModalOpen(true); };
@@ -69,6 +71,17 @@ export default function Home() {
     if (!name) return;
     actions.groupItems([...selectedIds], name);
     setGroupNameOpen(false);
+    exitSelectMode();
+  };
+
+  const openMoveCatPrompt = () => {
+    setMoveCatValue([]);
+    setMoveCatOpen(true);
+  };
+
+  const confirmMoveCat = () => {
+    actions.setCatsForItems([...selectedIds], moveCatValue);
+    setMoveCatOpen(false);
     exitSelectMode();
   };
 
@@ -114,6 +127,8 @@ export default function Home() {
           <option value="qty-desc">จำนวนมาก-น้อย</option>
           <option value="price-asc">ราคาต่ำ-สูง</option>
           <option value="price-desc">ราคาสูง-ต่ำ</option>
+          <option value="cat-asc">หมวดหมู่ ก-ฮ</option>
+          <option value="cat-desc">หมวดหมู่ ฮ-ก</option>
         </select>
         <button className="btn-primary" onClick={openAdd}>+ เพิ่มสินค้า</button>
         <button className="btn-ghost" onClick={() => setImportOpen(true)}>นำเข้าจาก Shopee</button>
@@ -123,6 +138,7 @@ export default function Home() {
         ) : (
           <button className="btn-ghost" onClick={() => setSelectMode(true)}>☑️ เลือกหลายอัน</button>
         )}
+        <Link href="/summary" className="btn-ghost">📊 สรุปยอด</Link>
         <Link href="/config" className="btn-ghost">⚙️ ตั้งค่า</Link>
       </div>
 
@@ -135,6 +151,13 @@ export default function Home() {
             onClick={openGroupNamePrompt}
           >
             👥 จัดกลุ่มที่เลือก
+          </button>
+          <button
+            className="btn-ghost"
+            disabled={selectedIds.size < 1}
+            onClick={openMoveCatPrompt}
+          >
+            🏷️ ย้ายหมวดหมู่
           </button>
           <button className="btn-ghost" onClick={exitSelectMode}>ยกเลิก</button>
         </div>
@@ -197,6 +220,41 @@ export default function Home() {
             <div className="modal-actions">
               <button className="btn-ghost" onClick={() => setGroupNameOpen(false)}>ยกเลิก</button>
               <button className="btn-primary" onClick={confirmGroupSelected}>จัดกลุ่ม</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {moveCatOpen && (
+        <div className="modal-backdrop open">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>ย้ายหมวดหมู่ {selectedItems.length} รายการ</h2>
+              <button className="modal-close" title="ปิด" onClick={() => setMoveCatOpen(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="sub sub-tight text-xs">
+                หมวดหมู่ใหม่ที่เลือกจะไปแทนที่หมวดหมู่เดิมของทุกรายการที่เลือกไว้ (เลือกว่างไว้เพื่อลบหมวดหมู่ออกทั้งหมด)
+              </p>
+              <div className="category-list" style={{ marginBottom: 12 }}>
+                {selectedItems.map((i) => (
+                  <div className="category-row" key={i.id}><span>{i.name}</span></div>
+                ))}
+              </div>
+              <div className="field">
+                <label>หมวดหมู่ใหม่</label>
+                <CategoryMultiSelect
+                  categories={categorySuggestions}
+                  selected={moveCatValue}
+                  onChange={setMoveCatValue}
+                  allowCreate
+                  emptyLabel="ไม่มีหมวดหมู่"
+                />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-ghost" onClick={() => setMoveCatOpen(false)}>ยกเลิก</button>
+              <button className="btn-primary" onClick={confirmMoveCat}>ย้ายหมวดหมู่</button>
             </div>
           </div>
         </div>

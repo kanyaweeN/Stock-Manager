@@ -50,11 +50,17 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, groupId: undefined, groupName: undefined } : i)));
   };
 
+  /** ตั้งหมวดหมู่ให้สินค้าหลายชิ้นพร้อมกัน (ทับของเดิมทั้งหมด) ใช้ตอนเลือกหลายอันแล้วอยากย้ายหมวดหมู่รวด */
+  const setCatsForItems = (ids: string[], cats: string[]) => {
+    setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, cats } : i)));
+  };
+
   const inc = (id: string) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i)));
   const dec = (id: string) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: Math.max(0, i.qty - 1) } : i)));
 
   const importFromShopee = (chosen: ImportCandidate[]) => {
     if (chosen.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
     // ซื้อซ้ำ (มี existingId + mergeExisting) ให้บวกจำนวนเข้ารายการเดิมแทนสร้างใหม่
     const toMerge = new Map(chosen.filter((c) => c.existingId && c.mergeExisting).map((c) => [c.existingId!, c]));
     const toAdd = chosen.filter((c) => !(c.existingId && c.mergeExisting));
@@ -73,6 +79,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
           size: use("size") && m.size ? m.size : i.size,
           note: use("note") && m.note ? m.note : i.note,
           status: use("status") && m.status ? m.status : i.status,
+          purchasedAt: today, // ซื้อซ้ำถือเป็นการซื้อครั้งใหม่ อัปเดตวันที่ล่าสุด
         };
       }),
       ...toAdd.map((c) => ({
@@ -89,9 +96,10 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
         price: c.price,
         size: c.size,
         variant: c.variant,
+        purchasedAt: today,
       })),
     ]);
   };
 
-  return { save, remove, groupItems, ungroup, inc, dec, importFromShopee, exportCsv };
+  return { save, remove, groupItems, ungroup, setCatsForItems, inc, dec, importFromShopee, exportCsv };
 }

@@ -15,8 +15,11 @@ interface Props {
   onUngroup: (id: string) => void;
 }
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 const emptyForm = {
   name: "", cats: [] as string[], qty: 0, min: 0, price: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
+  purchasedAt: todayStr(),
 };
 
 export default function ProductModal({ open, item, categories, onClose, onSave, onUngroup }: Props) {
@@ -35,9 +38,10 @@ export default function ProductModal({ open, item, categories, onClose, onSave, 
         img: item.img || "",
         link: item.link || "",
         status: item.status || "",
+        purchasedAt: item.purchasedAt || "",
       });
     } else {
-      setForm(emptyForm);
+      setForm({ ...emptyForm, purchasedAt: todayStr() });
     }
   }, [item, open]);
 
@@ -65,6 +69,7 @@ export default function ProductModal({ open, item, categories, onClose, onSave, 
         img: form.img.trim(),
         link: form.link.trim(),
         status: form.status,
+        purchasedAt: form.purchasedAt || undefined,
       },
       item ? item.id : null
     );
@@ -111,6 +116,15 @@ export default function ProductModal({ open, item, categories, onClose, onSave, 
           value={String(form.min)}
           onChange={(v) => setForm({ ...form, min: Number(v) || 0 })}
         />
+
+        <div className="field">
+          <label>วันที่ซื้อ</label>
+          <input
+            type="date"
+            value={form.purchasedAt}
+            onChange={(e) => setForm({ ...form, purchasedAt: e.target.value })}
+          />
+        </div>
 
         <TextField
           label="ราคา (บาท)"

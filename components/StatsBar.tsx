@@ -8,10 +8,10 @@ export default function StatsBar({ items }: { items: StockItem[] }) {
 
   return (
     <div className="stats">
-      <div className="stat"><div className="n">{countUnits(items)}</div><div className="l">รายการทั้งหมด</div></div>
-      <div className="stat"><div className="n">{total}</div><div className="l">จำนวนรวมทั้งหมด</div></div>
-      <div className="stat"><div className="n">{low}</div><div className="l">ใกล้หมด</div></div>
-      <div className="stat"><div className="n">{cats.size}</div><div className="l">หมวดหมู่</div></div>
+      <div className="stat stat--blue"><div className="n">{countUnits(items)}</div><div className="l">รายการทั้งหมด</div></div>
+      <div className="stat stat--orange"><div className="n">{total}</div><div className="l">จำนวนรวมทั้งหมด</div></div>
+      <div className="stat stat--warning"><div className="n">{low}</div><div className="l">ใกล้หมด</div></div>
+      <div className="stat stat--violet"><div className="n">{cats.size}</div><div className="l">หมวดหมู่</div></div>
     </div>
   );
 }
