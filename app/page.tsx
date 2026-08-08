@@ -11,6 +11,7 @@ import { useStockDB } from "@/lib/StockDBProvider";
 import { countUnits } from "@/lib/db";
 import { useProductFilters, type SortKey, type StockTab } from "@/lib/useProductFilters";
 import { useProductActions } from "@/lib/useProductActions";
+import { TAG_META, type IngredientTag } from "@/lib/ingredients";
 import type { StockItem } from "@/lib/types";
 import packageJson from "@/package.json";
 
@@ -22,6 +23,9 @@ export default function Home() {
     uncategorizedOnly, toggleUncategorizedOnly,
     sortKey, setSortKey,
     stockTab, setStockTab,
+    filterTag, setFilterTag,
+    excludeTag, setExcludeTag,
+    availableTags, withIngredientsCount,
     categorySuggestions, filtered,
     outOfStockCount, uncategorizedCount, groupedCount,
   } = useProductFilters(db.items, db.categoryPresets);
@@ -115,7 +119,7 @@ export default function Home() {
         <input
           id="search"
           type="text"
-          placeholder="ค้นหาชื่อสินค้า..."
+          placeholder="ค้นหาชื่อสินค้า / ส่วนผสม..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -139,8 +143,30 @@ export default function Home() {
           <button className="btn-ghost" onClick={() => setSelectMode(true)}>☑️ เลือกหลายอัน</button>
         )}
         <Link href="/summary" className="btn-ghost">📊 สรุปยอด</Link>
+        <Link href="/analyze" className="btn-ghost">🧪 วิเคราะห์ส่วนผสม</Link>
         <Link href="/config" className="btn-ghost">⚙️ ตั้งค่า</Link>
       </div>
+
+      {availableTags.length > 0 && (
+        <div className="toolbar toolbar--sub">
+          <label className="ing-filter-label">🧪 กรองด้วยส่วนผสม ({withIngredientsCount} รายการมีข้อมูล)</label>
+          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value as IngredientTag | "")}>
+            <option value="">ทั้งหมด</option>
+            {availableTags.map((t) => (
+              <option key={t} value={t}>{TAG_META[t].emoji} {TAG_META[t].label}</option>
+            ))}
+          </select>
+          <label className="ing-filter-label">
+            <input
+              type="checkbox"
+              checked={excludeTag}
+              disabled={!filterTag}
+              onChange={(e) => setExcludeTag(e.target.checked)}
+            />
+            กลับด้าน (เอาเฉพาะตัวที่ไม่มี)
+          </label>
+        </div>
+      )}
 
       {selectMode && (
         <div className="select-action-bar">
@@ -165,6 +191,8 @@ export default function Home() {
 
       <ProductGrid
         items={filtered}
+        avoidIngredients={db.avoidIngredients}
+        skinProfile={db.skinProfile}
         onInc={actions.inc}
         onDec={actions.dec}
         onEdit={openEdit}
@@ -178,6 +206,8 @@ export default function Home() {
         open={modalOpen}
         item={modalItem}
         categories={categorySuggestions}
+        avoidIngredients={db.avoidIngredients}
+        skinProfile={db.skinProfile}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         onUngroup={actions.ungroup}

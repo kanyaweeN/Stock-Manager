@@ -21,6 +21,8 @@ export interface StockItem {
   groupName?: string;
   /** วันที่ซื้อ (YYYY-MM-DD) — ใช้ทำสรุปยอดรายเดือน ของเก่าก่อนมีฟีลด์นี้จะไม่มีค่า (ไม่ทราบวันที่) */
   purchasedAt?: string;
+  /** ลิสต์ส่วนผสมดิบตามฉลาก (INCI) เก็บเป็นข้อความก้อนเดียว — แยก/วิเคราะห์ตอนใช้งานด้วย lib/ingredients.ts */
+  ingredients?: string;
 }
 
 export interface ImportCandidate {
@@ -35,10 +37,11 @@ export interface ImportCandidate {
   size?: string;
   variant?: string;
   note?: string;
+  ingredients?: string;
   /** id ของสินค้าที่มีอยู่แล้วในสต็อกที่ตรงกัน (เช็คจากชื่อ/ลิงก์) — ถ้ามีค่านี้แปลว่าอาจเป็นการซื้อซ้ำ */
   existingId?: string;
   /** ถ้าเป็นการซื้อซ้ำ ให้รวมจำนวนเข้ารายการเดิมแทนที่จะสร้างใหม่ (ค่าเริ่มต้น true เมื่อเจอรายการซ้ำ) */
   mergeExisting?: boolean;
   /** ตอนซื้อซ้ำ เลือกได้ว่าจะเอาค่าใหม่มาอัปเดตฟิลด์ไหนบ้าง (ค่าเริ่มต้น: อัปเดตทุกฟิลด์ที่มีค่าใหม่) */
-  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "note" | "status", boolean>>;
+  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients", boolean>>;
 }

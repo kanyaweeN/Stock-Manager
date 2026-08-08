@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/statusOptions";
+import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/ingredients";
+import type { SkinProfile } from "@/lib/db";
+
+/** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
+const CARD_TAG_LIMIT = 3;
 
 interface Props {
   items: StockItem[];
+  avoidIngredients?: string[];
+  skinProfile?: SkinProfile;
   onInc: (id: string) => void;
   onDec: (id: string) => void;
   onEdit: (item: StockItem) => void;
@@ -36,8 +43,24 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, onInc, onDec, onEdit, onDelete, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, selectMode, selectedIds, onToggleSelect }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+
+  const ingredientInfo = useMemo(() => {
+    const map = new Map<string, { tags: IngredientTag[]; warnCount: number; skinScore?: number; skinLevel?: string }>();
+    for (const i of items) {
+      if (!i.ingredients?.trim()) continue;
+      const a = analyzeIngredients(i.ingredients, avoidIngredients);
+      const compat = analyzeSkinCompat(i.ingredients, skinProfile);
+      map.set(i.id, {
+        tags: a.tags,
+        warnCount: a.warnings.filter((w) => w.level === "warn").length,
+        skinScore: compat?.score,
+        skinLevel: compat?.level,
+      });
+    }
+    return map;
+  }, [items, avoidIngredients, skinProfile]);
 
   if (items.length === 0) {
     return <div className="empty">ยังไม่มีสินค้าในสต็อก — กด &quot;เพิ่มสินค้า&quot; เพื่อเริ่มต้น</div>;
@@ -48,6 +71,7 @@ export default function ProductGrid({ items, onInc, onDec, onEdit, onDelete, sel
     const low = !outOfStock && i.min > 0 && i.qty <= i.min;
     const selected = !!selectedIds?.has(i.id);
     const interactive = selectMode && !suppressSelect;
+    const ing = ingredientInfo.get(i.id);
     return (
       <div
         className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""} ${selected ? "product-card--selected" : ""}`}
@@ -100,6 +124,28 @@ export default function ProductGrid({ items, onInc, onDec, onEdit, onDelete, sel
             <div className="product-card__tags">
               {i.source === "shopee" && <span className="source-tag">Shopee</span>}
               {i.variant && <span className="variant-tag">{i.variant}</span>}
+            </div>
+          )}
+          {ing && ing.tags.length > 0 && (
+            <div className="product-card__tags">
+              {ing.skinScore != null && ing.skinLevel && (
+                <span className={`skin-score skin-score--${ing.skinLevel}`} title={`ความเหมาะกับผิว ${ing.skinScore}/100`}>
+                  {COMPAT_META[ing.skinLevel as keyof typeof COMPAT_META]?.emoji} {ing.skinScore}
+                </span>
+              )}
+              {ing.warnCount > 0 && (
+                <span className="ing-tag ing-tag--caution" title="มีส่วนผสมที่ควรระวังหรือตีกัน">
+                  ⚠️ ควรระวัง {ing.warnCount}
+                </span>
+              )}
+              {ing.tags.slice(0, CARD_TAG_LIMIT).map((t) => (
+                <span className={`ing-tag ing-tag--${TAG_META[t].level}`} key={t}>
+                  {TAG_META[t].emoji} {TAG_META[t].label}
+                </span>
+              ))}
+              {ing.tags.length > CARD_TAG_LIMIT && (
+                <span className="variant-tag">+{ing.tags.length - CARD_TAG_LIMIT}</span>
+              )}
             </div>
           )}
           <div className="product-card__price-row">

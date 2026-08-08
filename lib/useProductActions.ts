@@ -5,9 +5,9 @@ import { uid } from "./uid";
 import type { ImportCandidate, StockItem } from "./types";
 
 function exportCsv(items: StockItem[]) {
-  const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,ราคา,ขนาด,หมายเหตุ\n";
+  const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,ราคา,ขนาด,หมายเหตุ,ส่วนผสม\n";
   const rows = items
-    .map((i) => [i.name, i.cats.join("; "), i.qty, i.min, i.price ?? "", i.size ?? "", i.note]
+    .map((i) => [i.name, i.cats.join("; "), i.qty, i.min, i.price ?? "", i.size ?? "", i.note, i.ingredients ?? ""]
       .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
   const blob = new Blob(["﻿" + header + rows], { type: "text/csv;charset=utf-8;" });
@@ -78,6 +78,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
           variant: use("variant") && m.variant ? m.variant : i.variant,
           size: use("size") && m.size ? m.size : i.size,
           note: use("note") && m.note ? m.note : i.note,
+          ingredients: use("ingredients") && m.ingredients ? m.ingredients : i.ingredients,
           status: use("status") && m.status ? m.status : i.status,
           purchasedAt: today, // ซื้อซ้ำถือเป็นการซื้อครั้งใหม่ อัปเดตวันที่ล่าสุด
         };
@@ -89,6 +90,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
         qty: c.qty,
         min: 0,
         note: c.note || "",
+        ingredients: c.ingredients || "",
         img: c.img,
         link: c.link,
         status: c.status,

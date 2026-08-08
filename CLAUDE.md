@@ -15,7 +15,7 @@ Next.js (App Router) + TypeScript stock/inventory tracker. Thai UI. No backend �
 ## Data model (`lib/types.ts`)
 
 ```ts
-StockItem { id, name, cats: string[], qty, min, note, img?, link?, status?, source?: "shopee"|"", price?, size?, variant? }
+StockItem { id, name, cats: string[], qty, min, note, img?, link?, status?, source?: "shopee"|"", price?, size?, variant?, groupId?, groupName?, purchasedAt?, ingredients? }
 ```
 
 - `cats` is an **array** (multi-category since 2026-07-20). Anywhere `cat` (singular) appears, it's legacy — check `db.ts` migration.
@@ -32,7 +32,10 @@ StockItem { id, name, cats: string[], qty, min, note, img?, link?, status?, sour
 | Stats header (counts) | `components/StatsBar.tsx` |
 | Reusable labeled input w/ copy·paste·clear buttons | `components/TextField.tsx` |
 | Config page tabs (backup/categories/sheets/storage) | `components/config/*.tsx`, routed at `app/config/page.tsx` |
-| Google Sheets push/pull (OAuth via GIS, columns A:L) | `lib/googleSheets.ts` — **column order is positional**; if you add a StockItem field, update `HEADER`, `itemsToRows`, `rowsToItems` together |
+| Ingredient (INCI) analysis — offline dictionary, tags, conflict rules | `lib/ingredients.ts` — **no network, no API**. Add ingredients to `INGREDIENT_DB`, tag pairs that clash to `CONFLICT_RULES`. New tag ⇒ also add to `TAG_META` + `TAG_PRIORITY` |
+| Ingredient analysis UI (tag chips, warnings, parsed list) | `components/IngredientPanel.tsx` — used in `ProductModal` and `/analyze` |
+| Multi-product ingredient comparison + user's avoid-list | `app/analyze/page.tsx`. Avoid-list is `StockDB.avoidIngredients` (not per-item) |
+| Google Sheets push/pull (OAuth via GIS, columns A:M) | `lib/googleSheets.ts` — **column order is positional**; if you add a StockItem field, update `HEADER`, `itemsToRows`, `rowsToItems`, `ITEMS_RANGE` and the `A1:M…` write range together |
 
 ## Conventions specific to this repo
 

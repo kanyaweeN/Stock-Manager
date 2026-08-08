@@ -15,7 +15,7 @@ interface Props {
   onImport: (candidates: ImportCandidate[]) => void;
 }
 
-type MergeField = "qty" | "price" | "img" | "variant" | "size" | "note" | "status";
+type MergeField = "qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients";
 const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   qty: "จำนวน",
   price: "ราคา",
@@ -24,6 +24,7 @@ const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   size: "ขนาด",
   note: "หมายเหตุ",
   status: "สถานะ",
+  ingredients: "ส่วนผสม",
 };
 
 function norm(s: string) {
@@ -52,6 +53,7 @@ function newFieldValue(field: MergeField, c: ImportCandidate, existing: StockIte
   if (field === "size") return c.size && c.size !== existing.size ? c.size : undefined;
   if (field === "note") return c.note && c.note !== existing.note ? c.note : undefined;
   if (field === "status") return c.status && c.status !== existing.status ? c.status : undefined;
+  if (field === "ingredients") return c.ingredients && c.ingredients !== existing.ingredients ? c.ingredients : undefined;
   return undefined;
 }
 
@@ -99,6 +101,7 @@ function oldFieldValue(field: MergeField, existing: StockItem): string | number 
   if (field === "size") return existing.size;
   if (field === "note") return existing.note;
   if (field === "status") return existing.status;
+  if (field === "ingredients") return existing.ingredients;
   return undefined;
 }
 
@@ -318,6 +321,12 @@ export default function ImportModal({ open, categories, items, onClose, onImport
                         placeholder="หมายเหตุ (ไม่บังคับ)"
                         value={c.note || ""}
                         onChange={(e) => updateCandidate(idx, { note: e.target.value })}
+                      />
+                      <textarea
+                        className="import-ingredients"
+                        placeholder="ส่วนผสม / INCI — วางลิสต์คั่นด้วยจุลภาค (ไม่บังคับ)"
+                        value={c.ingredients || ""}
+                        onChange={(e) => updateCandidate(idx, { ingredients: e.target.value })}
                       />
                       <div className="import-qty">
                         จำนวน

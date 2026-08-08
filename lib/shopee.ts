@@ -8,6 +8,19 @@ const NOISE_TEXT = /^(เรตติ้งร้าน|ดูร้านค้
 // ถ้าออเดอร์นี้ถูกคืนเงิน/คืนสินค้าแล้ว ไม่ควรนำเข้ามาเป็นสต็อกจริง (ของไม่ได้อยู่กับเราแล้ว)
 const REFUND_BADGE = /^คืนเงิน\s*\/\s*คืนสินค้า$/i;
 
+/**
+ * หาบล็อกส่วนผสมจากรายละเอียดสินค้า (มีเฉพาะตอนวาง HTML ของ "หน้าสินค้า" — หน้ารายการออเดอร์ไม่มีข้อมูลนี้)
+ * เป็น best-effort: ตัดเอาข้อความหลังคำว่า "ส่วนผสม/Ingredients:" จนกว่าจะเจอย่อหน้าใหม่
+ */
+export function extractIngredientsBlock(text: string): string | undefined {
+  const m = text.match(/(?:ส่วนผสม|ส่วนประกอบ|ingredients?)\s*[:：]\s*([^\n\r]{20,1500})/i);
+  if (!m) return undefined;
+  const body = m[1].trim();
+  // ต้องมีลักษณะเป็นลิสต์จริงๆ (คั่นด้วยจุลภาคหลายตัว) ไม่งั้นมักเป็นประโยคโฆษณาที่บังเอิญมีคำว่าส่วนผสม
+  if ((body.match(/,/g) || []).length < 3) return undefined;
+  return body.slice(0, 1500);
+}
+
 function getImgSrc(img: HTMLImageElement): string {
   const srcset = img.getAttribute("srcset") || img.getAttribute("data-srcset") || "";
   const fromSrcset = srcset.split(",")[0]?.trim().split(/\s+/)[0] || "";
@@ -130,6 +143,12 @@ export function extractShopeeItems(html: string): ImportCandidate[] {
 
     seen.add(absSrc);
     results.push({ name, qty, img: absSrc, link, cats: [], status: "", include: true, price, size, variant });
+  }
+
+  // ถ้าวาง HTML ของหน้าสินค้าเดี่ยวมา (เจอสินค้าชิ้นเดียว) ค่อยแนบส่วนผสมที่หาเจอให้ — ถ้ามีหลายชิ้นจะไม่รู้ว่าเป็นของใคร
+  if (results.length === 1) {
+    const ingredients = extractIngredientsBlock(doc.body?.textContent || "");
+    if (ingredients) results[0].ingredients = ingredients;
   }
 
   return results;

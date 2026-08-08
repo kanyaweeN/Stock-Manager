@@ -1,8 +1,39 @@
 import type { StockItem } from "./types";
 
+export type SkinType = "" | "oily" | "dry" | "combination" | "normal" | "sensitive";
+export type SkinConcern = "acne" | "aging" | "dark-spots" | "redness" | "dryness" | "oiliness" | "pores" | "dullness";
+
+export interface SkinProfile {
+  skinType: SkinType;
+  concerns: SkinConcern[];
+}
+
+export const SKIN_TYPE_LABELS: Record<SkinType, string> = {
+  "": "ยังไม่ได้ตั้ง",
+  oily: "ผิวมัน",
+  dry: "ผิวแห้ง",
+  combination: "ผิวผสม",
+  normal: "ผิวธรรมดา",
+  sensitive: "ผิวแพ้ง่าย",
+};
+
+export const SKIN_CONCERN_LABELS: Record<SkinConcern, string> = {
+  acne: "สิว",
+  aging: "ริ้วรอย/ชะลอวัย",
+  "dark-spots": "จุดด่างดำ/ฝ้า",
+  redness: "ผิวแดง/ระคายเคือง",
+  dryness: "ผิวแห้ง/ลอก",
+  oiliness: "หน้ามัน/มันเยิ้ม",
+  pores: "รูขุมขนกว้าง",
+  dullness: "ผิวหมองคล้ำ",
+};
+
 export interface StockDB {
   items: StockItem[];
   categoryPresets: string[];
+  /** ส่วนผสมที่ผู้ใช้ตั้งไว้ว่าแพ้/ไม่เอา — ใช้เตือนตอนวิเคราะห์ส่วนผสม (ดู lib/ingredients.ts) */
+  avoidIngredients?: string[];
+  skinProfile?: SkinProfile;
   updatedAt?: string;
 }
 
@@ -16,6 +47,7 @@ export function countUnits(items: StockItem[]): number {
 export const DEFAULT_DB: StockDB = {
   items: [],
   categoryPresets: ["เครื่องใช้", "อุปกรณ์ฝีมือ"],
+  avoidIngredients: [],
 };
 
 /** รองรับข้อมูลเก่าที่อาจไม่มี field ครบ */
@@ -38,9 +70,13 @@ export function migrateDB(raw: unknown): StockDB {
         ...i,
         cats: dedupedCats,
         source: isLegacyShopeeCat ? ("shopee" as const) : i.source,
+        // ข้อมูลเก่าก่อนมีฟีเจอร์วิเคราะห์ส่วนผสมจะไม่มี field นี้ — ปล่อยเป็นสตริงว่างไว้
+        ingredients: typeof i.ingredients === "string" ? i.ingredients : "",
       };
     }),
     categoryPresets: Array.isArray(r.categoryPresets) ? r.categoryPresets : DEFAULT_DB.categoryPresets,
+    avoidIngredients: Array.isArray(r.avoidIngredients) ? r.avoidIngredients : [],
+    skinProfile: r.skinProfile && typeof r.skinProfile === "object" ? r.skinProfile as SkinProfile : { skinType: "", concerns: [] },
     updatedAt: r.updatedAt,
   };
 }

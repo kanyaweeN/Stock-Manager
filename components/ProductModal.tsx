@@ -3,13 +3,18 @@
 import { useEffect, useState } from "react";
 import { STATUS_OPTIONS } from "@/lib/statusOptions";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
+import IngredientInput from "@/components/IngredientInput";
+import IngredientPanel from "@/components/IngredientPanel";
 import TextField from "@/components/TextField";
+import type { SkinProfile } from "@/lib/db";
 import type { ItemStatus, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
   item: StockItem | null;
   categories: string[];
+  avoidIngredients?: string[];
+  skinProfile?: SkinProfile;
   onClose: () => void;
   onSave: (data: Omit<StockItem, "id">, editId: string | null) => void;
   onUngroup: (id: string) => void;
@@ -19,10 +24,10 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const emptyForm = {
   name: "", cats: [] as string[], qty: 0, min: 0, price: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
-  purchasedAt: todayStr(),
+  purchasedAt: todayStr(), ingredients: "",
 };
 
-export default function ProductModal({ open, item, categories, onClose, onSave, onUngroup }: Props) {
+export default function ProductModal({ open, item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup }: Props) {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -39,6 +44,7 @@ export default function ProductModal({ open, item, categories, onClose, onSave, 
         link: item.link || "",
         status: item.status || "",
         purchasedAt: item.purchasedAt || "",
+        ingredients: item.ingredients || "",
       });
     } else {
       setForm({ ...emptyForm, purchasedAt: todayStr() });
@@ -70,6 +76,7 @@ export default function ProductModal({ open, item, categories, onClose, onSave, 
         link: form.link.trim(),
         status: form.status,
         purchasedAt: form.purchasedAt || undefined,
+        ingredients: form.ingredients.trim(),
       },
       item ? item.id : null
     );
@@ -147,6 +154,12 @@ export default function ProductModal({ open, item, categories, onClose, onSave, 
           value={form.note}
           onChange={(v) => setForm({ ...form, note: v })}
         />
+
+        <IngredientInput
+          value={form.ingredients}
+          onChange={(v) => setForm({ ...form, ingredients: v })}
+        />
+        <IngredientPanel ingredients={form.ingredients} avoidIngredients={avoidIngredients} skinProfile={skinProfile} />
 
         <TextField
           label="รูปภาพ (URL)"
