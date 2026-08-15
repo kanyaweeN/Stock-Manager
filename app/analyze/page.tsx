@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import IngredientPanel, { TagChip, WarningList } from "@/components/IngredientPanel";
 import { useStockDB } from "@/lib/StockDBProvider";
@@ -72,8 +71,7 @@ export default function AnalyzePage() {
   };
 
   return (
-    <div className="wrap">
-      <Link href="/" className="back-link">← กลับหน้าหลัก</Link>
+    <div className="page">
       <h1>🧪 วิเคราะห์ส่วนผสม</h1>
       <p className="sub sub-tight text-xs">
         ใช้ตารางข้อมูลในแอปล้วนๆ ไม่ได้ต่ออินเทอร์เน็ต เป็นแค่ตัวช่วยอ่านฉลาก ไม่ใช่คำแนะนำทางการแพทย์

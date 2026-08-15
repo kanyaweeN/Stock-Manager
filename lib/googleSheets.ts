@@ -1,68 +1,28 @@
-import { uid } from "./uid";
 import type { StockItem } from "./types";
 
-export const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
-const HEADER = ["id", "name", "cat", "qty", "min", "note", "img", "link", "status", "price", "size", "variant", "ingredients"] as const;
-const ITEMS_RANGE = "A1:M100000";
-const PRESETS_CELL = "N1";
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        oauth2: {
-          initTokenClient(config: {
-            client_id: string;
-            scope: string;
-            callback: (resp: { access_token?: string; error?: string }) => void;
-          }): { requestAccessToken(opts?: { prompt?: string }): void };
-        };
-      };
-    };
-  }
-}
-
-let gisLoadPromise: Promise<void> | null = null;
-
-/** โหลด Google Identity Services script (สำหรับขอ OAuth token ฝั่ง client ล้วนๆ ไม่ต้องมี backend) */
-export function loadGis(): Promise<void> {
-  if (window.google?.accounts?.oauth2) return Promise.resolve();
-  if (gisLoadPromise) return gisLoadPromise;
-  gisLoadPromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("โหลด Google Identity Services ไม่สำเร็จ"));
-    document.head.appendChild(script);
-  });
-  return gisLoadPromise;
-}
-
 /**
- * ขอ access token จาก Google
- * - silent = true: ขอแบบเงียบๆ ไม่เด้ง popup (ใช้ตอนโหลดหน้าใหม่ ถ้าเคยเชื่อมต่อไว้แล้วและยัง login Google อยู่)
- *   ถ้า session หมดอายุหรือไม่เคยยินยอมสิทธิ์มาก่อน จะล้มเหลวเงียบๆ โดยไม่โชว์ popup ใดๆ
- * - silent = false (ค่าเริ่มต้น): เด้ง popup ให้ผู้ใช้ login/ยินยอมสิทธิ์เอง
+ * ส่งออกรายการสินค้าไปดูเป็นตารางใน Google Sheet — **ทางเดียว (push อย่างเดียว)**
+ *
+ * การซิงก์ข้อมูลจริงย้ายไปอยู่ที่ `lib/googleDrive.ts` (JSON ทั้งก้อน) แล้ว
+ * ที่นี่จึงไม่มี pull อีกต่อไป เพราะชีตเก็บได้แค่ `items` — ดึงกลับมาทีไรก็ทับ
+ * สูตรต้นทุน/โปรไฟล์ผิว/ฟิลด์ที่ไม่มีคอลัมน์ทิ้งทุกที
  */
-export async function requestAccessToken(clientId: string, silent = false): Promise<string> {
-  await loadGis();
-  return new Promise((resolve, reject) => {
-    if (!window.google?.accounts?.oauth2) {
-      reject(new Error("Google Identity Services ยังไม่พร้อม"));
-      return;
-    }
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: SHEETS_SCOPE,
-      callback: (resp) => {
-        if (resp.error || !resp.access_token) reject(new Error(resp.error || "ขอ token ไม่สำเร็จ"));
-        else resolve(resp.access_token);
-      },
-    });
-    client.requestAccessToken(silent ? { prompt: "none" } : undefined);
-  });
-}
+export const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
+/**
+ * ลำดับคอลัมน์ = ลำดับใน HEADER (อิงตำแหน่งล้วนๆ) — เพิ่มฟิลด์ใหม่ให้**ต่อท้าย**เท่านั้น
+ * ไม่งั้นชีตเก่าจะอ่านค่าเพี้ยนตำแหน่ง แล้วอย่าลืมเติมค่าใน `itemsToRows` ให้ตรงตำแหน่งด้วย
+ */
+const HEADER = [
+  "id", "name", "cat", "qty", "min", "note", "img", "link", "status", "price", "size", "variant", "ingredients",
+  "source", "groupId", "groupName", "purchasedAt", "createdAt",
+] as const;
+
+/** 1→A (พอสำหรับ 26 คอลัมน์ — เกินกว่านี้ต้องเปลี่ยนวิธีคิดเป็นฐาน 26) */
+const col = (n: number) => String.fromCharCode(64 + n);
+const LAST_COL = col(HEADER.length);
+const ITEMS_RANGE = `A1:${LAST_COL}100000`;
+/** เก็บ categoryPresets ไว้ช่องถัดจากตารางสินค้า — ชีตเก่าที่ยังเก็บไว้ช่องอื่นจะอ่านไม่เจอ แล้วใช้ค่าในเครื่องแทน (ดู useGoogleSheetsSync.pull) */
+const PRESETS_CELL = `${col(HEADER.length + 1)}1`;
 
 function itemsToRows(items: StockItem[]): string[][] {
   return [
@@ -81,26 +41,13 @@ function itemsToRows(items: StockItem[]): string[][] {
       i.size || "",
       i.variant || "",
       i.ingredients || "",
+      i.source || "",
+      i.groupId || "",
+      i.groupName || "",
+      i.purchasedAt || "",
+      i.createdAt || "",
     ]),
   ];
-}
-
-function rowsToItems(rows: string[][]): StockItem[] {
-  return rows.slice(1).filter((r) => r[1]).map((r) => ({
-    id: r[0] || uid(),
-    name: r[1] || "",
-    cats: r[2] ? r[2].split(";").map((s) => s.trim()).filter(Boolean) : [],
-    qty: Number(r[3]) || 0,
-    min: Number(r[4]) || 0,
-    note: r[5] || "",
-    img: r[6] || "",
-    link: r[7] || "",
-    status: (r[8] as StockItem["status"]) || "",
-    price: r[9] ? Number(r[9]) : undefined,
-    size: r[10] || "",
-    variant: r[11] || "",
-    ingredients: r[12] || "",
-  }));
 }
 
 async function sheetsFetch(token: string, spreadsheetId: string, path: string, init?: RequestInit) {
@@ -130,7 +77,7 @@ export async function pushToSheet(
   await sheetsFetch(
     token,
     spreadsheetId,
-    `/values/A1:M${rows.length}?valueInputOption=RAW`,
+    `/values/A1:${LAST_COL}${rows.length}?valueInputOption=RAW`,
     { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: rows }) }
   );
   await sheetsFetch(
@@ -139,16 +86,4 @@ export async function pushToSheet(
     `/values/${PRESETS_CELL}?valueInputOption=RAW`,
     { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: [[categoryPresets.join(",")]] }) }
   );
-}
-
-export async function pullFromSheet(
-  token: string,
-  spreadsheetId: string
-): Promise<{ items: StockItem[]; categoryPresets: string[] }> {
-  const data = await sheetsFetch(token, spreadsheetId, `/values/${ITEMS_RANGE}`);
-  const items = rowsToItems((data.values as string[][]) || []);
-  const presetData = await sheetsFetch(token, spreadsheetId, `/values/${PRESETS_CELL}`);
-  const presetCell: string = presetData.values?.[0]?.[0] || "";
-  const categoryPresets = presetCell ? presetCell.split(",").map((s) => s.trim()).filter(Boolean) : [];
-  return { items, categoryPresets };
 }

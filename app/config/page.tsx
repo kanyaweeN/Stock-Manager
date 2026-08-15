@@ -1,27 +1,30 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { useStockDB } from "@/lib/StockDBProvider";
 import { useGoogleSheetsSync } from "@/lib/useGoogleSheetsSync";
+import { useGoogleDriveSync } from "@/lib/useGoogleDriveSync";
 import StorageTab from "@/components/config/StorageTab";
+import DriveTab from "@/components/config/DriveTab";
 import SheetsTab from "@/components/config/SheetsTab";
 import CategoriesTab from "@/components/config/CategoriesTab";
 import BackupTab from "@/components/config/BackupTab";
 import packageJson from "@/package.json";
 
-type Tab = "storage" | "sheets" | "categories" | "backup";
+type Tab = "storage" | "drive" | "sheets" | "categories" | "backup";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "storage", label: "ที่เก็บข้อมูล" },
-  { id: "sheets", label: "Google Sheets" },
+  { id: "drive", label: "Google Drive" },
+  { id: "sheets", label: "ส่งออก Sheet" },
   { id: "categories", label: "หมวดหมู่" },
   { id: "backup", label: "สำรอง/กู้คืน" },
 ];
 
 export default function ConfigPage() {
   const { db, setDb, status, linkedFileName, toggleLink } = useStockDB();
-  const sheetsSync = useGoogleSheetsSync(db, setDb);
+  const driveSync = useGoogleDriveSync(db, setDb);
+  const sheetsSync = useGoogleSheetsSync(db);
   const [tab, setTab] = useState<Tab>("storage");
 
   const setPresets = (updater: (prev: string[]) => string[]) => {
@@ -67,8 +70,7 @@ export default function ConfigPage() {
   };
 
   return (
-    <div className="wrap">
-      <Link href="/" className="back-link">← กลับหน้าหลัก</Link>
+    <div className="page">
       <h1>⚙️ ตั้งค่า</h1>
       <p className="sub sub-tight text-xs">เวอร์ชัน {packageJson.version}</p>
 
@@ -87,6 +89,7 @@ export default function ConfigPage() {
       {tab === "storage" && (
         <StorageTab status={status} linkedFileName={linkedFileName} onToggleLink={toggleLink} />
       )}
+      {tab === "drive" && <DriveTab {...driveSync} />}
       {tab === "sheets" && <SheetsTab {...sheetsSync} />}
       {tab === "categories" && (
         <CategoriesTab presets={allCategories} onAdd={addCategory} onRemove={removeCategory} onRename={renameCategory} />

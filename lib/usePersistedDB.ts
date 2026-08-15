@@ -5,6 +5,8 @@ import { DEFAULT_DB, migrateDB, type StockDB } from "./db";
 
 const DB_FILENAME = "stock-manager-db.json";
 const LS_KEY = "stock_manager_db_v1";
+/** หน่วงก่อนเขียนไฟล์ — กดปุ่ม +/- รัวๆ จะได้เขียนรอบเดียวแทนที่จะเขียนทั้งก้อนทุกคลิก */
+const SAVE_DEBOUNCE_MS = 500;
 
 interface WritableLike {
   write(data: string): Promise<void>;
@@ -128,11 +130,40 @@ export function usePersistedStockDB() {
     };
   }, []);
 
+  // เก็บ db ที่ยังไม่ได้เขียนลงไฟล์ไว้ เผื่อต้องรีบ flush ตอนปิดแท็บ/ออกจากหน้า
+  const pendingRef = useRef<StockDB | null>(null);
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+
   useEffect(() => {
     if (!loaded) return;
-    persist(db);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, linkedFile, loaded]);
+    pendingRef.current = db;
+    const t = setTimeout(() => {
+      pendingRef.current = null;
+      persist(db);
+    }, SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [db, loaded, persist]);
+
+  // ปิดแท็บ/สลับไปแท็บอื่น/unmount ระหว่างที่ยังหน่วงอยู่ ต้องเขียนทันที ไม่งั้นการแก้ล่าสุดหาย
+  useEffect(() => {
+    const flush = () => {
+      const pending = pendingRef.current;
+      if (!pending) return;
+      pendingRef.current = null;
+      persistRef.current(pending);
+    };
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onHide);
+      flush();
+    };
+  }, []);
 
   const toggleLink = useCallback(async () => {
     if (linkedFile) {

@@ -3,13 +3,17 @@ import type { useGoogleSheetsSync } from "@/lib/useGoogleSheetsSync";
 type SheetsSync = ReturnType<typeof useGoogleSheetsSync>;
 
 export default function SheetsTab(sync: SheetsSync) {
-  const { clientId, sheetId, token, message, busy, checking, origin, saveSettings, connect, push, pull, forget } = sync;
+  const { clientId, sheetId, token, message, busy, checking, origin, saveSettings, connect, push, forget } = sync;
 
   return (
     <div className="field tab-panel">
       <div className={`sync-status ${checking ? "sync-status--checking" : token ? "sync-status--on" : "sync-status--off"}`}>
         {checking ? "🟡 กำลังตรวจสอบการเชื่อมต่อ..." : token ? "🟢 เชื่อมต่ออยู่" : "⚪ ยังไม่เชื่อมต่อ"}
       </div>
+      <p className="sub sub-tight text-xs">
+        ส่งออก<strong>เฉพาะรายการสินค้า</strong>ไปดู/แก้เป็นตารางใน Google Sheet — ส่งขึ้นอย่างเดียว ไม่ดึงกลับ
+        (ชีตเก็บสูตรต้นทุนกับโปรไฟล์ผิวไม่ได้ ดึงกลับมาจะทำข้อมูลหาย) ถ้าต้องการสำรอง/ย้ายเครื่อง ใช้แท็บ Google Drive
+      </p>
       <p className="sub sub-tight text-xs">
         ต้องสร้าง OAuth Client ID จาก{" "}
         <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">
@@ -42,7 +46,6 @@ export default function SheetsTab(sync: SheetsSync) {
         {token && (
           <>
             <button className="btn-ghost" onClick={push} disabled={busy}>⬆️ ส่งขึ้น Sheet</button>
-            <button className="btn-ghost" onClick={pull} disabled={busy}>⬇️ ดึงจาก Sheet</button>
             <button className="btn-ghost" onClick={forget}>🚫 เลิกจำการเชื่อมต่อ</button>
           </>
         )}

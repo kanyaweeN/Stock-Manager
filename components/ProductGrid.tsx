@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/statusOptions";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/ingredients";
@@ -17,6 +17,8 @@ interface Props {
   onDec: (id: string) => void;
   onEdit: (item: StockItem) => void;
   onDelete: (item: StockItem) => void;
+  /** เพิ่มสินค้าชิ้นนี้เป็นวัตถุดิบในสูตรต้นทุน (ดู lib/cost.ts) */
+  onAddToRecipe?: (item: StockItem) => void;
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
@@ -43,8 +45,20 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onAddToRecipe, selectMode, selectedIds, onToggleSelect }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  /** id ของการ์ดที่เปิดเมนู ⋯ อยู่ (เปิดได้ทีละใบ) */
+  const [menuId, setMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!menuId) return;
+    const close = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (!el?.closest?.(".card-menu")) setMenuId(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuId]);
 
   const ingredientInfo = useMemo(() => {
     const map = new Map<string, { tags: IngredientTag[]; warnCount: number; skinScore?: number; skinLevel?: string }>();
@@ -99,16 +113,19 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
           ) : (
             <div className="product-card__img-placeholder">📦</div>
           )}
-          {outOfStock && <span className="badge-out product-card__low-badge">หมดแล้ว</span>}
-          {low && <span className="badge-low product-card__low-badge">ใกล้หมด</span>}
-          {i.status && (
-            <span className={`status-badge status-${i.status} product-card__status-badge`}>
-              {STATUS_LABELS[i.status]}
-            </span>
-          )}
         </div>
 
         <div className="product-card__body">
+          {/* ป้ายสถานะ — จอกว้างลอยทับรูป, จอมือถือไหลมาเป็นชิปบรรทัดแรกของเนื้อหา (ดู .product-card__flags) */}
+          {(outOfStock || low || i.status) && (
+            <div className="product-card__flags">
+              {outOfStock && <span className="badge-out">หมดแล้ว</span>}
+              {low && <span className="badge-low">ใกล้หมด{i.min > 0 ? ` · ขั้นต่ำ ${i.min}` : ""}</span>}
+              {i.status && (
+                <span className={`status-badge status-${i.status}`}>{STATUS_LABELS[i.status]}</span>
+              )}
+            </div>
+          )}
           <div className="product-card__title">
             {i.name}
             {i.link && (
@@ -159,11 +176,37 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               <button className="qty-btn" onClick={() => onDec(i.id)}>−</button>
               <span> {i.qty} </span>
               <button className="qty-btn" onClick={() => onInc(i.id)}>+</button>
-              {i.min > 0 && <span className="product-card__min">ขั้นต่ำ {i.min}</span>}
             </div>
-            <div className="product-card__actions">
-              <button className="icon-btn" title="แก้ไข" onClick={() => onEdit(i)}>✏️</button>
-              <button className="icon-btn del" title="ลบ" onClick={() => onDelete(i)}>🗑️</button>
+            {/* ตอนใกล้หมดมีป้าย "ใกล้หมด · ขั้นต่ำ n" อยู่แล้ว ไม่ต้องบอกซ้ำ */}
+            {i.min > 0 && !low && <span className="product-card__min">ขั้นต่ำ {i.min}</span>}
+            <div className="card-menu">
+              <button
+                className="icon-btn card-menu__btn"
+                title="เพิ่มเติม"
+                aria-expanded={menuId === i.id}
+                onClick={() => setMenuId((cur) => (cur === i.id ? null : i.id))}
+              >
+                ⋯
+              </button>
+              {menuId === i.id && (
+                <div className="menu__panel card-menu__panel">
+                  <button className="menu__item" onClick={() => { setMenuId(null); onEdit(i); }}><i>✏️</i> แก้ไข</button>
+                  {onAddToRecipe && (
+                    <button className="menu__item" onClick={() => { setMenuId(null); onAddToRecipe(i); }}>
+                      <i>🧮</i> ใส่ในสูตรต้นทุน
+                    </button>
+                  )}
+                  {i.link && (
+                    <a className="menu__item" href={i.link} target="_blank" rel="noopener noreferrer" onClick={() => setMenuId(null)}>
+                      <i>🔗</i> เปิดลิงก์สินค้า
+                    </a>
+                  )}
+                  <div className="menu__sep" />
+                  <button className="menu__item menu__item--danger" onClick={() => { setMenuId(null); onDelete(i); }}>
+                    <i>🗑️</i> ลบสินค้า
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

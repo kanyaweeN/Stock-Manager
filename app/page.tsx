@@ -1,22 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import StatsBar from "@/components/StatsBar";
+import { useMemo, useState } from "react";
+import FilterChips, { type ChipKey } from "@/components/FilterChips";
+import Toolbar from "@/components/Toolbar";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import ProductGrid from "@/components/ProductGrid";
 import ProductModal from "@/components/ProductModal";
 import ImportModal from "@/components/ImportModal";
+import RecipeModal from "@/components/RecipeModal";
 import { useStockDB } from "@/lib/StockDBProvider";
 import { countUnits } from "@/lib/db";
-import { useProductFilters, type SortKey, type StockTab } from "@/lib/useProductFilters";
+import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/cost";
+import { useProductFilters } from "@/lib/useProductFilters";
 import { useProductActions } from "@/lib/useProductActions";
-import { TAG_META, type IngredientTag } from "@/lib/ingredients";
-import type { StockItem } from "@/lib/types";
-import packageJson from "@/package.json";
+import { useRecipeActions } from "@/lib/useRecipeActions";
+import type { Recipe, StockItem } from "@/lib/types";
 
 export default function Home() {
-  const { db, setDb, status } = useStockDB();
+  const { db, setDb } = useStockDB();
   const {
     search, setSearch,
     filterCats, setFilterCats,
@@ -27,9 +28,11 @@ export default function Home() {
     excludeTag, setExcludeTag,
     availableTags, withIngredientsCount,
     categorySuggestions, filtered,
-    outOfStockCount, uncategorizedCount, groupedCount,
+    outOfStockCount, lowCount, totalUnits, uncategorizedCount, groupedCount,
   } = useProductFilters(db.items, db.categoryPresets);
   const actions = useProductActions(setDb);
+  const recipeActions = useRecipeActions(setDb);
+  const recipes = db.recipes ?? [];
 
   const [modalItem, setModalItem] = useState<StockItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,6 +43,9 @@ export default function Home() {
   const [groupNameInput, setGroupNameInput] = useState("");
   const [moveCatOpen, setMoveCatOpen] = useState(false);
   const [moveCatValue, setMoveCatValue] = useState<string[]>([]);
+  const [recipeDraft, setRecipeDraft] = useState<Recipe | null>(null);
+  /** สินค้าที่กำลังจะใส่เข้าสูตร — เปิดกล่องให้เลือกว่าจะใส่สูตรไหน (null = ไม่ได้เปิด) */
+  const [recipeTargetItems, setRecipeTargetItems] = useState<StockItem[] | null>(null);
 
   const openAdd = () => { setModalItem(null); setModalOpen(true); };
   const openEdit = (item: StockItem) => { setModalItem(item); setModalOpen(true); };
@@ -89,84 +95,91 @@ export default function Home() {
     exitSelectMode();
   };
 
+  const startNewRecipeWith = (chosen: StockItem[]) => {
+    setRecipeTargetItems(null);
+    setRecipeDraft({ ...emptyRecipe(), lines: chosen.map(lineFromItem) });
+  };
+
+  /** ใส่สินค้าเข้าสูตร — ถ้ายังไม่มีสูตรเลยก็ข้ามไปสร้างสูตรใหม่ให้เลย ไม่ต้องเลือก */
+  const openAddToRecipe = (chosen: StockItem[]) => {
+    if (chosen.length === 0) return;
+    if (recipes.length === 0) startNewRecipeWith(chosen);
+    else setRecipeTargetItems(chosen);
+  };
+
+  const addToExistingRecipe = (recipe: Recipe) => {
+    const chosen = recipeTargetItems ?? [];
+    setRecipeTargetItems(null);
+    setRecipeDraft({ ...recipe, lines: [...recipe.lines, ...chosen.map(lineFromItem)] });
+  };
+
+  const handleSaveRecipe = (recipe: Recipe) => {
+    recipeActions.save(recipe);
+    setRecipeDraft(null);
+  };
+
+  const categoryCount = useMemo(() => new Set(db.items.flatMap((i) => i.cats)).size, [db.items]);
+
+  /** ชิปตัวเลขทั้งแถวเลือกได้ทีละอัน — กดชิปที่เปิดอยู่ซ้ำ = กลับไป "ทั้งหมด" */
+  const activeChip: ChipKey = uncategorizedOnly ? "uncategorized" : stockTab;
+  const selectChip = (key: ChipKey) => {
+    const next = key === activeChip ? "all" : key;
+    if (next === "uncategorized") {
+      if (!uncategorizedOnly) toggleUncategorizedOnly();
+      setStockTab("all");
+      return;
+    }
+    if (uncategorizedOnly) toggleUncategorizedOnly();
+    setStockTab(next);
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setFilterCats([]);
+    setFilterTag("");
+    setExcludeTag(false);
+  };
+
   return (
-    <div className={`wrap ${selectMode ? "wrap--with-select-bar" : ""}`}>
-      <h1>📦 จัดการสต็อกสินค้า</h1>
-      <p className="sub">{status.msg}</p>
-      <p className="sub sub-tight text-xs">เวอร์ชัน {packageJson.version}</p>
+    <div className={`page ${selectMode ? "page--with-select-bar" : ""}`}>
+      <Toolbar
+        title="สินค้าทั้งหมด"
+        search={search}
+        onSearch={setSearch}
+        categories={categorySuggestions}
+        filterCats={filterCats}
+        onFilterCats={setFilterCats}
+        sortKey={sortKey}
+        onSortKey={setSortKey}
+        availableTags={availableTags}
+        withIngredientsCount={withIngredientsCount}
+        filterTag={filterTag}
+        onFilterTag={setFilterTag}
+        excludeTag={excludeTag}
+        onExcludeTag={setExcludeTag}
+        onClearFilters={clearFilters}
+        onAdd={openAdd}
+        onNewRecipe={() => setRecipeDraft(emptyRecipe())}
+        onImport={() => setImportOpen(true)}
+        onExport={() => actions.exportCsv(db.items)}
+        selectMode={selectMode}
+        onToggleSelectMode={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+      />
 
-      <StatsBar items={db.items} />
-
-      <div className="stock-tabs">
-        <button className={`stock-tab ${stockTab === "all" ? "active" : ""}`} onClick={() => setStockTab("all")}>
-          ทั้งหมด ({countUnits(db.items)})
-        </button>
-        <button className={`stock-tab ${stockTab === "in-stock" ? "active" : ""}`} onClick={() => setStockTab("in-stock")}>
-          มีสินค้า ({db.items.length - outOfStockCount})
-        </button>
-        <button className={`stock-tab ${stockTab === "out-of-stock" ? "active" : ""}`} onClick={() => setStockTab("out-of-stock")}>
-          หมดแล้ว ({outOfStockCount})
-        </button>
-        <button className={`stock-tab ${uncategorizedOnly ? "active" : ""}`} onClick={toggleUncategorizedOnly}>
-          ไม่มีหมวดหมู่ ({uncategorizedCount})
-        </button>
-        <button className={`stock-tab ${stockTab === "grouped" ? "active" : ""}`} onClick={() => setStockTab("grouped")}>
-          👥 กลุ่ม ({groupedCount})
-        </button>
-      </div>
-
-      <div className="toolbar">
-        <input
-          id="search"
-          type="text"
-          placeholder="ค้นหาชื่อสินค้า / ส่วนผสม..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <CategoryMultiSelect categories={categorySuggestions} selected={filterCats} onChange={setFilterCats} />
-        <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
-          <option value="name-asc">ชื่อ ก-ฮ</option>
-          <option value="name-desc">ชื่อ ฮ-ก</option>
-          <option value="qty-asc">จำนวนน้อย-มาก</option>
-          <option value="qty-desc">จำนวนมาก-น้อย</option>
-          <option value="price-asc">ราคาต่ำ-สูง</option>
-          <option value="price-desc">ราคาสูง-ต่ำ</option>
-          <option value="cat-asc">หมวดหมู่ ก-ฮ</option>
-          <option value="cat-desc">หมวดหมู่ ฮ-ก</option>
-        </select>
-        <button className="btn-primary" onClick={openAdd}>+ เพิ่มสินค้า</button>
-        <button className="btn-ghost" onClick={() => setImportOpen(true)}>นำเข้าจาก Shopee</button>
-        <button className="btn-ghost" onClick={() => actions.exportCsv(db.items)}>ส่งออก CSV</button>
-        {selectMode ? (
-          <button className="btn-ghost" onClick={exitSelectMode}>ยกเลิกการเลือก</button>
-        ) : (
-          <button className="btn-ghost" onClick={() => setSelectMode(true)}>☑️ เลือกหลายอัน</button>
-        )}
-        <Link href="/summary" className="btn-ghost">📊 สรุปยอด</Link>
-        <Link href="/analyze" className="btn-ghost">🧪 วิเคราะห์ส่วนผสม</Link>
-        <Link href="/config" className="btn-ghost">⚙️ ตั้งค่า</Link>
-      </div>
-
-      {availableTags.length > 0 && (
-        <div className="toolbar toolbar--sub">
-          <label className="ing-filter-label">🧪 กรองด้วยส่วนผสม ({withIngredientsCount} รายการมีข้อมูล)</label>
-          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value as IngredientTag | "")}>
-            <option value="">ทั้งหมด</option>
-            {availableTags.map((t) => (
-              <option key={t} value={t}>{TAG_META[t].emoji} {TAG_META[t].label}</option>
-            ))}
-          </select>
-          <label className="ing-filter-label">
-            <input
-              type="checkbox"
-              checked={excludeTag}
-              disabled={!filterTag}
-              onChange={(e) => setExcludeTag(e.target.checked)}
-            />
-            กลับด้าน (เอาเฉพาะตัวที่ไม่มี)
-          </label>
-        </div>
-      )}
+      <FilterChips
+        counts={{
+          all: countUnits(db.items),
+          totalUnits,
+          inStock: db.items.length - outOfStockCount,
+          low: lowCount,
+          outOfStock: outOfStockCount,
+          uncategorized: uncategorizedCount,
+          grouped: groupedCount,
+          categories: categoryCount,
+        }}
+        active={activeChip}
+        onSelect={selectChip}
+      />
 
       {selectMode && (
         <div className="select-action-bar">
@@ -185,6 +198,13 @@ export default function Home() {
           >
             🏷️ ย้ายหมวดหมู่
           </button>
+          <button
+            className="btn-ghost"
+            disabled={selectedIds.size < 1}
+            onClick={() => { openAddToRecipe(selectedItems); exitSelectMode(); }}
+          >
+            🧮 ใส่ในสูตรต้นทุน
+          </button>
           <button className="btn-ghost" onClick={exitSelectMode}>ยกเลิก</button>
         </div>
       )}
@@ -197,6 +217,7 @@ export default function Home() {
         onDec={actions.dec}
         onEdit={openEdit}
         onDelete={actions.remove}
+        onAddToRecipe={(item) => openAddToRecipe([item])}
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
@@ -212,6 +233,49 @@ export default function Home() {
         onSave={handleSave}
         onUngroup={actions.ungroup}
       />
+      <RecipeModal
+        open={recipeDraft !== null}
+        recipe={recipeDraft}
+        items={db.items}
+        onClose={() => setRecipeDraft(null)}
+        onSave={handleSaveRecipe}
+      />
+
+      {recipeTargetItems && (
+        <div className="modal-backdrop open">
+          <div className="modal">
+            <div className="modal-header">
+              <h2>ใส่ {recipeTargetItems.length} รายการในสูตรไหน?</h2>
+              <button className="modal-close" title="ปิด" onClick={() => setRecipeTargetItems(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="category-list" style={{ marginBottom: 12 }}>
+                {recipeTargetItems.map((i) => (
+                  <div className="category-row" key={i.id}>
+                    <span>{i.name}{i.price != null ? ` · ฿${i.price}` : ""}{i.size ? ` · ${i.size}` : ""}</span>
+                  </div>
+                ))}
+              </div>
+              <label className="text-xs" style={{ color: "var(--muted)" }}>เลือกสูตรที่มีอยู่</label>
+              <div className="stock-picker__list">
+                {recipes.map((r) => (
+                  <button className="stock-picker__row" key={r.id} onClick={() => addToExistingRecipe(r)}>
+                    <span className="stock-picker__name">{r.name || "(ไม่มีชื่อ)"}</span>
+                    <span className="stock-picker__meta">
+                      วัตถุดิบ {r.lines.length} · {baht(recipeTotals(r).perUnitCost)}/{r.yieldUnit}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-ghost" onClick={() => setRecipeTargetItems(null)}>ยกเลิก</button>
+              <button className="btn-primary" onClick={() => startNewRecipeWith(recipeTargetItems)}>+ สูตรใหม่</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ImportModal
         open={importOpen}
         categories={categorySuggestions}

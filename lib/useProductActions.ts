@@ -29,7 +29,8 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     if (editId) {
       setItems((prev) => prev.map((i) => (i.id === editId ? { ...i, ...data } : i)));
     } else {
-      setItems((prev) => [...prev, { id: uid(), ...data }]);
+      // createdAt ติดตอนสร้างครั้งเดียว การแก้ไขทีหลังไม่แตะ (ไม่งั้นลำดับ "เพิ่มล่าสุด" จะเพี้ยน)
+      setItems((prev) => [...prev, { id: uid(), ...data, createdAt: data.createdAt || new Date().toISOString() }]);
     }
   };
 
@@ -60,7 +61,8 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
 
   const importFromShopee = (chosen: ImportCandidate[]) => {
     if (chosen.length === 0) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date().toISOString();
+    const today = now.slice(0, 10);
     // ซื้อซ้ำ (มี existingId + mergeExisting) ให้บวกจำนวนเข้ารายการเดิมแทนสร้างใหม่
     const toMerge = new Map(chosen.filter((c) => c.existingId && c.mergeExisting).map((c) => [c.existingId!, c]));
     const toAdd = chosen.filter((c) => !(c.existingId && c.mergeExisting));
@@ -99,6 +101,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
         size: c.size,
         variant: c.variant,
         purchasedAt: today,
+        createdAt: now,
       })),
     ]);
   };

@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from "react";
 import type { StockDB } from "./db";
-import { pullFromSheet, pushToSheet, requestAccessToken } from "./googleSheets";
+import { requestAccessToken } from "./googleAuth";
+import { SHEETS_SCOPE, pushToSheet } from "./googleSheets";
 
+/** client id ใช้ร่วมกับ Google Drive sync — เป็น OAuth client ตัวเดียวกัน (key เก่าไว้รองรับคนที่ตั้งค่าไว้แล้ว) */
+const CLIENT_ID_KEY = "stock_manager_google_client_id";
 const GS_CLIENT_ID_KEY = "stock_manager_gs_client_id";
 const GS_SHEET_ID_KEY = "stock_manager_gs_sheet_id";
 const GS_REMEMBER_KEY = "stock_manager_gs_remember";
 
-/** จัดการ state และ logic ทั้งหมดของการเชื่อมต่อ/ซิงก์ข้อมูลกับ Google Sheets */
-export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB) => StockDB) => void) {
+/**
+ * จัดการการส่งออกรายการสินค้าไป Google Sheet — **ส่งขึ้นอย่างเดียว ไม่มีดึงกลับ**
+ * ถ้าต้องการซิงก์/กู้คืนข้อมูลจริง ใช้ `useGoogleDriveSync` (เก็บ StockDB ทั้งก้อนเป็น JSON)
+ */
+export function useGoogleSheetsSync(db: StockDB) {
   const [clientId, setClientId] = useState("");
   const [sheetId, setSheetId] = useState("");
   const [token, setToken] = useState<string | null>(null);
@@ -22,7 +28,11 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
     // ถ้าเคยตั้งค่าไว้ในเบราว์เซอร์นี้แล้วใช้ค่านั้นก่อน ไม่งั้น fallback ไปใช้ค่า default จาก env
     // (ตั้งใน .env.local เป็น NEXT_PUBLIC_GOOGLE_CLIENT_ID / NEXT_PUBLIC_GOOGLE_SHEET_ID)
     // เพื่อไม่ต้องกรอกเองทุกครั้งที่เปิดเบราว์เซอร์ใหม่/ล้าง localStorage
-    const savedClientId = localStorage.getItem(GS_CLIENT_ID_KEY) || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+    const savedClientId =
+      localStorage.getItem(CLIENT_ID_KEY) ||
+      localStorage.getItem(GS_CLIENT_ID_KEY) ||
+      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+      "";
     const savedSheetId = localStorage.getItem(GS_SHEET_ID_KEY) || process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID || "";
     setClientId(savedClientId);
     setSheetId(savedSheetId);
@@ -35,7 +45,7 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
         setToken(t);
         setMessage("✅ เชื่อมต่ออัตโนมัติสำเร็จ");
       };
-      const silent = requestAccessToken(savedClientId, true);
+      const silent = requestAccessToken(savedClientId, SHEETS_SCOPE, true);
       // เผื่อ callback ไม่ยอมเรียกกลับเลย (เช่น browser บล็อก third-party cookie) — ไม่งั้นจะค้างที่ "กำลังตรวจสอบ" ตลอดไป
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000));
       Promise.race([silent, timeout])
@@ -53,7 +63,7 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
   const saveSettings = (nextClientId: string, nextSheetId: string) => {
     setClientId(nextClientId);
     setSheetId(nextSheetId);
-    localStorage.setItem(GS_CLIENT_ID_KEY, nextClientId);
+    localStorage.setItem(CLIENT_ID_KEY, nextClientId);
     localStorage.setItem(GS_SHEET_ID_KEY, nextSheetId);
   };
 
@@ -65,7 +75,7 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
     setBusy(true);
     setMessage("กำลังเชื่อมต่อ...");
     try {
-      const t = await requestAccessToken(clientId.trim());
+      const t = await requestAccessToken(clientId.trim(), SHEETS_SCOPE);
       setToken(t);
       localStorage.setItem(GS_REMEMBER_KEY, "1");
       setMessage("กำลังส่งข้อมูลขึ้น Sheet ครั้งแรก...");
@@ -92,32 +102,11 @@ export function useGoogleSheetsSync(db: StockDB, setDb: (updater: (prev: StockDB
     }
   };
 
-  const pull = async () => {
-    if (!token) return;
-    const ok = confirm("จะดึงข้อมูลจาก Google Sheet มาแทนที่ข้อมูลปัจจุบันในเครื่อง ต้องการดำเนินการต่อหรือไม่?");
-    if (!ok) return;
-    setBusy(true);
-    setMessage("กำลังดึงข้อมูลจาก Google Sheet...");
-    try {
-      const pulled = await pullFromSheet(token, sheetId.trim());
-      setDb((prev) => ({
-        ...prev,
-        items: pulled.items,
-        categoryPresets: pulled.categoryPresets.length ? pulled.categoryPresets : prev.categoryPresets,
-      }));
-      setMessage(`✅ ดึงข้อมูลมาแล้ว · ${pulled.items.length} รายการ`);
-    } catch (e) {
-      setMessage("ดึงข้อมูลไม่สำเร็จ: " + (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const forget = () => {
     setToken(null);
     localStorage.removeItem(GS_REMEMBER_KEY);
     setMessage("เลิกจำการเชื่อมต่อแล้ว");
   };
 
-  return { clientId, sheetId, token, message, busy, checking, origin, saveSettings, connect, push, pull, forget };
+  return { clientId, sheetId, token, message, busy, checking, origin, saveSettings, connect, push, forget };
 }

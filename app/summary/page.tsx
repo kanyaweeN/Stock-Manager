@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useStockDB } from "@/lib/StockDBProvider";
 import type { StockItem } from "@/lib/types";
@@ -149,8 +148,7 @@ export default function SummaryPage() {
   };
 
   return (
-    <div className="wrap">
-      <Link href="/" className="back-link">← กลับหน้าหลัก</Link>
+    <div className="page">
       <h1>📊 สรุปยอด</h1>
       <p className="sub sub-tight text-xs">
         สรุปมูลค่ารวม (จำนวน × ราคา) — รายการที่ไม่ได้กรอกราคา/วันที่ซื้อจะนับจำนวนแต่ไม่มีมูลค่า/ไม่เข้าเงื่อนไขตัวกรองวันที่
