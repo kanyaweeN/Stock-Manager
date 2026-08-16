@@ -14,6 +14,9 @@ function SkinScoreBadge({ score, level }: { score: number; level: string }) {
   );
 }
 
+/** โปรไฟล์ผิวว่างเปล่า — ต้องเป็นค่าคงที่ตัวเดียว ไม่งั้นสร้าง object ใหม่ทุก render แล้ว memo ที่อ้างถึงพังหมด */
+const EMPTY_PROFILE = { skinType: "" as SkinType, concerns: [] as SkinConcern[] };
+
 export default function AnalyzePage() {
   const { db, setDb } = useStockDB();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -21,21 +24,24 @@ export default function AnalyzePage() {
   const [search, setSearch] = useState("");
 
   const avoid = useMemo(() => db.avoidIngredients || [], [db.avoidIngredients]);
-  const profile = db.skinProfile || { skinType: "" as SkinType, concerns: [] };
+  const profile = db.skinProfile || EMPTY_PROFILE;
 
+  // ทั้งสองตัวต้องอ่านโปรไฟล์จาก `prev` ไม่ใช่ตัวแปร `profile` ที่ปิดทับมาจากตอน render
+  // ไม่งั้นถ้ามี setDb ซ้อนกันในรอบเดียว (เช่นกดติ๊ก concern สองอันติดๆ) อันหลังจะเขียนทับด้วยค่าเก่า
   const setSkinType = (skinType: SkinType) =>
-    setDb((prev) => ({ ...prev, skinProfile: { ...profile, skinType } }));
+    setDb((prev) => ({ ...prev, skinProfile: { ...(prev.skinProfile ?? EMPTY_PROFILE), skinType } }));
 
   const toggleConcern = (c: SkinConcern) =>
-    setDb((prev) => ({
-      ...prev,
-      skinProfile: {
-        ...profile,
-        concerns: profile.concerns.includes(c)
-          ? profile.concerns.filter((x) => x !== c)
-          : [...profile.concerns, c],
-      },
-    }));
+    setDb((prev) => {
+      const cur = prev.skinProfile ?? EMPTY_PROFILE;
+      return {
+        ...prev,
+        skinProfile: {
+          ...cur,
+          concerns: cur.concerns.includes(c) ? cur.concerns.filter((x) => x !== c) : [...cur.concerns, c],
+        },
+      };
+    });
 
   const withIngredients = useMemo(
     () => db.items.filter((i) => i.ingredients?.trim()),

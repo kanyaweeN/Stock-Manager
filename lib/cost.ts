@@ -1,10 +1,30 @@
 import type { Recipe, RecipeLine, StockItem } from "./types";
 import { uid } from "./uid";
 
-/** ต้นทุนของวัตถุดิบ 1 บรรทัด = ราคาที่ซื้อ ÷ ปริมาณต่อแพ็ค × ปริมาณที่ใช้ */
+/**
+ * ต้นทุนของวัตถุดิบ 1 บรรทัด = ราคาต่อ 1 แพ็ค ÷ ปริมาณที่ได้ต่อ 1 แพ็ค × ปริมาณที่ใช้
+ *
+ * หมายเหตุเรื่อง "ซื้อหลายแพ็ค": `buyPrice` เป็นราคา **ต่อ 1 แพ็ค** (เหมือนช่องราคาในสต็อก)
+ * ซื้อ 3 แพ็คจ่ายจริง ฿90 ก็จริง แต่ก็ได้ของ 3 เท่าเหมือนกัน ต้นทุนต่อหน่วยจึงเท่าเดิม
+ * (฿30 ÷ 1000 g = ฿90 ÷ 3000 g) — จำนวนแพ็คที่ซื้อจึงไม่เข้ามาในสูตรนี้โดยตั้งใจ
+ */
 export function lineCost(line: RecipeLine): number {
   if (!line.packAmount || line.packAmount <= 0) return 0;
   return (line.buyPrice / line.packAmount) * line.usedAmount;
+}
+
+/** ปัญหาที่ทำให้บรรทัดนี้คิดต้นทุนไม่ได้ (หรือได้ค่าที่เชื่อไม่ได้) — เอาไปเตือนบน UI */
+export function lineIssue(line: RecipeLine): string | null {
+  if (!(line.packAmount > 0)) {
+    return 'ยังไม่รู้ว่า 1 แพ็คได้ปริมาณเท่าไร — กรอกช่อง "ได้ปริมาณ" ก่อน ไม่งั้นบรรทัดนี้คิดเป็น ฿0';
+  }
+  if (!(line.buyPrice > 0)) return "ยังไม่ได้กรอกราคาที่ซื้อ (ต่อ 1 แพ็ค)";
+  return null;
+}
+
+/** ตัวเลขปริมาณแบบอ่านง่าย — ตัด .00 ทิ้ง */
+export function amountText(n: number): string {
+  return (Math.round(n * 1000) / 1000).toLocaleString("th-TH", { maximumFractionDigits: 3 });
 }
 
 /** ต้นทุนต่อ 1 หน่วยย่อย (เช่น บาท/กรัม) — ใช้โชว์ให้เห็นว่าของชิ้นนี้ตกหน่วยละเท่าไร */
@@ -50,28 +70,86 @@ export function baht(n: number): string {
   return `฿${rounded.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// แกะขนาดบรรจุจากข้อความ `item.size`
+// ─────────────────────────────────────────────────────────────
+
+/** หน่วยที่แปลงเป็นหน่วยฐานได้ (น้ำหนัก → g, ปริมาตร → ml) */
+const UNIT_TABLE: Record<string, { base: string; factor: number }> = {};
+const addUnits = (base: string, factor: number, names: string[]) => {
+  for (const nm of names) UNIT_TABLE[nm] = { base, factor };
+};
+addUnits("g", 1, ["g", "gram", "grams", "gm", "กรัม", "ก"]);
+addUnits("g", 1000, ["kg", "kgs", "กก", "กิโล", "กิโลกรัม"]);
+addUnits("g", 100, ["ขีด"]);
+addUnits("g", 0.001, ["mg", "มก", "มิลลิกรัม"]);
+addUnits("g", 28.3495, ["oz", "ออนซ์"]);
+addUnits("g", 453.592, ["lb", "lbs", "ปอนด์"]);
+addUnits("ml", 1, ["ml", "cc", "มล", "มิลลิลิตร", "ซีซี"]);
+addUnits("ml", 1000, ["l", "ลิตร", "ล"]);
+
+/** หน่วยนับชิ้น — ใช้เป็นปริมาณต่อแพ็คได้ตรงๆ ไม่ต้องแปลง */
+const COUNT_UNITS = new Set([
+  "ชิ้น", "อัน", "เม็ด", "ใบ", "แผ่น", "เส้น", "ลูก", "ดวง", "ชุด", "คู่",
+  "ซอง", "ขวด", "หลอด", "ม้วน", "ก้อน", "pcs", "pc", "ea", "set",
+]);
+
+/** หน่วยความยาว = ขนาดมิติของตัวสินค้า (เช่น "10x15 ซม.") ไม่ใช่ปริมาณบรรจุ ห้ามเอามาหาร */
+const LENGTH_UNITS = new Set([
+  "cm", "ซม", "เซนติเมตร", "mm", "มม", "มิลลิเมตร", "m", "เมตร", "นิ้ว", "inch", "in", "ft",
+]);
+
+const unitKey = (u: string) => u.trim().toLowerCase().replace(/\.+$/, "");
+
 /**
- * แกะขนาดบรรจุจากข้อความ field `size` ของสินค้า เช่น "500 g", "30ml", "1 กก."
- * คืน null ถ้าอ่านไม่ออก (เช่น "S, M, L") — ให้ผู้ใช้กรอกเอง
+ * แกะขนาดบรรจุจากข้อความ field `size` ของสินค้า เช่น "500 g", "30ml", "1 กก.", "500ml x2"
+ * แปลงเป็นหน่วยฐานให้เลย (1 กก. → 1000 g) จะได้กรอก "ใช้ไป" เป็นกรัม/มล. ตามที่ชั่งจริงได้
+ *
+ * คืน null ถ้าอ่านไม่ออก (เช่น "S, M, L", "10x15 ซม.", "500" เฉยๆ ไม่บอกหน่วย)
+ * — ตรงนี้สำคัญ: เดาผิดแล้วเอาไปเป็น "ตัวหาร" ต้นทุนจะเพี้ยนแบบเงียบๆ สู้ให้ผู้ใช้กรอกเองดีกว่า
  */
 export function parsePackSize(size?: string): { amount: number; unit: string } | null {
   if (!size) return null;
-  const m = size.trim().match(/^(\d+(?:[.,]\d+)?)\s*([A-Za-z฀-๿.]*)/);
-  if (!m) return null;
-  const amount = Number(m[1].replace(",", "."));
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  return { amount, unit: m[2] || "ชิ้น" };
+  const s = size.replace(/(\d),(\d)/g, "$1$2").trim().toLowerCase();
+  if (!s) return null;
+
+  let found: { amount: number; unit: string } | null = null;
+  for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*([a-z฀-๿]+\.?)?/g)) {
+    const amount = Number(m[1]);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const key = unitKey(m[2] ?? "");
+    if (LENGTH_UNITS.has(key)) return null; // เจอหน่วยความยาว = เป็นขนาดมิติทั้งข้อความ
+    if (found) continue; // เอาตัวแรกที่อ่านออกพอ แต่ยังวนต่อเผื่อเจอหน่วยความยาวทีหลัง
+    const conv = UNIT_TABLE[key];
+    if (conv) found = { amount: amount * conv.factor, unit: conv.base };
+    else if (COUNT_UNITS.has(key)) found = { amount, unit: key };
+  }
+  if (!found) return null;
+
+  // แพ็คคู่/แพ็คสาม เช่น "500ml x2" หรือ "2x500ml" = ได้ 1000 ml ต่อการซื้อ 1 ครั้ง
+  const mult =
+    s.match(/[x×]\s*(\d+)\s*(?:แพ็?ค|ห่อ|ถุง|ขวด|ชิ้น|pack|packs)?\s*$/) ||
+    s.match(/^(\d+)\s*[x×]\s*(?=\d)/);
+  const times = mult ? Number(mult[1]) : 1;
+  if (times > 1 && times <= 100) found = { ...found, amount: found.amount * times };
+
+  return found;
 }
 
-/** สร้างบรรทัดวัตถุดิบจากสินค้าในสต็อก — ดึงราคา/ขนาดบรรจุมาให้อัตโนมัติ */
+/**
+ * สร้างบรรทัดวัตถุดิบจากสินค้าในสต็อก — ดึงราคา/ขนาดบรรจุมาให้อัตโนมัติ
+ * ถ้าแกะขนาดไม่ออก จะตั้ง packAmount = 0 (= ยังไม่รู้) แล้วให้ UI เตือนให้กรอกเอง
+ * ไม่ตั้งเป็น 1 เงียบๆ เพราะจะกลายเป็น "ใช้ 50 g = จ่ายราคาเต็ม 50 แพ็ค"
+ */
 export function lineFromItem(item: StockItem): RecipeLine {
   const pack = parsePackSize(item.size);
+  const countable = !item.size?.trim(); // ไม่ได้ระบุขนาดไว้เลย = ของนับเป็นชิ้น
   return {
     id: uid(),
     itemId: item.id,
     name: item.name,
     buyPrice: item.price ?? 0,
-    packAmount: pack?.amount ?? 1,
+    packAmount: pack?.amount ?? (countable ? 1 : 0),
     unit: pack?.unit ?? "ชิ้น",
     usedAmount: 0,
   };

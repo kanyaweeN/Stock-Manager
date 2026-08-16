@@ -1,4 +1,4 @@
-import type { Recipe, RecipeLine, StockItem } from "./types";
+import type { PlanLine, PricePoint, PurchasePlan, Recipe, RecipeLine, StockItem } from "./types";
 
 export type SkinType = "" | "oily" | "dry" | "combination" | "normal" | "sensitive";
 export type SkinConcern = "acne" | "aging" | "dark-spots" | "redness" | "dryness" | "oiliness" | "pores" | "dullness";
@@ -38,6 +38,8 @@ export interface StockDB {
   skinProfile?: SkinProfile;
   /** สูตรต้นทุน (ทำอะไร ใช้อะไรบ้าง ต้นทุนต่อชิ้นเท่าไร) — ดู lib/cost.ts */
   recipes?: Recipe[];
+  /** แผนซื้อของ (เดือนหน้า/ปีใหม่ ต้องซื้ออะไรบ้าง ซื้อไปแล้วเท่าไร) — ดู lib/plan.ts */
+  plans?: PurchasePlan[];
   updatedAt?: string;
 }
 
@@ -125,6 +127,31 @@ export const MIGRATIONS: Migration[] = [
         return { ...i, createdAt: typeof i.purchasedAt === "string" ? i.purchasedAt : "" };
       }),
   },
+  {
+    to: 6,
+    note: "เพิ่ม item.priceHistory (ประวัติราคาแต่ละครั้งที่ซื้อ) — ตั้งต้นด้วยราคาปัจจุบัน 1 จุด ถ้ามีราคาอยู่แล้ว",
+    up: (db) =>
+      mapItems(db, (i) => {
+        if (Array.isArray(i.priceHistory)) return i;
+        const price = typeof i.price === "number" && Number.isFinite(i.price) ? i.price : null;
+        if (price == null) return { ...i, priceHistory: [] };
+        const qty = typeof i.buyQty === "number" && i.buyQty > 0 ? i.buyQty : 1;
+        // ของที่นำเข้าก่อนเวอร์ชันนี้อาจเก็บ price เป็น "ยอดรวมทั้งแถว" (ดู lib/shopee.ts)
+        // ย้อนกลับไปหารให้ไม่ได้ เพราะ item.qty ถูกเพิ่ม/ลดหลังจากนั้นไปแล้ว — ติดธงไว้ให้ UI เตือนแทน
+        // (ตัวที่ buyQty มีค่าอยู่แล้ว = นำเข้าด้วยโค้ดใหม่ ราคาต่อชิ้นถูกอยู่แล้ว ไม่ต้องเตือน)
+        const unverified = i.source === "shopee" && typeof i.buyQty !== "number";
+        return {
+          ...i,
+          priceHistory: [{ date: typeof i.purchasedAt === "string" ? i.purchasedAt : "", price, qty }],
+          ...(unverified ? { priceUnverified: true } : {}),
+        };
+      }),
+  },
+  {
+    to: 7,
+    note: "เพิ่มฟีเจอร์วางแผนการซื้อ — เติม db.plans",
+    up: (db) => ({ ...db, plans: asArray(db.plans) }),
+  },
 ];
 
 /** เวอร์ชันล่าสุด = ปลายทางของ migration step สุดท้าย (คำนวณให้ ไม่ต้องแก้มือ) */
@@ -136,6 +163,7 @@ export const DEFAULT_DB: StockDB = {
   categoryPresets: ["เครื่องใช้", "อุปกรณ์ฝีมือ"],
   avoidIngredients: [],
   recipes: [],
+  plans: [],
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -150,6 +178,15 @@ function dropRedundantParentCats(cats: string[]): string[] {
   return cats.filter((c) => !cats.some((other) => other !== c && other.startsWith(`${c} > `)));
 }
 
+/** ทิ้งจุดที่ไม่มีราคาเป็นตัวเลข (ข้อมูลพัง/แก้มือมาผิด) แล้วเรียงตามวันที่ให้เสมอ */
+function normalizePriceHistory(raw: unknown): PricePoint[] {
+  return asArray(raw)
+    .map((p) => (p ?? {}) as Partial<PricePoint>)
+    .filter((p): p is PricePoint => typeof p.price === "number" && Number.isFinite(p.price))
+    .map((p) => ({ date: str(p.date), price: p.price, qty: num(p.qty, 1) > 0 ? num(p.qty, 1) : 1 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 function normalizeItem(raw: unknown): StockItem {
   const i = (raw ?? {}) as RawItem & Partial<StockItem>;
   const cats = asArray(i.cats).filter((c): c is string => typeof c === "string" && c !== "");
@@ -158,6 +195,9 @@ function normalizeItem(raw: unknown): StockItem {
     cats: dropRedundantParentCats(cats),
     ingredients: str(i.ingredients),
     createdAt: str(i.createdAt),
+    priceHistory: normalizePriceHistory(i.priceHistory),
+    // เก็บเฉพาะตอนเป็น true จริงๆ — ไม่งั้นทุกรายการจะพก `priceUnverified: false` ติดไป Drive/แบ็กอัปเปล่าๆ
+    priceUnverified: i.priceUnverified === true ? true : undefined,
   };
 }
 
@@ -188,6 +228,33 @@ function normalizeRecipe(raw: unknown, idx: number): Recipe {
   };
 }
 
+function normalizePlan(raw: unknown, idx: number): PurchasePlan {
+  const p = (raw ?? {}) as Partial<PurchasePlan>;
+  return {
+    id: p.id || `plan-${idx}`,
+    name: str(p.name),
+    note: str(p.note),
+    dueDate: str(p.dueDate) || undefined,
+    budget: typeof p.budget === "number" && Number.isFinite(p.budget) ? p.budget : undefined,
+    lines: asArray(p.lines).map((l, li): PlanLine => {
+      const line = (l ?? {}) as Partial<PlanLine>;
+      return {
+        id: line.id || `pline-${idx}-${li}`,
+        itemId: line.itemId,
+        name: str(line.name),
+        qty: num(line.qty, 1) > 0 ? num(line.qty, 1) : 1,
+        price: num(line.price),
+        note: str(line.note),
+        bought: line.bought === true,
+        boughtAt: str(line.boughtAt) || undefined,
+        paidPrice: typeof line.paidPrice === "number" && Number.isFinite(line.paidPrice) ? line.paidPrice : undefined,
+      };
+    }),
+    createdAt: str(p.createdAt) || undefined,
+    updatedAt: p.updatedAt,
+  };
+}
+
 function normalizeDB(db: RawDB, version: number): StockDB {
   const skinProfile = db.skinProfile;
   return {
@@ -202,6 +269,7 @@ function normalizeDB(db: RawDB, version: number): StockDB {
     skinProfile:
       skinProfile && typeof skinProfile === "object" ? (skinProfile as SkinProfile) : { skinType: "", concerns: [] },
     recipes: asArray(db.recipes).map(normalizeRecipe),
+    plans: asArray(db.plans).map(normalizePlan),
     updatedAt: typeof db.updatedAt === "string" ? db.updatedAt : undefined,
   };
 }

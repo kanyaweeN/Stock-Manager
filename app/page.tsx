@@ -64,6 +64,15 @@ export default function Home() {
     });
   };
 
+  /**
+   * เลือกทั้งหมด = เฉพาะรายการที่มองเห็นอยู่ตอนนี้ (ผ่านตัวกรอง/คำค้นแล้ว) ไม่ใช่ทั้งสต็อก
+   * จะได้ใช้คู่กับตัวกรองเพื่อ "ลบทั้งหมดในหมวดนี้" ได้ และไม่เผลอลบของที่มองไม่เห็น
+   */
+  const allFilteredSelected = filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds(allFilteredSelected ? new Set() : new Set(filtered.map((i) => i.id)));
+  };
+
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedIds(new Set());
@@ -184,6 +193,9 @@ export default function Home() {
       {selectMode && (
         <div className="select-action-bar">
           <span>เลือกไว้ {selectedIds.size} รายการ</span>
+          <button className="btn-ghost" onClick={toggleSelectAllFiltered}>
+            {allFilteredSelected ? "ล้างที่เลือก" : `เลือกทั้งหมด (${filtered.length})`}
+          </button>
           <button
             className="btn-primary"
             disabled={selectedIds.size < 2}
@@ -204,6 +216,14 @@ export default function Home() {
             onClick={() => { openAddToRecipe(selectedItems); exitSelectMode(); }}
           >
             🧮 ใส่ในสูตรต้นทุน
+          </button>
+          <button
+            className="btn-danger"
+            disabled={selectedIds.size < 1}
+            // ยกเลิกใน confirm แล้วต้องไม่หลุดออกจากโหมดเลือก ไม่งั้นที่เลือกไว้หายหมดฟรีๆ
+            onClick={() => { if (actions.removeMany(selectedItems)) exitSelectMode(); }}
+          >
+            🗑️ ลบที่เลือก
           </button>
           <button className="btn-ghost" onClick={exitSelectMode}>ยกเลิก</button>
         </div>

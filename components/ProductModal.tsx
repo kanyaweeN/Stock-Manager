@@ -6,8 +6,11 @@ import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import IngredientInput from "@/components/IngredientInput";
 import IngredientPanel from "@/components/IngredientPanel";
 import TextField from "@/components/TextField";
+import { baht } from "@/lib/cost";
+import { todayISO } from "@/lib/date";
 import type { SkinProfile } from "@/lib/db";
-import type { ItemStatus, StockItem } from "@/lib/types";
+import { priceStats, pushPricePoint } from "@/lib/price";
+import type { ItemStatus, PricePoint, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -20,11 +23,11 @@ interface Props {
   onUngroup: (id: string) => void;
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => todayISO();
 
 const emptyForm = {
-  name: "", cats: [] as string[], qty: 0, min: 0, price: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
-  purchasedAt: todayStr(), ingredients: "",
+  name: "", cats: [] as string[], qty: 0, min: 0, price: "", buyQty: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
+  purchasedAt: todayStr(), ingredients: "", priceHistory: [] as PricePoint[],
 };
 
 export default function ProductModal({ open, item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup }: Props) {
@@ -38,6 +41,7 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
         qty: item.qty,
         min: item.min,
         price: item.price != null ? String(item.price) : "",
+        buyQty: item.buyQty != null ? String(item.buyQty) : "",
         size: item.size || "",
         note: item.note,
         img: item.img || "",
@@ -45,6 +49,7 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
         status: item.status || "",
         purchasedAt: item.purchasedAt || "",
         ingredients: item.ingredients || "",
+        priceHistory: item.priceHistory || [],
       });
     } else {
       setForm({ ...emptyForm, purchasedAt: todayStr() });
@@ -60,6 +65,26 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
 
   if (!open) return null;
 
+  const stats = priceStats(form.priceHistory);
+
+  const removePricePoint = (idx: number) => {
+    setForm((f) => ({ ...f, priceHistory: f.priceHistory.filter((_, i) => i !== idx) }));
+  };
+
+  /** จดราคาที่กรอกอยู่ตอนนี้ลงประวัติ — ใช้ตอนกรอกสินค้าเองโดยไม่ได้นำเข้าจาก Shopee */
+  const logCurrentPrice = () => {
+    const price = Number(form.price);
+    if (!form.price.trim() || !Number.isFinite(price)) return;
+    setForm((f) => ({
+      ...f,
+      priceHistory: pushPricePoint(f.priceHistory, {
+        date: f.purchasedAt || todayStr(),
+        price: Math.max(0, price),
+        qty: Math.max(1, Number(f.buyQty) || 1),
+      }),
+    }));
+  };
+
   const handleSave = () => {
     const name = form.name.trim();
     if (!name) return;
@@ -70,6 +95,10 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
         qty: Math.max(0, Number(form.qty) || 0),
         min: Math.max(0, Number(form.min) || 0),
         price: form.price.trim() ? Math.max(0, Number(form.price) || 0) : undefined,
+        buyQty: form.buyQty.trim() ? Math.max(0, Number(form.buyQty) || 0) : undefined,
+        priceHistory: form.priceHistory,
+        // บันทึกเอง = ผู้ใช้ตรวจราคาแล้ว ปลดธง "ยังไม่ยืนยัน" ของข้อมูลเก่าทิ้ง
+        priceUnverified: undefined,
         size: form.size.trim(),
         note: form.note.trim(),
         img: form.img.trim(),
@@ -133,13 +162,73 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
           />
         </div>
 
+        {item?.priceUnverified && (
+          <div className="price-unverified">
+            <span>⚠️</span>
+            <span>
+              ราคานี้นำเข้าจาก Shopee ด้วยเวอร์ชันเก่า ที่เก็บ<strong>ยอดรวมทั้งแถว</strong>ไว้ในช่องราคา
+              ถ้าตอนนั้นซื้อมามากกว่า 1 ชิ้น ให้หารด้วยจำนวนที่ซื้อก่อน แล้วกดบันทึก — คำเตือนนี้จะหายไปเอง
+              (มูลค่าสต็อกในหน้าสรุปและต้นทุนในสูตรคิดจากราคา<strong>ต่อชิ้น</strong>)
+            </span>
+          </div>
+        )}
+
         <TextField
-          label="ราคา (บาท)"
+          label="ราคาต่อ 1 ชิ้น/แพ็ค (บาท)"
           type="number"
           placeholder="ไม่บังคับ"
           value={form.price}
           onChange={(v) => setForm({ ...form, price: v })}
         />
+
+        <TextField
+          label="ซื้อครั้งล่าสุดกี่ชิ้น/แพ็ค"
+          type="number"
+          placeholder="ไม่บังคับ — ใช้โชว์ยอดที่จ่ายจริง"
+          value={form.buyQty}
+          onChange={(v) => setForm({ ...form, buyQty: v })}
+        />
+
+        <div className="field">
+          <label>ประวัติราคา</label>
+          {stats ? (
+            <>
+              <div className="price-stats">
+                <span className="price-stats__avg">เฉลี่ย <strong>{baht(stats.avg)}</strong> /ชิ้น</span>
+                {stats.min !== stats.max && <span>ต่ำสุด {baht(stats.min)} · สูงสุด {baht(stats.max)}</span>}
+                <span>ซื้อ {stats.times} ครั้ง · รวม {stats.totalQty} ชิ้น · จ่ายไป {baht(stats.totalSpent)}</span>
+              </div>
+              <ul className="price-history">
+                {form.priceHistory.map((p, idx) => (
+                  <li className="price-history__row" key={`${p.date}-${idx}`}>
+                    <span className="price-history__date">{p.date || "ไม่ทราบวันที่"}</span>
+                    <span className="price-history__price">{baht(p.price)}/ชิ้น</span>
+                    <span className="price-history__qty">× {p.qty}</span>
+                    <span className="price-history__total">= {baht(p.price * p.qty)}</span>
+                    <button
+                      type="button"
+                      className="icon-btn del"
+                      title="ลบรายการนี้ออกจากประวัติ"
+                      onClick={() => removePricePoint(idx)}
+                    >
+                      🗑️
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="sub text-xs">ยังไม่มีประวัติ — ระบบจะจดให้อัตโนมัติทุกครั้งที่นำเข้าจาก Shopee</p>
+          )}
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            disabled={!form.price.trim()}
+            onClick={logCurrentPrice}
+          >
+            ＋ จดราคาที่กรอกไว้ลงประวัติ
+          </button>
+        </div>
 
         <TextField
           label="ขนาด"

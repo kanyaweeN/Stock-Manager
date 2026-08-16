@@ -49,7 +49,10 @@ export function usePersistedStockDB() {
   const persist = useCallback(
     async (data: StockDB) => {
       const withTimestamp = { ...data, updatedAt: new Date().toISOString() };
-      const json = JSON.stringify(withTimestamp, null, 2);
+      // OPFS/localStorage เป็นที่เก็บของเครื่อง ไม่มีใครเปิดอ่านด้วยตา — เขียนแบบไม่จัดรูปแบบเล็กลงเยอะ
+      // (localStorage มีเพดานราว 5MB ต่อโดเมน การเว้นวรรคทิ้งกินโควตาฟรีๆ)
+      // ส่วนไฟล์บนเครื่องที่ผู้ใช้เลือกผูกเอาไว้เปิดอ่าน/แก้เอง ยังจัดรูปแบบให้อยู่ข้างล่าง
+      const json = JSON.stringify(withTimestamp);
       const savedTo: string[] = [];
       const failedTo: string[] = [];
 
@@ -74,7 +77,7 @@ export function usePersistedStockDB() {
       if (linkedFile) {
         try {
           const w = await linkedFile.createWritable();
-          await w.write(json);
+          await w.write(JSON.stringify(withTimestamp, null, 2));
           await w.close();
           savedTo.push(`ไฟล์ "${linkedFile.name}" บนเครื่อง`);
         } catch (e) {

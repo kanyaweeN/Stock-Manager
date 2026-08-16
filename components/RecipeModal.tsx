@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { baht, emptyLine, lineCost, lineFromItem, recipeTotals, unitCost } from "@/lib/cost";
+import { amountText, baht, emptyLine, lineCost, lineFromItem, lineIssue, recipeTotals, unitCost } from "@/lib/cost";
 import { MaterialThumb } from "@/components/MaterialLabel";
 import type { Recipe, RecipeLine, StockItem } from "@/lib/types";
 
@@ -46,7 +46,7 @@ const toDraftLine = (l: RecipeLine): LineDraft => ({
   itemId: l.itemId,
   name: l.name,
   buyPrice: l.buyPrice ? String(l.buyPrice) : "",
-  packAmount: String(l.packAmount ?? 1),
+  packAmount: l.packAmount ? String(l.packAmount) : "", // 0 = ยังไม่รู้ขนาดแพ็ค ปล่อยว่างให้กรอกเอง
   unit: l.unit,
   usedAmount: l.usedAmount ? String(l.usedAmount) : "",
 });
@@ -56,7 +56,8 @@ const toLine = (l: LineDraft): RecipeLine => ({
   itemId: l.itemId,
   name: l.name.trim(),
   buyPrice: n(l.buyPrice),
-  packAmount: n(l.packAmount) || 1,
+  // ห้าม fallback เป็น 1 — ช่องว่างแปลว่า "ยังไม่รู้ขนาดแพ็ค" ถ้าหารด้วย 1 เงียบๆ ต้นทุนจะพุ่งเป็นราคาเต็มคูณจำนวนที่ใช้
+  packAmount: n(l.packAmount),
   unit: l.unit.trim() || "ชิ้น",
   usedAmount: n(l.usedAmount),
 });
@@ -250,7 +251,9 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
 
           <h3 className="cost-section-title">วัตถุดิบที่ใช้</h3>
           <p className="sub sub-tight text-xs">
-            เลือกของจากสต็อกเพื่อดึงราคา/ขนาดมาให้อัตโนมัติ หรือกรอกเองก็ได้ — ต้นทุน = ราคาที่ซื้อ ÷ ปริมาณต่อแพ็ค × ปริมาณที่ใช้
+            เลือกของจากสต็อกเพื่อดึงราคา/ขนาดมาให้อัตโนมัติ หรือกรอกเองก็ได้ — ต้นทุน = ราคาต่อ 1 แพ็ค ÷ ปริมาณที่ได้ต่อ 1 แพ็ค × ปริมาณที่ใช้
+            <br />
+            ซื้อทีละหลายแพ็คไม่ทำให้ต้นทุนต่อหน่วยเปลี่ยน (฿30 ÷ 1000 g = ฿90 ÷ 3000 g) ให้กรอก<strong>ราคาต่อแพ็ค</strong>คู่กับ<strong>ขนาด 1 แพ็ค</strong>เสมอ
           </p>
 
           {draft.lines.length === 0 && (
@@ -263,6 +266,7 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
             {draft.lines.map((l) => {
               const line = toLine(l);
               const cost = lineCost(line);
+              const issue = lineIssue(line);
               const share = materialCost > 0 ? (cost / materialCost) * 100 : 0;
               const linked = l.itemId ? itemById.get(l.itemId) : undefined;
               return (
@@ -295,7 +299,10 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
                           {linked.variant ? ` · ${linked.variant}` : ""}
                           {linked.size ? ` · ${linked.size}` : ""}
                           {` · เหลือ ${linked.qty}`}
-                          {linked.price != null ? ` · ฿${linked.price.toLocaleString("th-TH")}` : ""}
+                          {linked.price != null ? ` · ฿${linked.price.toLocaleString("th-TH")}/แพ็ค` : ""}
+                          {linked.price != null && (linked.buyQty ?? 0) > 1
+                            ? ` (ซื้อ ${linked.buyQty} แพ็ค = จ่ายจริง ${baht(linked.price * linked.buyQty!)})`
+                            : ""}
                           {linked.link && (
                             <a className="link-icon" href={linked.link} target="_blank" rel="noopener noreferrer" title="เปิดลิงก์สินค้า">🔗</a>
                           )}
@@ -310,7 +317,7 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
 
                   <div className="cost-line__grid">
                     <label className="cost-num">
-                      <span>ราคาที่ซื้อ (บาท)</span>
+                      <span>ราคาต่อ 1 แพ็ค (บาท)</span>
                       <input
                         type="number"
                         min="0"
@@ -320,7 +327,7 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
                       />
                     </label>
                     <label className="cost-num">
-                      <span>ได้ปริมาณ</span>
+                      <span>1 แพ็คได้ปริมาณ</span>
                       <input
                         type="number"
                         min="0"
@@ -350,9 +357,18 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
                     </label>
                   </div>
 
+                  {issue && <div className="cost-line__warn text-xs">⚠️ {issue}</div>}
+
                   <div className="cost-line__foot">
                     <span className="text-xs cost-line__rate">
-                      {baht(unitCost(line))} ต่อ 1 {line.unit}
+                      {line.packAmount > 0 ? (
+                        <>
+                          {baht(line.buyPrice)} ÷ {amountText(line.packAmount)} {line.unit} ={" "}
+                          <strong>{baht(unitCost(line))}</strong> ต่อ 1 {line.unit}
+                        </>
+                      ) : (
+                        "ยังคิดต้นทุนต่อหน่วยไม่ได้"
+                      )}
                     </span>
                     <span className="cost-line__cost">
                       {baht(cost)}

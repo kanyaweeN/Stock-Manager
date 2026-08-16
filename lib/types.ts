@@ -1,5 +1,15 @@
 export type ItemStatus = "" | "rebuy" | "avoid" | "have";
 
+/** ราคาที่ซื้อได้ 1 ครั้ง — เก็บต่อกันเป็นประวัติเพื่อดูราคาขึ้น/ลง และหาราคาเฉลี่ย (ดู lib/price.ts) */
+export interface PricePoint {
+  /** วันที่ซื้อ (YYYY-MM-DD) — ว่างได้ถ้าไม่ทราบ (ข้อมูลเก่าที่ backfill มา) */
+  date: string;
+  /** ราคา **ต่อ 1 แพ็ค/ชิ้น** ณ ครั้งนั้น */
+  price: number;
+  /** ซื้อกี่แพ็คในครั้งนั้น — ใช้ถ่วงน้ำหนักตอนหาค่าเฉลี่ย (จ่ายจริงครั้งนั้น = price × qty) */
+  qty: number;
+}
+
 export interface StockItem {
   id: string;
   name: string;
@@ -12,7 +22,19 @@ export interface StockItem {
   status?: ItemStatus;
   /** ที่มาของรายการ เช่น นำเข้าจาก Shopee — ใช้แสดงเป็น tag แยกจากหมวดหมู่จริง */
   source?: "shopee" | "";
+  /** ราคา **ต่อ 1 แพ็ค/ชิ้น** (ไม่ใช่ยอดรวมที่จ่าย) — ยอดจ่ายจริง = price × buyQty */
   price?: number;
+  /** ซื้อมากี่แพ็คในครั้งล่าสุด — ใช้โชว์ยอดที่จ่ายจริงเฉยๆ ไม่มีผลกับต้นทุนต่อหน่วยใน /cost */
+  buyQty?: number;
+  /**
+   * `price` ของรายการนี้อาจเป็น "ยอดรวมทั้งแถว" ไม่ใช่ราคาต่อชิ้น — ติดให้ตอน migrate v6
+   * กับของที่นำเข้าจาก Shopee ก่อนเวอร์ชันที่แก้เรื่องนี้ (ดู lib/shopee.ts) ย้อนหารเองไม่ได้
+   * เพราะ `qty` ถูกเพิ่ม/ลดไปหลังจากนั้นแล้ว จึงต้องเตือนให้ผู้ใช้ตรวจเอง
+   * เคลียร์ทิ้งเมื่อผู้ใช้กดบันทึกใน ProductModal หรือเมื่อนำเข้าซ้ำแล้วราคาถูกอัปเดต
+   */
+  priceUnverified?: boolean;
+  /** ประวัติราคาทุกครั้งที่ซื้อ เรียงจากเก่าไปใหม่ — เพิ่มอัตโนมัติตอนนำเข้าจาก Shopee (ดู lib/price.ts) */
+  priceHistory?: PricePoint[];
   size?: string;
   /** แท็กรอง เช่น ตัวเลือกสินค้า/รุ่น/สี ที่ดึงมาจากตอนนำเข้า */
   variant?: string;
@@ -64,6 +86,40 @@ export interface Recipe {
   updatedAt?: string;
 }
 
+/** ของ 1 อย่างในแผนซื้อ — ยอดของบรรทัด = ราคาต่อชิ้น × จำนวนที่จะซื้อ */
+export interface PlanLine {
+  id: string;
+  /** ผูกกับสินค้าในสต็อก (ถ้าเลือกมาจากสต็อก) — ว่างได้ถ้าเป็นของที่ยังไม่เคยมี */
+  itemId?: string;
+  name: string;
+  /** จะซื้อกี่ชิ้น/แพ็ค */
+  qty: number;
+  /** ราคาต่อ 1 ชิ้น/แพ็ค ที่ตั้งงบไว้ — เดาให้จากราคาล่าสุดในสต็อกตอนเลือกสินค้า */
+  price: number;
+  note: string;
+  /** ซื้อไปแล้วหรือยัง */
+  bought: boolean;
+  /** วันที่ซื้อจริง (YYYY-MM-DD) — เซ็ตให้อัตโนมัติตอนติ๊กว่าซื้อแล้ว */
+  boughtAt?: string;
+  /** ราคาที่จ่ายจริงต่อชิ้น (ถ้าไม่กรอก = จ่ายตามราคาที่ตั้งงบไว้) */
+  paidPrice?: number;
+}
+
+/** แผนซื้อของ 1 รอบ เช่น "ของใช้เดือนหน้า" หรือ "ของปีใหม่" */
+export interface PurchasePlan {
+  id: string;
+  name: string;
+  note: string;
+  /** กำหนดซื้อให้เสร็จภายในวันที่ (YYYY-MM-DD) — ว่างได้ถ้าไม่กำหนดเวลา */
+  dueDate?: string;
+  /** งบที่ตั้งไว้ทั้งแผน (ไม่กรอกก็ได้) */
+  budget?: number;
+  lines: PlanLine[];
+  /** วันเวลาที่สร้างแผน (ISO) — ใช้เทียบว่าของที่นำเข้าหลังจากนี้น่าจะเป็นของในแผนที่ซื้อไปแล้ว */
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface ImportCandidate {
   name: string;
   qty: number;
@@ -72,7 +128,12 @@ export interface ImportCandidate {
   cats: string[];
   status: ItemStatus;
   include: boolean;
+  /** ราคา **ต่อ 1 แพ็ค/ชิ้น** (= lineTotal ÷ qty) — เป็นค่าที่เอาไปลงสต็อกจริง */
   price?: number;
+  /** ยอดรวมทั้งแถวที่ Shopee โชว์ (ราคาต่อชิ้น × จำนวน) — เก็บไว้ให้ผู้ใช้ตรวจทานและสลับโหมดราคาได้ */
+  lineTotal?: number;
+  /** วันที่สั่งซื้อจริงที่แกะจากหน้าออเดอร์ (YYYY-MM-DD) — ไม่มีก็ใช้วันที่นำเข้าแทน */
+  purchasedAt?: string;
   size?: string;
   variant?: string;
   note?: string;

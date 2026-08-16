@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/statusOptions";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/ingredients";
+import { formatThaiShortDate } from "@/lib/date";
+import { priceStats } from "@/lib/price";
 import type { SkinProfile } from "@/lib/db";
 
 /** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
@@ -76,6 +78,27 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
     return map;
   }, [items, avoidIngredients, skinProfile]);
 
+  /**
+   * ราคาเฉลี่ยที่จะโชว์บนการ์ด — คิดล่วงหน้าทีเดียวต่อการเปลี่ยนของ items
+   * เดิมคิดใหม่ทุกใบทุกครั้งที่ re-render (เปิด/ปิดเมนู ⋯ ก็คิดใหม่ทั้งกริด)
+   * โชว์เฉพาะตอนซื้อมาหลายครั้งแล้วราคาไม่เท่ากัน ไม่งั้นเป็นตัวเลขซ้ำเปล่าๆ
+   */
+  const avgPriceById = useMemo(() => {
+    const map = new Map<string, { text: string; title: string }>();
+    for (const i of items) {
+      const stats = priceStats(i.priceHistory);
+      // เทียบแบบมีช่วงคลาด: avg ปัดเหลือ 2 ตำแหน่งแล้ว แต่ price ที่ผู้ใช้กรอกอาจละเอียดกว่า
+      if (!stats || stats.times < 2 || Math.abs(stats.avg - (i.price ?? 0)) < 0.01) continue;
+      map.set(i.id, {
+        text: `เฉลี่ย ฿${stats.avg.toLocaleString("th-TH")}`,
+        title: `ซื้อ ${stats.times} ครั้ง · ราคาเฉลี่ยถ่วงน้ำหนักตามจำนวน`,
+      });
+    }
+    return map;
+  }, [items]);
+
+  const clusters = useMemo(() => clusterByGroup(items), [items]);
+
   if (items.length === 0) {
     return <div className="empty">ยังไม่มีสินค้าในสต็อก — กด &quot;เพิ่มสินค้า&quot; เพื่อเริ่มต้น</div>;
   }
@@ -86,6 +109,8 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
     const selected = !!selectedIds?.has(i.id);
     const interactive = selectMode && !suppressSelect;
     const ing = ingredientInfo.get(i.id);
+    const avg = avgPriceById.get(i.id);
+    const boughtLabel = formatThaiShortDate(i.purchasedAt);
     return (
       <div
         className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""} ${selected ? "product-card--selected" : ""}`}
@@ -167,8 +192,22 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
           )}
           <div className="product-card__price-row">
             {i.price != null && <span className="product-card__price">฿{i.price.toLocaleString("th-TH")}</span>}
+            {i.priceUnverified && (
+              <span className="product-card__price-warn" title="ราคานี้อาจเป็นยอดรวมทั้งแถวจากการนำเข้าเวอร์ชันเก่า — เปิดแก้ไขเพื่อตรวจสอบ">⚠️</span>
+            )}
+            {avg && <span className="product-card__avg" title={avg.title}>{avg.text}</span>}
             {i.size && <span className="product-card__size">ขนาด {i.size}</span>}
           </div>
+          {/*
+            โชว์วันที่ซื้อเสมอ — เป็นคีย์ที่ลิสต์เรียงตามค่าเริ่มต้น ("ซื้อล่าสุด")
+            ถ้าไม่โชว์ ผู้ใช้จะดูไม่ออกว่าทำไมของเรียงลำดับแบบนี้ โดยเฉพาะตอนนำเข้าออเดอร์เก่าย้อนหลัง
+            ที่ของเพิ่งเข้าระบบวันนี้แต่วันที่ซื้อเป็นปีก่อนๆ
+          */}
+          {boughtLabel && (
+            <div className="product-card__bought" title={`ซื้อล่าสุด ${i.purchasedAt}`}>
+              🗓️ ซื้อ {boughtLabel}
+            </div>
+          )}
           {i.note && <div className="product-card__note">📝 {i.note}</div>}
 
           <div className="product-card__footer" onClick={(e) => e.stopPropagation()}>
@@ -214,7 +253,6 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
     );
   };
 
-  const clusters = clusterByGroup(items);
   const openCluster = openGroupId ? clusters.find((c) => c[0].groupId === openGroupId) : undefined;
 
   /** เลือก/ยกเลิกเลือกสมาชิกทั้งกลุ่มพร้อมกัน กันปัญหาที่เลือกได้แค่การ์ดหน้าสุดของกอง แล้วสมาชิกที่เหลือหลุดออกจากกลุ่มตอนจัดกลุ่มใหม่ */

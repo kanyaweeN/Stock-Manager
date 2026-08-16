@@ -8,6 +8,7 @@ import packageJson from "@/package.json";
 /** เมนูหลัก — ใช้ทั้งแถบข้าง (จอกว้าง) และแถบล่าง (มือถือ) */
 const NAV = [
   { href: "/", icon: "🏠", label: "สินค้า", short: "สินค้า" },
+  { href: "/plan", icon: "🛒", label: "วางแผนซื้อ", short: "แผนซื้อ" },
   { href: "/summary", icon: "📊", label: "สรุปยอด", short: "สรุปยอด" },
   { href: "/cost", icon: "🧮", label: "คำนวณต้นทุน", short: "ต้นทุน" },
   { href: "/analyze", icon: "🧪", label: "วิเคราะห์ส่วนผสม", short: "ส่วนผสม" },
@@ -25,6 +26,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const counts: Record<string, number> = {
     "/": db.items.length,
     "/cost": db.recipes?.length ?? 0,
+    // นับเฉพาะของที่ยังไม่ได้ซื้อ — ตัวเลขนี้คือ "ค้างอยู่กี่อย่าง" ไม่ใช่จำนวนแผน
+    "/plan": (db.plans ?? []).reduce((s, p) => s + p.lines.filter((l) => !l.bought).length, 0),
   };
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));

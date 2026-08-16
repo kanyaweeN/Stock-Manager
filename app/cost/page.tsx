@@ -5,7 +5,7 @@ import RecipeModal from "@/components/RecipeModal";
 import MaterialLabel from "@/components/MaterialLabel";
 import { useStockDB } from "@/lib/StockDBProvider";
 import { useRecipeActions } from "@/lib/useRecipeActions";
-import { baht, emptyRecipe, lineCost, recipeTotals } from "@/lib/cost";
+import { baht, emptyRecipe, lineCost, lineIssue, recipeTotals } from "@/lib/cost";
 import type { Recipe } from "@/lib/types";
 
 export default function CostPage() {
@@ -104,9 +104,13 @@ export default function CostPage() {
                     <tbody>
                       {r.lines.map((l) => {
                         const cost = lineCost(l);
+                        const issue = lineIssue(l);
                         return (
                           <tr key={l.id}>
-                            <td><MaterialLabel line={l} item={l.itemId ? itemById.get(l.itemId) : undefined} /></td>
+                            <td>
+                              <MaterialLabel line={l} item={l.itemId ? itemById.get(l.itemId) : undefined} />
+                              {issue && <div className="cost-line__warn text-xs">⚠️ {issue}</div>}
+                            </td>
                             <td>{l.usedAmount} {l.unit}</td>
                             <td>
                               <div className="summary-bar-cell">

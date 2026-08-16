@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { todayISO } from "@/lib/date";
 import type { StockDB } from "@/lib/db";
 import { DEFAULT_DB, migrateDB } from "@/lib/db";
 
@@ -18,7 +19,7 @@ export default function BackupTab({ db, onRestore }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stock-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `stock-backup-${todayISO()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

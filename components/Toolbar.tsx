@@ -6,6 +6,8 @@ import { TAG_META, type IngredientTag } from "@/lib/ingredients";
 import type { SortKey } from "@/lib/useProductFilters";
 
 const SORT_LABELS: Record<SortKey, string> = {
+  "bought-desc": "ซื้อล่าสุด",
+  "bought-asc": "ซื้อเก่าสุด",
   "added-desc": "เพิ่มล่าสุด",
   "added-asc": "เพิ่มเก่าสุด",
   "name-asc": "ชื่อ ก-ฮ",
@@ -82,7 +84,9 @@ export default function Toolbar(p: Props) {
           )}
         </div>
 
-        <button className="btn-primary topbar__add" onClick={p.onAdd}>＋ เพิ่มสินค้า</button>
+        {/* นำเข้าจาก Shopee เป็นทางหลักที่ของเข้าสต็อก เลยเป็นปุ่มหลัก ส่วนกรอกเองเป็นปุ่มรอง */}
+        <button className="btn-primary topbar__import" onClick={p.onImport}>📥 นำเข้า Shopee</button>
+        <button className="btn-ghost topbar__add" onClick={p.onAdd}>＋ เพิ่มเอง</button>
 
         <div className="menu" ref={menuRef}>
           <button
@@ -95,7 +99,6 @@ export default function Toolbar(p: Props) {
           </button>
           {menuOpen && (
             <div className="menu__panel">
-              <button className="menu__item" onClick={run(p.onImport)}><i>📥</i> นำเข้าจาก Shopee</button>
               <button className="menu__item" onClick={run(p.onExport)}><i>📤</i> ส่งออก CSV</button>
               <button className="menu__item" onClick={run(p.onNewRecipe)}><i>🧮</i> สร้างสูตรต้นทุนใหม่</button>
               <div className="menu__sep" />
@@ -150,7 +153,9 @@ export default function Toolbar(p: Props) {
         )}
       </div>
 
-      <button className="fab" onClick={p.onAdd} title="เพิ่มสินค้า" aria-label="เพิ่มสินค้า">＋</button>
+      {/* มือถือ: ปุ่มลอยสองชั้น — ตัวล่างเด่นคือนำเข้า Shopee ตัวเล็กด้านบนคือกรอกเอง */}
+      <button className="fab fab--add" onClick={p.onAdd} title="เพิ่มสินค้าเอง" aria-label="เพิ่มสินค้าเอง">＋</button>
+      <button className="fab" onClick={p.onImport} title="นำเข้าจาก Shopee" aria-label="นำเข้าจาก Shopee">📥</button>
     </>
   );
 }

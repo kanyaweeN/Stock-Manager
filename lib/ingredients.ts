@@ -200,6 +200,28 @@ export const INGREDIENT_DB: IngredientDef[] = [
   d("Mica", "ไมก้า", ["colorant"], /^(mica|iron oxides)$/),
 ];
 
+/**
+ * จำผลการค้นตาราง `INGREDIENT_DB` ของชื่อที่ normalize แล้ว
+ *
+ * การค้น 1 ครั้ง = ยิง regex ทั้งตาราง (ร้อยกว่าตัว) และชื่ออย่าง aqua/glycerin/parfum
+ * โผล่ซ้ำแทบทุกขวด ยิ่งกว่านั้นลิสต์ส่วนผสมทั้งสต็อกถูก parse ใหม่ทุกครั้งที่ `db.items`
+ * เปลี่ยน identity (กด +/- ทีเดียวก็นับ) — ถ้าไม่จำผลไว้ การกดปุ่มจำนวนจะช้าตามขนาดสต็อก
+ *
+ * อาร์เรย์ที่คืนถูกใช้ร่วมกันหลายที่ ห้ามแก้ไข (ผู้เรียกอ่านอย่างเดียวทั้งหมด)
+ */
+const DEFS_CACHE_LIMIT = 4000;
+const defsCache = new Map<string, IngredientDef[]>();
+
+function defsFor(key: string): IngredientDef[] {
+  const hit = defsCache.get(key);
+  if (hit) return hit;
+  const defs = INGREDIENT_DB.filter((def) => def.match.test(key));
+  // กันโตไม่จำกัดจากข้อความมั่วๆ ที่วางมา — เต็มแล้วล้างทิ้งทั้งก้อน ง่ายกว่าและพอสำหรับงานนี้
+  if (defsCache.size >= DEFS_CACHE_LIMIT) defsCache.clear();
+  defsCache.set(key, defs);
+  return defs;
+}
+
 /** ตัดวงเล็บ/เครื่องหมาย/เปอร์เซ็นต์ออก เหลือชื่อล้วนพิมพ์เล็ก ใช้เทียบกับ regex ในตาราง */
 function normalize(raw: string): string {
   return raw
@@ -237,7 +259,7 @@ export function parseIngredients(text: string): ParsedIngredient[] {
     seen.add(key);
 
     const pctMatch = raw.match(/(\d+(?:\.\d+)?)\s*%/);
-    const defs = INGREDIENT_DB.filter((def) => def.match.test(key));
+    const defs = defsFor(key);
     out.push({
       raw,
       key,
@@ -393,16 +415,30 @@ function findAvoidHits(
     });
 }
 
+/**
+ * จำผลการวิเคราะห์ตาม (ข้อความส่วนผสม + ลิสต์ตัวที่ไม่เอา)
+ * หน้า /analyze เรียกตัวนี้ตรงๆ ในลูป render และหน้าแรกเรียกให้ทุกสินค้าใหม่ทุกครั้งที่ items เปลี่ยน
+ * ผลลัพธ์ใช้ร่วมกัน ห้ามแก้ไข (ตอนนี้ผู้เรียกทุกที่อ่านอย่างเดียว)
+ */
+const ANALYSIS_CACHE_LIMIT = 1000;
+const analysisCache = new Map<string, IngredientAnalysis>();
+
 /** วิเคราะห์ส่วนผสมของสินค้าชิ้นเดียว */
 export function analyzeIngredients(text: string | undefined, avoid: string[] = []): IngredientAnalysis {
   if (!text || !text.trim()) return EMPTY_ANALYSIS;
+
+  // คีย์แคชต้องแยก text ออกจาก avoid แบบไม่กำกวม — JSON.stringify จัดการ escape ให้เอง
+  const cacheKey = JSON.stringify([text, avoid]);
+  const cached = analysisCache.get(cacheKey);
+  if (cached) return cached;
+
   const list = parseIngredients(text);
   const known = list.filter((p) => p.defs.length > 0);
   const tagCounts: Record<string, number> = {};
   for (const p of list) for (const t of p.tags) tagCounts[t] = (tagCounts[t] || 0) + 1;
 
   const label = (p: ParsedIngredient) => p.defs[0]?.th || p.raw;
-  return {
+  const result: IngredientAnalysis = {
     list,
     known,
     unknown: list.filter((p) => p.defs.length === 0),
@@ -410,6 +446,10 @@ export function analyzeIngredients(text: string | undefined, avoid: string[] = [
     tagCounts,
     warnings: [...findAvoidHits(list, avoid, label), ...findConflicts(list, label)],
   };
+
+  if (analysisCache.size >= ANALYSIS_CACHE_LIMIT) analysisCache.clear();
+  analysisCache.set(cacheKey, result);
+  return result;
 }
 
 export interface ComparedIngredient {
@@ -464,10 +504,24 @@ export function compareIngredients(
   };
 }
 
-/** แท็กทั้งหมดของสินค้าชิ้นหนึ่ง (ใช้ตอนกรอง/โชว์ badge บนการ์ด) */
+/**
+ * แท็กทั้งหมดของสินค้าชิ้นหนึ่ง (ใช้ตอนกรอง/โชว์ badge บนการ์ด)
+ *
+ * จำผลตามข้อความส่วนผสม — ตัวนี้ถูกเรียกซ้ำจากหลายทาง (useProductFilters, analyzeSkinCompat)
+ * ทุกครั้งที่ items เปลี่ยน ทั้งที่ข้อความส่วนผสมแทบไม่เคยเปลี่ยนตาม
+ * อาร์เรย์ที่คืนใช้ร่วมกัน ห้ามแก้ไข
+ */
+const TAGS_CACHE_LIMIT = 1000;
+const tagsCache = new Map<string, IngredientTag[]>();
+
 export function itemTags(ingredients: string | undefined): IngredientTag[] {
   if (!ingredients?.trim()) return [];
-  return sortTags(parseIngredients(ingredients).flatMap((p) => p.tags));
+  const hit = tagsCache.get(ingredients);
+  if (hit) return hit;
+  const tags = sortTags(parseIngredients(ingredients).flatMap((p) => p.tags));
+  if (tagsCache.size >= TAGS_CACHE_LIMIT) tagsCache.clear();
+  tagsCache.set(ingredients, tags);
+  return tags;
 }
 
 // ── Skin Profile Compatibility ───────────────────────────────

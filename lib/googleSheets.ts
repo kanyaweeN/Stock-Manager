@@ -1,3 +1,4 @@
+import { priceStats } from "./price";
 import type { StockItem } from "./types";
 
 /**
@@ -15,6 +16,7 @@ export const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const HEADER = [
   "id", "name", "cat", "qty", "min", "note", "img", "link", "status", "price", "size", "variant", "ingredients",
   "source", "groupId", "groupName", "purchasedAt", "createdAt",
+  "buyQty", "avgPrice", "priceHistory",
 ] as const;
 
 /** 1→A (พอสำหรับ 26 คอลัมน์ — เกินกว่านี้ต้องเปลี่ยนวิธีคิดเป็นฐาน 26) */
@@ -27,26 +29,33 @@ const PRESETS_CELL = `${col(HEADER.length + 1)}1`;
 function itemsToRows(items: StockItem[]): string[][] {
   return [
     [...HEADER],
-    ...items.map((i) => [
-      i.id,
-      i.name,
-      i.cats.join("; "),
-      String(i.qty),
-      String(i.min),
-      i.note,
-      i.img || "",
-      i.link || "",
-      i.status || "",
-      i.price != null ? String(i.price) : "",
-      i.size || "",
-      i.variant || "",
-      i.ingredients || "",
-      i.source || "",
-      i.groupId || "",
-      i.groupName || "",
-      i.purchasedAt || "",
-      i.createdAt || "",
-    ]),
+    ...items.map((i) => {
+      const stats = priceStats(i.priceHistory);
+      return [
+        i.id,
+        i.name,
+        i.cats.join("; "),
+        String(i.qty),
+        String(i.min),
+        i.note,
+        i.img || "",
+        i.link || "",
+        i.status || "",
+        i.price != null ? String(i.price) : "",
+        i.size || "",
+        i.variant || "",
+        i.ingredients || "",
+        i.source || "",
+        i.groupId || "",
+        i.groupName || "",
+        i.purchasedAt || "",
+        i.createdAt || "",
+        i.buyQty != null ? String(i.buyQty) : "",
+        stats ? String(stats.avg) : "",
+        // ประวัติราคาแบนเป็นข้อความบรรทัดเดียว — ชีตเป็น export อย่างเดียวอยู่แล้ว ไม่ต้อง parse กลับ
+        (i.priceHistory ?? []).map((p) => `${p.date || "?"}@${p.price}x${p.qty}`).join("; "),
+      ];
+    }),
   ];
 }
 

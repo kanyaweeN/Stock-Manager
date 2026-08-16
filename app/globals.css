@@ -122,7 +122,7 @@ body {
   .shell__main { margin-left: 0; padding: 14px 14px calc(var(--tabbar-h) + 24px); }
   .shell__tabbar {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     background: color-mix(in srgb, var(--panel) 92%, transparent);
     backdrop-filter: blur(12px);
     border-top: 1px solid var(--border);
@@ -231,11 +231,13 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
 .fchip.is-active::before { background: var(--accent); }
 .fchip.is-active .fchip__l { color: var(--accent-ink); }
 
-/* ปุ่มลอยเพิ่มสินค้า — โผล่เฉพาะจอมือถือแทนปุ่มในแถบบน */
+.topbar__import, .topbar__add { flex-shrink: 0; }
+
+/* ปุ่มลอย — โผล่เฉพาะจอมือถือแทนปุ่มในแถบบน ตัวล่าง = นำเข้า Shopee (ทางหลัก), ตัวบน = เพิ่มเอง */
 .fab { display: none; }
 @media (max-width: 860px) {
   .topbar__title { font-size: 18px; }
-  .topbar__add { display: none; }
+  .topbar__add, .topbar__import { display: none; }
   .fab {
     position: fixed; right: 16px; z-index: 25;
     bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom, 0px));
@@ -243,6 +245,13 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
     width: 54px; height: 54px; padding: 0; border-radius: 18px;
     background: var(--accent); color: #fff; font-size: 26px; line-height: 1;
     box-shadow: 0 12px 26px -10px var(--accent);
+  }
+  /* ปุ่มรองวางซ้อนขึ้นไปด้านบน เล็กกว่าและสีอ่อนกว่า ให้ตัวนำเข้าเด่นกว่าชัดเจน */
+  .fab--add {
+    bottom: calc(var(--tabbar-h) + 16px + 54px + 10px + env(safe-area-inset-bottom, 0px));
+    width: 44px; height: 44px; border-radius: 15px; font-size: 21px;
+    background: var(--panel); color: var(--accent);
+    border: 1px solid var(--border-strong); box-shadow: var(--shadow-2);
   }
   /* มือถือ: ชิปเป็นแถบเลื่อนแนวนอนแถวเดียว ไม่ให้ตัวเลขดันเนื้อหาจริงลงไปไกล */
   .fchips {
@@ -515,6 +524,26 @@ tr:last-child td { border-bottom: none; }
   transition: width .2s ease;
 }
 .summary-bar-label { font-weight: 600; white-space: nowrap; }
+.summary-share { color: var(--muted); font-weight: 500; font-size: 11px; }
+.summary-sub-title { font-size: 13.5px; font-weight: 700; margin: 18px 0 8px; }
+/* ตัวเลขเทียบเดือนก่อนบนการ์ดสถิติ — ขึ้น = ส้ม (จ่ายเยอะขึ้น) ลง = เขียว */
+.summary-delta { margin-left: 6px; font-weight: 700; }
+.summary-delta.is-up { color: var(--low); }
+.summary-delta.is-down { color: var(--ok); }
+
+/* ประโยคสรุป: ตัวเลขที่แปลเป็นภาษาคนแล้วว่าต้องสนใจอะไร */
+.insight-list { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 6px; }
+.insight {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 13px; line-height: 1.5;
+  padding: 9px 12px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+}
+.insight__icon { flex-shrink: 0; }
+.insight--info { border-left-color: var(--accent); }
+.insight--good { border-left-color: var(--ok); background: var(--ok-soft); }
+.insight--warn { border-left-color: var(--low); background: var(--low-bg); }
 tr.low-row { background: var(--low-bg); }
 td.qty { font-weight: 600; text-align: center; width: 90px; }
 td.actions { text-align: right; white-space: nowrap; width: 160px; }
@@ -586,6 +615,32 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   color: var(--danger); font-size: 12px; padding: 0;
 }
 .manual-link-select { width: 100%; font-size: 13px; color: var(--muted); }
+
+/* ประวัติราคาใน ProductModal — สรุปด้านบน แล้วไล่รายครั้งด้านล่าง */
+.price-stats {
+  display: flex; flex-wrap: wrap; gap: 4px 12px;
+  padding: 8px 10px; margin-bottom: 6px;
+  background: var(--accent-soft); border-radius: 8px;
+  font-size: 12px; color: var(--muted);
+}
+.price-stats__avg { color: var(--accent); font-size: 13px; }
+/* เตือนว่าราคาของรายการนี้อาจเป็น "ยอดรวมทั้งแถว" จากการนำเข้าเวอร์ชันเก่า */
+.price-unverified {
+  display: flex; gap: 6px; align-items: flex-start;
+  padding: 8px 10px; margin-bottom: 12px;
+  background: var(--low-bg); border-radius: 8px;
+  font-size: 12px; line-height: 1.45; color: var(--low);
+}
+.price-history { list-style: none; margin: 0 0 8px; padding: 0; max-height: 180px; overflow-y: auto; }
+.price-history__row {
+  display: grid; grid-template-columns: auto 1fr auto auto auto;
+  align-items: center; gap: 8px;
+  padding: 5px 10px; border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--muted);
+}
+.price-history__row:last-child { border-bottom: none; }
+.price-history__price { color: var(--text); font-weight: 600; }
+.price-history__total { color: var(--muted); white-space: nowrap; }
 .field { margin-bottom: 12px; }
 .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .field input, .field select, .field textarea { width: 100%; }
@@ -705,6 +760,31 @@ td.thumb-cell { width: 46px; }
   background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
   font-size: 13px; color: var(--muted);
 }
+.dup-backdated {
+  margin: 6px 0 2px; padding: 6px 8px; border-radius: 6px;
+  background: var(--low-bg); color: var(--low); line-height: 1.45;
+}
+
+/* เทียบยอดที่แกะได้กับ "รวมค่าสินค้า" บนหน้าออเดอร์ — จับเคสแถวหล่นหาย */
+.import-total-check {
+  padding: 8px 12px; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; line-height: 1.5;
+}
+.import-total-check.is-ok { background: var(--ok-soft); color: var(--ok); }
+.import-total-check.is-warn { background: var(--low-bg); color: var(--low); }
+.import-total-check .sub { color: inherit; opacity: .85; }
+.import-order-date {
+  padding: 0 2px; margin-bottom: 10px; color: var(--muted);
+}
+.import-price-mode {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; margin-bottom: 12px;
+  background: var(--accent-soft); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; line-height: 1.45; cursor: pointer;
+}
+.import-price-mode input { margin-top: 3px; flex-shrink: 0; }
+.import-price-total { color: var(--muted); white-space: nowrap; }
 .import-list-wrap { max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .img-preview { max-width: 100%; max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
 
@@ -877,7 +957,10 @@ td.thumb-cell { width: 46px; }
 .badge-out { color: var(--danger); font-size: 11px; font-weight: 600; }
 .product-card__price-row { display: flex; align-items: baseline; gap: 8px; }
 .product-card__price { font-weight: 700; color: var(--accent); font-size: 16px; letter-spacing: -.01em; }
+.product-card__avg { font-size: 12px; color: var(--violet); font-weight: 600; }
+.product-card__price-warn { font-size: 12px; cursor: help; }
 .product-card__size { font-size: 12px; color: var(--muted); }
+.product-card__bought { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .qty-btn { border-radius: 999px; width: 26px; height: 26px; }
 
 /* จอมือถือ: การ์ดกริดกลายเป็นรายการแนวนอน — ปุ่ม −/+ อยู่ขอบขวาในระยะนิ้วโป้ง */
@@ -1082,6 +1165,7 @@ td.thumb-cell { width: 46px; }
 .cost-num { display: flex; flex-direction: column; gap: 2px; }
 .cost-num > span { font-size: 11px; color: var(--muted); }
 .cost-num input { width: 100%; }
+.cost-line__warn { color: var(--low); margin-top: 6px; line-height: 1.4; }
 .cost-line__foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .cost-line__rate { color: var(--muted); }
 .cost-line__cost { font-weight: 700; white-space: nowrap; }
@@ -1133,8 +1217,57 @@ td.thumb-cell { width: 46px; }
 .recipe-table { margin-top: 4px; }
 .recipe-card__note { color: var(--muted); margin: 10px 0 0; white-space: pre-wrap; }
 
+/* ── วางแผนซื้อของ — app/plan/page.tsx + components/PlanModal.tsx ── */
+.plan-card { border-top-color: var(--violet); }
+.plan-card--done { border-top-color: var(--ok); opacity: .8; }
+.plan-due { font-weight: 600; }
+.plan-due--normal { color: var(--muted); }
+.plan-due--soon { color: var(--low); }
+.plan-due--late { color: var(--danger); }
+.plan-due--done { color: var(--ok); }
+
+.plan-progress {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--border); margin: 0 0 12px;
+}
+.plan-progress__fill { display: block; height: 100%; background: var(--ok); transition: width .18s; }
+
+.plan-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.plan-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.plan-item:last-child { border-bottom: none; }
+.plan-item__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.plan-item__name { font-weight: 600; font-size: 13px; }
+.plan-item__meta { font-size: 11px; color: var(--muted); }
+.plan-item__hint { color: var(--low); }
+.plan-item__total { font-weight: 700; font-size: 13px; white-space: nowrap; }
+.plan-item.is-bought .plan-item__name { text-decoration: line-through; color: var(--muted); }
+.plan-item.is-bought .plan-item__total { color: var(--ok); }
+
+.plan-check { display: flex; align-items: center; flex-shrink: 0; cursor: pointer; }
+.plan-check input { width: 17px; height: 17px; margin: 0; accent-color: var(--ok); cursor: pointer; }
+
+.plan-lines { display: flex; flex-direction: column; gap: 10px; }
+.plan-line {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px; background: var(--bg);
+}
+.plan-line.is-bought { border-color: var(--ok); background: var(--ok-soft); }
+.plan-line.is-bought .plan-line__name { text-decoration: line-through; color: var(--muted); }
+.plan-line__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.plan-line__name { flex: 1; min-width: 0; font-weight: 600; }
+.plan-line__total { font-weight: 700; white-space: nowrap; }
+.plan-line__grid { display: grid; grid-template-columns: 90px 130px minmax(0, 1fr); gap: 8px; }
+.plan-line__grid--bought { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 8px; }
+.plan-num-wide { min-width: 0; }
+.plan-picker__hint { color: var(--muted); margin: 6px 0 0; text-align: center; }
+
 @media (max-width: 620px) {
   .cost-line__head { flex-wrap: wrap; }
   .cost-line__pick { max-width: none; flex: 1; }
   .cost-line__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-line__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-num-wide { grid-column: 1 / -1; }
 }

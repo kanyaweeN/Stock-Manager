@@ -1,5 +1,6 @@
 "use client";
 
+import { todayISO } from "./date";
 import type { StockDB } from "./db";
 import type { Recipe } from "./types";
 import { uid } from "./uid";
@@ -31,7 +32,7 @@ function exportRecipeCsv(recipe: Recipe) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `cost-${recipe.name || "recipe"}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `cost-${recipe.name || "recipe"}-${todayISO()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
