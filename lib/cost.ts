@@ -1,4 +1,5 @@
-import type { Recipe, RecipeLine, StockItem } from "./types";
+import type { PricingSettings, Recipe, RecipeLine, StockItem } from "./types";
+import { priceOutcome } from "./pricing";
 import { uid } from "./uid";
 
 /**
@@ -39,7 +40,9 @@ export interface RecipeTotals {
   batchCost: number;
   /** ต้นทุนต่อชิ้น */
   perUnitCost: number;
-  /** กำไรต่อชิ้น (ถ้ากรอกราคาขาย) */
+  /** ค่าธรรมเนียม/ค่าส่งที่โดนหักจากราคาขายต่อชิ้น (0 ถ้าไม่ได้ตั้งค่าไว้) */
+  feePerUnit: number;
+  /** กำไรต่อชิ้น หลังหักค่าธรรมเนียมแล้ว (ถ้ากรอกราคาขาย) */
   profitPerUnit: number | null;
   /** กำไรทั้งรอบ */
   profitPerBatch: number | null;
@@ -47,20 +50,29 @@ export interface RecipeTotals {
   marginPct: number | null;
 }
 
-export function recipeTotals(recipe: Recipe): RecipeTotals {
+/** ไม่มีค่าธรรมเนียม = คิดกำไรแบบตรงๆ (ราคาขาย − ต้นทุน) เหมือนก่อนมีหน้าคิดราคาขาย */
+const NO_FEES: PricingSettings = { targetMarginPct: 0, feePct: 0, feePerUnit: 0, rounding: "none" };
+
+/**
+ * ส่ง `pricing` มาด้วยถ้าอยากให้กำไรหักค่าธรรมเนียมร้าน/ค่าส่งให้ (ดู lib/pricing.ts)
+ * ไม่ส่ง = กำไรดิบ ราคาขาย − ต้นทุน
+ */
+export function recipeTotals(recipe: Recipe, pricing?: PricingSettings): RecipeTotals {
   const materialCost = recipe.lines.reduce((s, l) => s + lineCost(l), 0);
   const batchCost = materialCost + (recipe.laborCost || 0) + (recipe.otherCost || 0);
   const yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1;
   const perUnitCost = batchCost / yieldQty;
   const sell = recipe.sellPrice;
-  const hasSell = typeof sell === "number" && sell > 0;
+  const outcome =
+    typeof sell === "number" && sell > 0 ? priceOutcome(sell, perUnitCost, pricing ?? NO_FEES) : null;
   return {
     materialCost,
     batchCost,
     perUnitCost,
-    profitPerUnit: hasSell ? sell - perUnitCost : null,
-    profitPerBatch: hasSell ? (sell - perUnitCost) * yieldQty : null,
-    marginPct: hasSell ? ((sell - perUnitCost) / sell) * 100 : null,
+    feePerUnit: outcome?.fee ?? 0,
+    profitPerUnit: outcome ? outcome.profit : null,
+    profitPerBatch: outcome ? outcome.profit * yieldQty : null,
+    marginPct: outcome ? outcome.marginPct : null,
   };
 }
 

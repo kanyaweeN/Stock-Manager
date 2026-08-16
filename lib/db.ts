@@ -1,4 +1,5 @@
-import type { PlanLine, PricePoint, PurchasePlan, Recipe, RecipeLine, StockItem } from "./types";
+import type { PlanLine, PricePoint, PricingSettings, PurchasePlan, Recipe, RecipeLine, StockItem } from "./types";
+import { DEFAULT_PRICING, ROUNDING_VALUES } from "./pricing";
 
 export type SkinType = "" | "oily" | "dry" | "combination" | "normal" | "sensitive";
 export type SkinConcern = "acne" | "aging" | "dark-spots" | "redness" | "dryness" | "oiliness" | "pores" | "dullness";
@@ -40,6 +41,8 @@ export interface StockDB {
   recipes?: Recipe[];
   /** แผนซื้อของ (เดือนหน้า/ปีใหม่ ต้องซื้ออะไรบ้าง ซื้อไปแล้วเท่าไร) — ดู lib/plan.ts */
   plans?: PurchasePlan[];
+  /** ตั้งค่าคิดราคาขาย (กำไรที่อยากได้ / ค่าธรรมเนียม / วิธีปัดราคา) — ดู lib/pricing.ts */
+  pricing?: PricingSettings;
   updatedAt?: string;
 }
 
@@ -152,6 +155,11 @@ export const MIGRATIONS: Migration[] = [
     note: "เพิ่มฟีเจอร์วางแผนการซื้อ — เติม db.plans",
     up: (db) => ({ ...db, plans: asArray(db.plans) }),
   },
+  {
+    to: 8,
+    note: "เพิ่มฟีเจอร์คิดราคาขาย — เติม db.pricing (กำไรที่อยากได้ / ค่าธรรมเนียม / วิธีปัดราคา)",
+    up: (db) => ({ ...db, pricing: db.pricing ?? { ...DEFAULT_PRICING } }),
+  },
 ];
 
 /** เวอร์ชันล่าสุด = ปลายทางของ migration step สุดท้าย (คำนวณให้ ไม่ต้องแก้มือ) */
@@ -164,6 +172,7 @@ export const DEFAULT_DB: StockDB = {
   avoidIngredients: [],
   recipes: [],
   plans: [],
+  pricing: { ...DEFAULT_PRICING },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -255,6 +264,18 @@ function normalizePlan(raw: unknown, idx: number): PurchasePlan {
   };
 }
 
+/** ค่าตั้งราคาที่เพี้ยน (แก้ไฟล์มือ/ข้อมูลเก่า) ต้องไม่ทำให้สูตรคิดราคาระเบิด — บีบให้อยู่ในช่วงที่คิดได้เสมอ */
+function normalizePricing(raw: unknown): PricingSettings {
+  const p = (raw ?? {}) as Partial<PricingSettings>;
+  const clampPct = (v: unknown, fallback: number) => Math.min(99, Math.max(0, num(v, fallback)));
+  return {
+    targetMarginPct: clampPct(p.targetMarginPct, DEFAULT_PRICING.targetMarginPct),
+    feePct: clampPct(p.feePct, DEFAULT_PRICING.feePct),
+    feePerUnit: Math.max(0, num(p.feePerUnit, DEFAULT_PRICING.feePerUnit)),
+    rounding: ROUNDING_VALUES.includes(p.rounding!) ? p.rounding! : DEFAULT_PRICING.rounding,
+  };
+}
+
 function normalizeDB(db: RawDB, version: number): StockDB {
   const skinProfile = db.skinProfile;
   return {
@@ -270,6 +291,7 @@ function normalizeDB(db: RawDB, version: number): StockDB {
       skinProfile && typeof skinProfile === "object" ? (skinProfile as SkinProfile) : { skinType: "", concerns: [] },
     recipes: asArray(db.recipes).map(normalizeRecipe),
     plans: asArray(db.plans).map(normalizePlan),
+    pricing: normalizePricing(db.pricing),
     updatedAt: typeof db.updatedAt === "string" ? db.updatedAt : undefined,
   };
 }

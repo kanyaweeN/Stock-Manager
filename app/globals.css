@@ -1189,6 +1189,40 @@ td.thumb-cell { width: 46px; }
 .cost-summary__row--profit strong { color: #16a34a; }
 .cost-summary__row--loss strong { color: var(--danger); }
 
+/* ── คิดราคาขาย "ควรขายเท่าไร" — components/PriceAdvisor.tsx ── */
+.price-advisor {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--violet);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.price-advisor__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.price-advisor__label { font-size: 11.5px; color: var(--muted); }
+.price-advisor__price { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; color: var(--violet); }
+.price-advisor__price--none { color: var(--muted); }
+.price-advisor__meta { color: var(--muted); }
+.price-advisor__controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.price-advisor__controls input, .price-advisor__controls select { width: 100%; }
+.price-table th, .price-table td { padding: 6px 8px; font-size: 13px; white-space: nowrap; }
+.price-table th { text-transform: none; letter-spacing: 0; }
+.price-table td small { color: var(--muted); font-weight: 500; }
+.price-table__row--active { background: var(--accent-soft); }
+.price-table__row--current { background: var(--low-bg); }
+.price-table__profit { color: var(--ok); font-weight: 600; }
+.price-table__loss { color: var(--danger); font-weight: 600; }
+.price-notes { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.6; }
+.price-notes li + li { margin-top: 3px; }
+@media (max-width: 640px) {
+  .price-advisor__controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .price-advisor__price { font-size: 24px; }
+  .price-table th, .price-table td { padding: 6px 5px; font-size: 12px; }
+}
+
 .recipe-list { display: flex; flex-direction: column; gap: 14px; }
 .recipe-card {
   border: 1px solid var(--border);
@@ -1214,6 +1248,9 @@ td.thumb-cell { width: 46px; }
 .recipe-figure__l { font-size: 11px; color: var(--muted); }
 .recipe-figure--profit .recipe-figure__n { color: #16a34a; }
 .recipe-figure--loss .recipe-figure__n { color: var(--danger); }
+.recipe-figure--suggest { border-style: dashed; }
+.recipe-figure--suggest .recipe-figure__n { color: var(--violet); }
+.recipe-card__hint { color: var(--muted); margin: 0 0 10px; }
 .recipe-table { margin-top: 4px; }
 .recipe-card__note { color: var(--muted); margin: 10px 0 0; white-space: pre-wrap; }
 

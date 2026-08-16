@@ -6,12 +6,14 @@ import MaterialLabel from "@/components/MaterialLabel";
 import { useStockDB } from "@/lib/StockDBProvider";
 import { useRecipeActions } from "@/lib/useRecipeActions";
 import { baht, emptyRecipe, lineCost, lineIssue, recipeTotals } from "@/lib/cost";
+import { DEFAULT_PRICING, pct, suggestPrice } from "@/lib/pricing";
 import type { Recipe } from "@/lib/types";
 
 export default function CostPage() {
   const { db, setDb } = useStockDB();
   const actions = useRecipeActions(setDb);
   const recipes = db.recipes ?? [];
+  const pricing = db.pricing ?? DEFAULT_PRICING;
 
   const [editing, setEditing] = useState<Recipe | null>(null);
 
@@ -19,8 +21,8 @@ export default function CostPage() {
   const itemById = useMemo(() => new Map(db.items.map((i) => [i.id, i])), [db.items]);
 
   const totalProfitPerBatch = useMemo(
-    () => recipes.reduce((s, r) => s + (recipeTotals(r).profitPerBatch ?? 0), 0),
-    [recipes]
+    () => recipes.reduce((s, r) => s + (recipeTotals(r, pricing).profitPerBatch ?? 0), 0),
+    [recipes, pricing]
   );
 
   const handleSave = (recipe: Recipe) => {
@@ -41,6 +43,10 @@ export default function CostPage() {
           <div className="n">{baht(totalProfitPerBatch)}</div>
           <div className="l">กำไรรวมถ้าทำครบทุกสูตร 1 รอบ</div>
         </div>
+        <div className="stat stat--violet">
+          <div className="n">{pct(pricing.targetMarginPct)}</div>
+          <div className="l">เป้ากำไรที่ใช้คิดราคาขาย (แก้ได้ในสูตร)</div>
+        </div>
       </div>
 
       <div className="toolbar">
@@ -52,8 +58,12 @@ export default function CostPage() {
       ) : (
         <div className="recipe-list">
           {recipes.map((r) => {
-            const t = recipeTotals(r);
+            const t = recipeTotals(r, pricing);
             const maxCost = Math.max(...r.lines.map(lineCost), 0.0001);
+            // ยังไม่ได้ตั้งราคาขาย → เสนอราคาที่ควรขายให้เลย / ตั้งแล้วแต่กำไรไม่ถึงเป้า → บอกว่าควรขายเท่าไร
+            const suggested = suggestPrice(t.perUnitCost, pricing);
+            const belowTarget =
+              suggested != null && t.marginPct != null && t.marginPct + 0.5 < pricing.targetMarginPct;
             return (
               <div className="recipe-card" key={r.id}>
                 <div className="recipe-card__head">
@@ -76,7 +86,7 @@ export default function CostPage() {
                     <div className="recipe-figure__n">{baht(t.perUnitCost)}</div>
                     <div className="recipe-figure__l">ต้นทุนต่อ 1 {r.yieldUnit}</div>
                   </div>
-                  {r.sellPrice != null && (
+                  {r.sellPrice != null ? (
                     <>
                       <div className="recipe-figure">
                         <div className="recipe-figure__n">{baht(r.sellPrice)}</div>
@@ -89,8 +99,24 @@ export default function CostPage() {
                         <div className="recipe-figure__l">กำไรต่อชิ้น</div>
                       </div>
                     </>
+                  ) : (
+                    suggested && (
+                      <div className="recipe-figure recipe-figure--suggest">
+                        <div className="recipe-figure__n">
+                          {baht(suggested.price)} <small>({pct(suggested.outcome.marginPct)})</small>
+                        </div>
+                        <div className="recipe-figure__l">ราคาที่ควรขาย · ยังไม่ได้ตั้งราคา</div>
+                      </div>
+                    )
                   )}
                 </div>
+
+                {r.sellPrice != null && belowTarget && (
+                  <p className="text-xs recipe-card__hint">
+                    💡 กำไรยังไม่ถึงเป้า {pct(pricing.targetMarginPct)} — ถ้าจะให้ถึงต้องขาย{" "}
+                    <strong>{baht(suggested!.price)}</strong>
+                  </p>
+                )}
 
                 {r.lines.length > 0 && (
                   <table className="recipe-table">

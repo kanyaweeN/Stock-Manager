@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { amountText, baht, emptyLine, lineCost, lineFromItem, lineIssue, recipeTotals, unitCost } from "@/lib/cost";
 import { MaterialThumb } from "@/components/MaterialLabel";
+import PriceAdvisor from "@/components/PriceAdvisor";
+import { usePricingSettings } from "@/lib/usePricingSettings";
 import type { Recipe, RecipeLine, StockItem } from "@/lib/types";
 
 interface Props {
@@ -109,8 +111,10 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  const [pricing] = usePricingSettings();
   const preview = useMemo(() => (draft ? fromDraft(draft) : null), [draft]);
-  const totals = useMemo(() => (preview ? recipeTotals(preview) : null), [preview]);
+  // ส่ง pricing เข้าไปด้วย กำไรที่โชว์จะได้หักค่าธรรมเนียมตรงกับตัวเลขในบล็อก "ควรขายเท่าไร" ข้างล่าง
+  const totals = useMemo(() => (preview ? recipeTotals(preview, pricing) : null), [preview, pricing]);
 
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
@@ -446,7 +450,13 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
               <span>ต้นทุนต่อ 1 {preview.yieldUnit}</span>
               <strong>{baht(totals.perUnitCost)}</strong>
             </div>
-            {totals.profitPerUnit != null ? (
+            {totals.feePerUnit > 0 && (
+              <div className="cost-summary__row">
+                <span>ค่าธรรมเนียม/ค่าส่ง ต่อ 1 {preview.yieldUnit}</span>
+                <strong>−{baht(totals.feePerUnit)}</strong>
+              </div>
+            )}
+            {totals.profitPerUnit != null && (
               <>
                 <div className={`cost-summary__row ${totals.profitPerUnit < 0 ? "cost-summary__row--loss" : "cost-summary__row--profit"}`}>
                   <span>กำไรต่อ 1 {preview.yieldUnit}</span>
@@ -456,13 +466,16 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
                   <span>กำไรทั้งรอบ</span><strong>{baht(totals.profitPerBatch!)}</strong>
                 </div>
               </>
-            ) : (
-              <div className="cost-summary__row">
-                <span>ราคาขายแนะนำ</span>
-                <strong>{baht(totals.perUnitCost * 2)} (×2) · {baht(totals.perUnitCost * 3)} (×3)</strong>
-              </div>
             )}
           </div>
+
+          <h3 className="cost-section-title">ควรขายเท่าไร</h3>
+          <PriceAdvisor
+            cost={totals.perUnitCost}
+            unitLabel={preview.yieldUnit}
+            sellPrice={preview.sellPrice}
+            onUsePrice={(price) => setDraft({ ...draft, sellPrice: String(price) })}
+          />
         </div>
 
         <div className="modal-actions">
