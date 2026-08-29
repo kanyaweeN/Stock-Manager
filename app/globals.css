@@ -23,6 +23,8 @@
   --violet-soft: #f1eaff;
   --fav: #e0a106;
   --fav-soft: #fff5d9;
+  --orange: #eb6834;
+  --scrim: rgba(16, 24, 40, .45);
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .05);
   --shadow-2: 0 1px 2px rgba(16, 24, 40, .05), 0 10px 28px -14px rgba(16, 24, 40, .3);
   --side-w: 216px;
@@ -52,6 +54,8 @@
     --violet-soft: #241a3d;
     --fav: #f0c03c;
     --fav-soft: #2e2408;
+    --orange: #ff8a5c;
+    --scrim: rgba(0, 0, 0, .66);
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
     --shadow-2: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px -16px rgba(0, 0, 0, .8);
   }
@@ -63,11 +67,37 @@ body {
   background: var(--bg);
   color: var(--text);
   padding: 0;
+  /* ไทยมีสระบน-ล่างซ้อนกันได้ 2 ชั้น (เช่น "เปื้อน") ค่า normal ของเบราว์เซอร์เบียดจนชนกัน */
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  accent-color: var(--accent);
   -webkit-font-smoothing: antialiased;
+}
+::selection { background: color-mix(in srgb, var(--accent) 26%, transparent); }
+
+/* วงแหวนโฟกัสของคีย์บอร์ด — ปุ่ม/ลิงก์/summary ทั้งแอปไม่เคยมี ทำให้กด Tab แล้วไม่รู้ว่าอยู่ตรงไหน
+   (`:focus-visible` โผล่เฉพาะตอนใช้คีย์บอร์ด กดด้วยเมาส์ไม่ขึ้น) */
+:is(button, a, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* เคารพค่า "ลดการเคลื่อนไหว" ของระบบ — การ์ดเด้ง/รูปซูม/แผงป๊อปทำให้บางคนเวียนหัว */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .product-card:hover { transform: none; }
+  .product-card:hover .product-card__img { transform: none; }
+  .field-actions__btn:active { transform: none; }
 }
 
 /* ── โครงแอป: แถบข้าง (จอกว้าง) / แถบล่าง (มือถือ) — components/AppShell.tsx ── */
-.shell { min-height: 100vh; }
+.shell { min-height: 100vh; min-height: 100dvh; }
 .shell__side {
   position: fixed;
   top: 0; left: 0; bottom: 0;
@@ -609,6 +639,11 @@ select {
   cursor: pointer;
 }
 select:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+/* Safari บน iOS ซูมทั้งหน้าเข้าไปเองเมื่อโฟกัสช่องที่ตัวอักษรเล็กกว่า 16px
+   แล้วไม่ซูมกลับ ผู้ใช้ต้องถ่างนิ้วออกเองทุกครั้งที่กรอกของ */
+@media (max-width: 860px) {
+  input, select, textarea { font-size: 16px; }
+}
 @media (prefers-color-scheme: dark) {
   select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
@@ -659,7 +694,7 @@ a.btn-primary, a.btn-ghost {
 .stat .n { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
 .stat .l { font-size: 11.5px; color: var(--muted); }
 .stat--blue { border-left-color: var(--accent); }
-.stat--orange { border-left-color: #eb6834; }
+.stat--orange { border-left-color: var(--orange); }
 .stat--green { border-left-color: var(--ok); }
 .stat--warning { border-left-color: var(--low); }
 .stat--violet { border-left-color: var(--violet); }
@@ -715,7 +750,7 @@ tr.low-row { background: var(--low-bg); }
 td.qty { font-weight: 600; text-align: center; width: 90px; }
 td.actions { text-align: right; white-space: nowrap; width: 160px; }
 .qty-btn {
-  width: 26px; height: 26px; border-radius: 6px; padding: 0;
+  width: 26px; height: 26px; border-radius: 999px; padding: 0;
   border: 1px solid var(--border); background: var(--card); color: var(--text);
   font-size: 15px; line-height: 1;
 }
@@ -726,14 +761,15 @@ td.actions { text-align: right; white-space: nowrap; width: 160px; }
 .empty { text-align: center; padding: 40px; color: var(--muted); }
 
 .modal-backdrop {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+  display: none; position: fixed; inset: 0; background: var(--scrim);
   align-items: center; justify-content: center; z-index: 50;
+  padding: 16px;
 }
 .modal-backdrop.open { display: flex; }
 .modal {
   background: var(--card); border-radius: 12px;
   width: 100%; max-width: 480px; border: 1px solid var(--border);
-  max-height: 88vh; overflow: hidden;
+  max-height: 88vh; max-height: calc(100dvh - 32px); overflow: hidden;
   display: flex; flex-direction: column;
 }
 .modal h2 { margin: 0 0 16px; font-size: 17px; }
@@ -876,7 +912,7 @@ td.thumb-cell { width: 46px; }
   color: var(--accent); cursor: pointer;
 }
 .status-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.status-rebuy { background: #e8f9f0; color: #16a34a; border: 1px solid #16a34a; }
+.status-rebuy { background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); }
 .status-avoid { background: var(--low-bg); color: var(--danger); border: 1px solid var(--danger); }
 .status-have { background: var(--low-bg); color: var(--low); border: 1px solid var(--low); }
 .link-icon { margin-left: 6px; text-decoration: none; }
@@ -900,7 +936,7 @@ td.thumb-cell { width: 46px; }
   border-radius: 999px; margin-bottom: 12px;
   background: var(--bg); border: 1px solid var(--border);
 }
-.sync-status--on { color: #16a34a; }
+.sync-status--on { color: var(--ok); }
 .sync-status--off { color: var(--muted); }
 .sync-status--checking { color: var(--low); }
 .sub-tight { margin-top: -4px; }
@@ -1146,7 +1182,7 @@ td.thumb-cell { width: 46px; }
 }
 .product-group__peek > .product-card__select { z-index: 10; }
 .product-card:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
+  box-shadow: var(--shadow-2);
   transform: translateY(-2px);
 }
 .product-card.out-of-stock-row .product-card__img-wrap { filter: grayscale(1); opacity: .55; }
@@ -1275,7 +1311,6 @@ td.thumb-cell { width: 46px; }
   font-size: 12px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.qty-btn { border-radius: 999px; width: 26px; height: 26px; }
 
 /* จอมือถือ: การ์ดกริดกลายเป็นรายการแนวนอน — ปุ่ม −/+ อยู่ขอบขวาในระยะนิ้วโป้ง */
 @media (max-width: 640px) {
@@ -1310,6 +1345,8 @@ td.thumb-cell { width: 46px; }
   }
   .product-card__min { display: none; }
   .card-menu { margin-left: 0; }
+  .qty-btn { width: 32px; height: 32px; font-size: 17px; }
+  .product-card__footer .qty span { min-width: 26px; }
   .product-card__select { top: auto; left: auto; right: 8px; bottom: 8px; }
   .fav-btn {
     position: absolute; top: 6px; right: 6px; z-index: 2;
@@ -1509,7 +1546,7 @@ td.thumb-cell { width: 46px; }
 .cost-summary__row:last-child { border-bottom: none; }
 .cost-summary__row--main { font-size: 16px; background: var(--low-bg); }
 .cost-summary__row--main strong { color: var(--accent); }
-.cost-summary__row--profit strong { color: #16a34a; }
+.cost-summary__row--profit strong { color: var(--ok); }
 .cost-summary__row--loss strong { color: var(--danger); }
 
 /* ── คิดราคาขาย "ควรขายเท่าไร" — components/PriceAdvisor.tsx ── */
@@ -1569,7 +1606,7 @@ td.thumb-cell { width: 46px; }
 .recipe-figure__n { font-size: 20px; font-weight: 700; color: var(--accent); }
 .recipe-figure__n small { font-size: 12px; font-weight: 500; }
 .recipe-figure__l { font-size: 11px; color: var(--muted); }
-.recipe-figure--profit .recipe-figure__n { color: #16a34a; }
+.recipe-figure--profit .recipe-figure__n { color: var(--ok); }
 .recipe-figure--loss .recipe-figure__n { color: var(--danger); }
 .recipe-figure--suggest { border-style: dashed; }
 .recipe-figure--suggest .recipe-figure__n { color: var(--violet); }
