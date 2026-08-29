@@ -1,27 +1,29 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { todayISO } from "@/lib/date";
+import { formatThaiShortDate, todayISO } from "@/lib/date";
+import { downloadFile } from "@/lib/download";
+import { sortTrash, TRASH_MAX } from "@/lib/trash";
+import type { StockItem } from "@/lib/types";
 import type { StockDB } from "@/lib/db";
 import { DEFAULT_DB, migrateDB } from "@/lib/db";
 
 interface Props {
   db: StockDB;
   onRestore: (db: StockDB) => void;
+  /** กู้ของกลับเข้าสต็อก / ลบถาวร — มาจาก `useProductActions` (ดู lib/trash.ts) */
+  onRestoreItem: (id: string) => void;
+  onDeleteForever: (item: StockItem) => void;
+  onEmptyTrash: (count: number) => void;
 }
 
-export default function BackupTab({ db, onRestore }: Props) {
+export default function BackupTab({ db, onRestore, onRestoreItem, onDeleteForever, onEmptyTrash }: Props) {
+  const trash = sortTrash(db.trash ?? []);
   const [message, setMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `stock-backup-${todayISO()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(`stock-backup-${todayISO()}.json`, JSON.stringify(db, null, 2), "json");
   };
 
   const handleImport = (file: File) => {
@@ -71,9 +73,35 @@ export default function BackupTab({ db, onRestore }: Props) {
       />
       {message && <p className="sub">{message}</p>}
 
+      <h3 className="summary-sub-title">🗑️ ถังขยะ ({trash.length})</h3>
+      <p className="sub sub-tight text-xs">
+        ของที่ลบออกจากสต็อกมาพักไว้ที่นี่ กดกู้คืนได้ — เก็บได้มากสุด {TRASH_MAX} รายการ
+        เกินแล้วตัวที่ลบนานสุดจะหลุดออกถาวร (ประวัติราคา/ส่วนผสมกลับมาครบตอนกู้คืน)
+      </p>
+      {trash.length === 0 ? (
+        <p className="sub text-xs">ยังไม่มีของในถังขยะ</p>
+      ) : (
+        <>
+          <div className="trash-list">
+            {trash.map((i) => (
+              <div className="trash-row" key={i.id}>
+                <span className="trash-row__name">{i.name || "(ไม่มีชื่อ)"}</span>
+                <span className="trash-row__meta">
+                  {i.qty} ชิ้น
+                  {i.deletedAt ? ` · ลบเมื่อ ${formatThaiShortDate(i.deletedAt.slice(0, 10)) || i.deletedAt.slice(0, 10)}` : ""}
+                </span>
+                <button className="btn-ghost btn-sm" onClick={() => onRestoreItem(i.id)}>↩️ กู้คืน</button>
+                <button className="icon-btn del" title="ลบถาวร" onClick={() => onDeleteForever(i)}>🗑️</button>
+              </div>
+            ))}
+          </div>
+          <button className="btn-ghost btn-sm" onClick={() => onEmptyTrash(trash.length)}>ล้างถังขยะทั้งหมด</button>
+        </>
+      )}
+
       <div className="danger-zone">
         <p className="sub sub-tight text-xs">
-          ลบข้อมูลสินค้าและหมวดหมู่ทั้งหมดทิ้ง (แนะนำให้สำรองข้อมูลไว้ก่อนกด)
+          ลบข้อมูลสินค้าและหมวดหมู่ทั้งหมดทิ้ง <b>รวมถังขยะด้วย</b> (แนะนำให้สำรองข้อมูลไว้ก่อนกด)
         </p>
         <button className="btn-danger" onClick={handleClearAll}>🗑️ ล้างข้อมูลทั้งหมด</button>
       </div>

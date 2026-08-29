@@ -5,7 +5,11 @@ import type { StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/statusOptions";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/ingredients";
 import { formatThaiShortDate } from "@/lib/date";
-import { priceStats } from "@/lib/price";
+import ModalShell from "@/components/ModalShell";
+import { effectiveExpiry, expiryLabel, type ExpiryInfo } from "@/lib/expiry";
+import { isLow, isOutOfStock } from "@/lib/stock";
+import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/usage";
+import { buyTimes, priceStats, FREQUENT_MIN_TIMES } from "@/lib/price";
 import type { SkinProfile } from "@/lib/db";
 
 /** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
@@ -19,8 +23,12 @@ interface Props {
   onDec: (id: string) => void;
   onEdit: (item: StockItem) => void;
   onDelete: (item: StockItem) => void;
+  /** ปัก/เอาดาวของโปรดออก — โชว์เป็นปุ่มดาวบนการ์ด และกรองด้วยชิป "⭐ ของโปรด" */
+  onToggleFav?: (id: string) => void;
   /** เพิ่มสินค้าชิ้นนี้เป็นวัตถุดิบในสูตรต้นทุน (ดู lib/cost.ts) */
   onAddToRecipe?: (item: StockItem) => void;
+  /** จดสินค้าชิ้นนี้ไว้ในแผนซื้อของ (ดู lib/plan.ts) */
+  onAddToPlan?: (item: StockItem) => void;
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
@@ -47,7 +55,7 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onAddToRecipe, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, selectMode, selectedIds, onToggleSelect }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   /** id ของการ์ดที่เปิดเมนู ⋯ อยู่ (เปิดได้ทีละใบ) */
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -79,20 +87,52 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
   }, [items, avoidIngredients, skinProfile]);
 
   /**
-   * ราคาเฉลี่ยที่จะโชว์บนการ์ด — คิดล่วงหน้าทีเดียวต่อการเปลี่ยนของ items
-   * เดิมคิดใหม่ทุกใบทุกครั้งที่ re-render (เปิด/ปิดเมนู ⋯ ก็คิดใหม่ทั้งกริด)
-   * โชว์เฉพาะตอนซื้อมาหลายครั้งแล้วราคาไม่เท่ากัน ไม่งั้นเป็นตัวเลขซ้ำเปล่าๆ
+   * ข้อมูลจากประวัติการซื้อที่จะโชว์บนการ์ด (จำนวนครั้งที่ซื้อ + ราคาเฉลี่ย) —
+   * คิดล่วงหน้าทีเดียวต่อการเปลี่ยนของ items เดิมคิดใหม่ทุกใบทุกครั้งที่ re-render
+   * (เปิด/ปิดเมนู ⋯ ก็คิดใหม่ทั้งกริด)
+   *
+   * ราคาเฉลี่ยโชว์เฉพาะตอนซื้อมาหลายครั้งแล้วราคาไม่เท่ากัน ไม่งั้นเป็นตัวเลขซ้ำเปล่าๆ
    */
-  const avgPriceById = useMemo(() => {
-    const map = new Map<string, { text: string; title: string }>();
+  const buyInfoById = useMemo(() => {
+    const map = new Map<string, { times: number; avg?: { text: string; title: string } }>();
     for (const i of items) {
       const stats = priceStats(i.priceHistory);
       // เทียบแบบมีช่วงคลาด: avg ปัดเหลือ 2 ตำแหน่งแล้ว แต่ price ที่ผู้ใช้กรอกอาจละเอียดกว่า
-      if (!stats || stats.times < 2 || Math.abs(stats.avg - (i.price ?? 0)) < 0.01) continue;
+      const showAvg = !!stats && stats.times >= 2 && Math.abs(stats.avg - (i.price ?? 0)) >= 0.01;
+      const times = buyTimes(i);
+      if (!showAvg && times === 0) continue;
       map.set(i.id, {
-        text: `เฉลี่ย ฿${stats.avg.toLocaleString("th-TH")}`,
-        title: `ซื้อ ${stats.times} ครั้ง · ราคาเฉลี่ยถ่วงน้ำหนักตามจำนวน`,
+        times,
+        avg: showAvg && stats
+          ? {
+              text: `เฉลี่ย ฿${stats.avg.toLocaleString("th-TH")}`,
+              title: `ซื้อ ${stats.times} ครั้ง · ราคาเฉลี่ยถ่วงน้ำหนักตามจำนวน`,
+            }
+          : undefined,
       });
+    }
+    return map;
+  }, [items]);
+
+  /**
+   * วันหมดอายุที่ใช้จริงของแต่ละใบ — เก็บเฉพาะตัวที่ต้องเตือน (หมดแล้ว/ใกล้หมด)
+   * ของที่ยังอีกนานไม่ต้องมีป้าย ไม่งั้นการ์ดเต็มไปด้วยป้ายที่ไม่ต้องทำอะไร
+   */
+  const expiryById = useMemo(() => {
+    const map = new Map<string, ExpiryInfo>();
+    for (const i of items) {
+      const info = effectiveExpiry(i);
+      if (info && (info.expired || info.soon)) map.set(i.id, info);
+    }
+    return map;
+  }, [items]);
+
+  /** เหลือพอใช้อีกกี่วัน — โชว์เฉพาะตัวที่ใกล้จะหมด ของที่ยังอีกนานไม่ต้องรก */
+  const runoutById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const i of items) {
+      const left = daysUntilEmpty(i);
+      if (left != null && left <= RUNOUT_SOON_DAYS) map.set(i.id, left);
     }
     return map;
   }, [items]);
@@ -104,16 +144,20 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
   }
 
   const renderCard = (i: StockItem, suppressSelect = false) => {
-    const outOfStock = i.qty === 0;
-    const low = !outOfStock && i.min > 0 && i.qty <= i.min;
+    const outOfStock = isOutOfStock(i);
+    const low = isLow(i);
     const selected = !!selectedIds?.has(i.id);
     const interactive = selectMode && !suppressSelect;
     const ing = ingredientInfo.get(i.id);
-    const avg = avgPriceById.get(i.id);
+    const buy = buyInfoById.get(i.id);
+    const avg = buy?.avg;
+    const frequent = (buy?.times ?? 0) >= FREQUENT_MIN_TIMES;
     const boughtLabel = formatThaiShortDate(i.purchasedAt);
+    const exp = expiryById.get(i.id);
+    const runout = runoutById.get(i.id);
     return (
       <div
-        className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""} ${selected ? "product-card--selected" : ""}`}
+        className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""} ${selected ? "product-card--selected" : ""} ${i.fav ? "product-card--fav" : ""}`}
         key={i.id}
         onClick={interactive ? () => onToggleSelect?.(i.id) : undefined}
       >
@@ -142,10 +186,28 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
 
         <div className="product-card__body">
           {/* ป้ายสถานะ — จอกว้างลอยทับรูป, จอมือถือไหลมาเป็นชิปบรรทัดแรกของเนื้อหา (ดู .product-card__flags) */}
-          {(outOfStock || low || i.status) && (
+          {(outOfStock || low || frequent || exp || runout != null || i.status) && (
             <div className="product-card__flags">
               {outOfStock && <span className="badge-out">หมดแล้ว</span>}
               {low && <span className="badge-low">ใกล้หมด{i.min > 0 ? ` · ขั้นต่ำ ${i.min}` : ""}</span>}
+              {frequent && (
+                <span className="badge-frequent" title="นับจากประวัติราคา — ซื้อซ้ำหลายครั้งแล้ว">
+                  🔁 ซื้อ {buy?.times} ครั้ง
+                </span>
+              )}
+              {runout != null && !outOfStock && (
+                <span className="badge-runout" title="ประมาณจากอัตราการใช้ย้อนหลัง (ดู lib/usage.ts)">
+                  📉 หมดใน ~{runout} วัน
+                </span>
+              )}
+              {exp && (
+                <span
+                  className={`badge-expiry ${exp.expired ? "badge-expiry--gone" : ""}`}
+                  title={`หมดอายุ ${exp.date}${exp.source === "pao" ? " (นับจากวันที่เปิดใช้)" : " (ตามฉลาก)"}`}
+                >
+                  {exp.expired ? "⛔" : "⏰"} {expiryLabel(exp)}
+                </span>
+              )}
               {i.status && (
                 <span className={`status-badge status-${i.status}`}>{STATUS_LABELS[i.status]}</span>
               )}
@@ -162,9 +224,10 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
           <div className="product-card__category">
             {i.cats.length > 0 ? i.cats.join(" · ") : "ไม่มีหมวดหมู่"}
           </div>
-          {(i.source === "shopee" || i.variant) && (
+          {(i.source === "shopee" || i.variant || i.shop) && (
             <div className="product-card__tags">
               {i.source === "shopee" && <span className="source-tag">Shopee</span>}
+              {i.shop && <span className="shop-tag" title="ร้านที่ซื้อครั้งล่าสุด">🏪 {i.shop}</span>}
               {i.variant && <span className="variant-tag">{i.variant}</span>}
             </div>
           )}
@@ -208,6 +271,9 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               🗓️ ซื้อ {boughtLabel}
             </div>
           )}
+          {i.location && (
+            <div className="product-card__location" title="เก็บไว้ตรงไหน">📍 {i.location}</div>
+          )}
           {i.note && <div className="product-card__note">📝 {i.note}</div>}
 
           <div className="product-card__footer" onClick={(e) => e.stopPropagation()}>
@@ -217,7 +283,22 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               <button className="qty-btn" onClick={() => onInc(i.id)}>+</button>
             </div>
             {/* ตอนใกล้หมดมีป้าย "ใกล้หมด · ขั้นต่ำ n" อยู่แล้ว ไม่ต้องบอกซ้ำ */}
+            {i.openPct != null && i.qty > 0 && (
+              <span className="product-card__open" title="ขวด/แพ็คที่เปิดอยู่เหลืออยู่เท่าไร">
+                เปิดแล้ว {i.openPct}%
+              </span>
+            )}
             {i.min > 0 && !low && <span className="product-card__min">ขั้นต่ำ {i.min}</span>}
+            {onToggleFav && (
+              <button
+                className={`icon-btn fav-btn ${i.fav ? "fav-btn--on" : ""}`}
+                title={i.fav ? "เอาออกจากของโปรด" : "เพิ่มเป็นของโปรด"}
+                aria-pressed={!!i.fav}
+                onClick={() => onToggleFav(i.id)}
+              >
+                {i.fav ? "★" : "☆"}
+              </button>
+            )}
             <div className="card-menu">
               <button
                 className="icon-btn card-menu__btn"
@@ -233,6 +314,11 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
                   {onAddToRecipe && (
                     <button className="menu__item" onClick={() => { setMenuId(null); onAddToRecipe(i); }}>
                       <i>🧮</i> ใส่ในสูตรต้นทุน
+                    </button>
+                  )}
+                  {onAddToPlan && (
+                    <button className="menu__item" onClick={() => { setMenuId(null); onAddToPlan(i); }}>
+                      <i>🛒</i> ใส่ในแผนซื้อของ
                     </button>
                   )}
                   {i.link && (
@@ -308,15 +394,15 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
       })}
 
       {openCluster && (
-        <div className="modal-backdrop open" onClick={() => setOpenGroupId(null)}>
-          <div className="modal product-group-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>👥 {openCluster[0].groupName} · {openCluster.length} รายการ</h2>
-              <button className="modal-close" onClick={() => setOpenGroupId(null)}>×</button>
-            </div>
-            <div className="product-group__stack">{openCluster.map((i) => renderCard(i))}</div>
-          </div>
-        </div>
+        <ModalShell
+          open
+          title={`👥 ${openCluster[0].groupName} · ${openCluster.length} รายการ`}
+          onClose={() => setOpenGroupId(null)}
+          className="product-group-modal"
+          closeOnBackdrop
+        >
+          <div className="product-group__stack">{openCluster.map((i) => renderCard(i))}</div>
+        </ModalShell>
       )}
     </div>
   );

@@ -8,6 +8,41 @@ export interface PricePoint {
   price: number;
   /** ซื้อกี่แพ็คในครั้งนั้น — ใช้ถ่วงน้ำหนักตอนหาค่าเฉลี่ย (จ่ายจริงครั้งนั้น = price × qty) */
   qty: number;
+  /** ร้านที่ซื้อครั้งนั้น — ว่างได้ (ของเก่า/กรอกเอง) ใช้เทียบว่าร้านไหนขายถูกกว่า ดู lib/summary.ts */
+  shop?: string;
+  /** ออเดอร์ที่จุดนี้มาจาก (`PurchaseOrder.id`) — ใช้ผูกค่าส่ง/ส่วนลดระดับออเดอร์เข้ากับครั้งที่ซื้อ */
+  orderId?: string;
+}
+
+/**
+ * ค่าใช้จ่ายระดับ "ออเดอร์" ที่ไม่ได้อยู่ในราคาสินค้า — ค่าส่งกับส่วนลด/โค้ด
+ *
+ * แยกออกมาเป็นก้อนของตัวเองแทนที่จะแปะไว้กับ `PricePoint` เพราะออเดอร์เดียวมีของหลายชิ้น
+ * ถ้าเก็บไว้ที่จุดราคาจะถูกนับซ้ำเท่าจำนวนชิ้น — จุดราคาชี้กลับมาที่นี่ด้วย `orderId` แทน
+ * ยอดจ่ายจริงของออเดอร์ = ราคาสินค้าทุกชิ้น + `shipping` − `discount` (ดู `orderExtras` ใน lib/summary.ts)
+ */
+export interface PurchaseOrder {
+  id: string;
+  /** วันที่สั่งซื้อ (YYYY-MM-DD) — ว่างได้ถ้าไม่ทราบ (ยอดจะไปกองที่แถว "ไม่ทราบวันที่" เหมือนจุดราคา) */
+  date: string;
+  shop?: string;
+  /** ค่าส่งที่จ่ายจริง (หลังหักส่วนลดค่าส่งแล้ว) */
+  shipping: number;
+  /** ส่วนลด/โค้ดที่หักออกจากยอดทั้งออเดอร์ — เก็บเป็น**เลขบวก** แล้วค่อยเอาไปลบ */
+  discount: number;
+  note: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * การเปลี่ยนจำนวนของ 1 วัน — `delta` ติดลบ = ใช้ไป, บวก = เติมเข้า/แก้ตัวเลขให้ถูก
+ * รวมเป็นวันละจุดเสมอ (กด − สามทีในวันเดียว = จุดเดียว delta -3) ดู lib/usage.ts
+ */
+export interface UsagePoint {
+  /** วันที่ (YYYY-MM-DD) ตามเวลาเครื่อง */
+  date: string;
+  delta: number;
 }
 
 export interface StockItem {
@@ -38,6 +73,43 @@ export interface StockItem {
   size?: string;
   /** แท็กรอง เช่น ตัวเลือกสินค้า/รุ่น/สี ที่ดึงมาจากตอนนำเข้า */
   variant?: string;
+  /**
+   * ประวัติการเปลี่ยนจำนวน (วันละจุด เรียงเก่า→ใหม่) — จดให้ตอนกด +/− บนการ์ด
+   * ใช้ประมาณว่า "ของจะหมดอีกกี่วัน" ซึ่งเดาจาก `qty` เฉยๆ ไม่ได้ ดู lib/usage.ts
+   */
+  usageLog?: UsagePoint[];
+  /** หน่วยของ `packAmount` เช่น g, ml, ชิ้น — ไม่กรอกก็ได้ แล้ว /cost จะไปเดาจาก `size` แทน */
+  unit?: string;
+  /** 1 แพ็ค/ขวดได้ปริมาณเท่าไร (หน่วยตาม `unit`) — ใช้คิดต้นทุนต่อหน่วยใน /cost */
+  packAmount?: number;
+  /**
+   * ขวด/แพ็คที่ "เปิดใช้อยู่" เหลืออยู่กี่ % (0–100) — ไม่กรอก = ถือว่าเต็มขวด
+   *
+   * `qty` นับเป็นแพ็คเต็มๆ เท่านั้น ของที่ใช้ไปครึ่งขวดจึงยังนับเป็น 1 เหมือนขวดใหม่
+   * ฟิลด์นี้เก็บ "เศษ" ไว้ต่างหาก **โดยไม่แตะความหมายของ `qty`** (ซึ่งทั้งแอปใช้อยู่)
+   * แล้วให้ `remainingUnits()` ใน lib/usage.ts เป็นคนรวมสองอย่างเข้าด้วยกัน
+   */
+  openPct?: number;
+  /** ปกติซื้อทีละกี่ชิ้น/แพ็ค — ใช้เติมจำนวนให้อัตโนมัติตอนเพิ่มลงแผนซื้อของ */
+  reorderQty?: number;
+  /**
+   * ถูกลบเมื่อไร (ISO) — มีค่าก็ต่อเมื่ออยู่ใน `StockDB.trash` แล้วเท่านั้น
+   * **ของที่ถูกลบถูกย้ายออกจาก `db.items` จริงๆ** ไม่ใช่ซ่อนด้วยแฟล็ก โค้ดทุกที่ที่วน
+   * `db.items` อยู่แล้วจึงไม่ต้องแก้สักบรรทัด (ดู lib/trash.ts)
+   */
+  deletedAt?: string;
+  /** เก็บไว้ตรงไหน เช่น "ลิ้นชักบน", "ตู้ห้องนอน" — ค้นหาเจอด้วยช่องค้นหาหน้าแรก */
+  location?: string;
+  /** ร้านที่ซื้อครั้งล่าสุด — เดินหน้าพร้อม `purchasedAt` (ออเดอร์เก่าที่ลงย้อนหลังไม่ทับ) ประวัติร้านทุกครั้งอยู่ใน `priceHistory[].shop` */
+  shop?: string;
+  /** วันหมดอายุตามฉลาก (YYYY-MM-DD) — ดู lib/expiry.ts */
+  expiryAt?: string;
+  /** วันที่เปิดใช้ (YYYY-MM-DD) — มีความหมายก็ต่อเมื่อกรอก `paoMonths` ด้วย */
+  openedAt?: string;
+  /** เปิดแล้วใช้ได้กี่เดือน (PAO — สัญลักษณ์กระปุกเปิดฝาบนฉลาก เช่น 12M) นับจาก `openedAt` */
+  paoMonths?: number;
+  /** ปักดาวเป็นของโปรด — ใช้กรองด้วยชิป "⭐ ของโปรด" ที่หน้าแรก ไม่มีผลกับการเรียงลำดับ */
+  fav?: boolean;
   /** จัดกลุ่มสินค้าหลายชิ้นที่เป็น "ตัวเดียวกัน" เข้าด้วยกันแบบไม่ลบทิ้ง (เช่น ซื้อจากคนละร้าน) — สินค้าที่ groupId เดียวกันถือว่าอยู่กลุ่มเดียวกัน */
   groupId?: string;
   groupName?: string;
@@ -68,6 +140,21 @@ export interface RecipeLine {
   usedAmount: number;
 }
 
+/**
+ * บันทึกว่า "ทำสูตรนี้ไปแล้ว 1 ครั้ง" — **ไม่ตัดสต็อกให้**
+ *
+ * ตรงกับกติกาเดิมของสูตรต้นทุนที่ไม่ยุ่งกับสต็อก (สต็อกอัปเดตทางนำเข้า Shopee ทางเดียว)
+ * ที่นี่แค่จดว่าทำไปกี่รอบเมื่อไร เพื่อตอบว่าลงทุนวัตถุดิบไปเท่าไรและได้ของกี่ชิ้น
+ */
+export interface ProductionRun {
+  id: string;
+  /** วันที่ทำ (YYYY-MM-DD) */
+  date: string;
+  /** ทำไปกี่รอบสูตร (1 รอบ = ได้ของ `Recipe.yieldQty` ชิ้น) */
+  batches: number;
+  note: string;
+}
+
 /** สูตรการผลิต 1 รอบ ใช้คำนวณต้นทุนต่อชิ้น */
 export interface Recipe {
   id: string;
@@ -83,6 +170,8 @@ export interface Recipe {
   otherCost: number;
   /** ราคาขายต่อชิ้น (ถ้ากรอกจะคำนวณกำไรให้) */
   sellPrice?: number;
+  /** ประวัติว่าทำสูตรนี้ไปแล้วกี่รอบ เมื่อไร (เรียงเก่า→ใหม่) */
+  runs?: ProductionRun[];
   updatedAt?: string;
 }
 
@@ -103,6 +192,9 @@ export interface PricingSettings {
   rounding: PriceRounding;
 }
 
+/** ความสำคัญของของในแผน — ใช้ตัดสินว่าตัดอะไรออกก่อนตอนงบไม่พอ */
+export type PlanPriority = "must" | "normal" | "maybe";
+
 /** ของ 1 อย่างในแผนซื้อ — ยอดของบรรทัด = ราคาต่อชิ้น × จำนวนที่จะซื้อ */
 export interface PlanLine {
   id: string;
@@ -120,6 +212,8 @@ export interface PlanLine {
   boughtAt?: string;
   /** ราคาที่จ่ายจริงต่อชิ้น (ถ้าไม่กรอก = จ่ายตามราคาที่ตั้งงบไว้) */
   paidPrice?: number;
+  /** ไม่กรอก = `"normal"` — ดู `planTotals.mustRemaining` ที่บอกว่า "ขั้นต่ำต้องมีเงินเท่าไร" */
+  priority?: PlanPriority;
 }
 
 /** แผนซื้อของ 1 รอบ เช่น "ของใช้เดือนหน้า" หรือ "ของปีใหม่" */
@@ -151,6 +245,8 @@ export interface ImportCandidate {
   lineTotal?: number;
   /** วันที่สั่งซื้อจริงที่แกะจากหน้าออเดอร์ (YYYY-MM-DD) — ไม่มีก็ใช้วันที่นำเข้าแทน */
   purchasedAt?: string;
+  /** ร้านที่แกะได้จากหน้าออเดอร์ (best-effort — Shopee สุ่มชื่อ class แก้เองได้ในหน้ารีวิว) */
+  shop?: string;
   size?: string;
   variant?: string;
   note?: string;
@@ -160,5 +256,5 @@ export interface ImportCandidate {
   /** ถ้าเป็นการซื้อซ้ำ ให้รวมจำนวนเข้ารายการเดิมแทนที่จะสร้างใหม่ (ค่าเริ่มต้น true เมื่อเจอรายการซ้ำ) */
   mergeExisting?: boolean;
   /** ตอนซื้อซ้ำ เลือกได้ว่าจะเอาค่าใหม่มาอัปเดตฟิลด์ไหนบ้าง (ค่าเริ่มต้น: อัปเดตทุกฟิลด์ที่มีค่าใหม่) */
-  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients", boolean>>;
+  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients" | "shop", boolean>>;
 }

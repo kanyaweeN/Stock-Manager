@@ -1,0 +1,109 @@
+import { describe, expect, it } from "vitest";
+import { lineFromItem, parsePackSize, productionSummary, recipeTotals } from "@/lib/cost";
+import { priceForMargin, roundPrice } from "@/lib/pricing";
+import type { PricingSettings, Recipe, StockItem } from "@/lib/types";
+
+const item = (over: Partial<StockItem> = {}): StockItem => ({
+  id: "i", name: "x", cats: [], qty: 1, min: 0, note: "", ...over,
+});
+
+const recipe = (over: Partial<Recipe> = {}): Recipe => ({
+  id: "r", name: "สูตร", note: "", lines: [], yieldQty: 10, yieldUnit: "ก้อน", laborCost: 0, otherCost: 0, ...over,
+});
+
+describe("parsePackSize", () => {
+  it("แกะน้ำหนัก/ปริมาตรเป็นหน่วยฐาน", () => {
+    expect(parsePackSize("1000 g")).toEqual({ amount: 1000, unit: "g" });
+    expect(parsePackSize("1 kg")).toEqual({ amount: 1000, unit: "g" });
+    expect(parsePackSize("500ml")).toEqual({ amount: 500, unit: "ml" });
+  });
+
+  it("ขนาดที่เป็นมิติ (ความยาว) ไม่ใช่ขนาดบรรจุ", () => {
+    expect(parsePackSize("10x15 ซม.")).toBeNull();
+  });
+
+  it("แกะไม่ออก = null ไม่เดามั่ว", () => {
+    expect(parsePackSize("ขวดกลาง")).toBeNull();
+    expect(parsePackSize("")).toBeNull();
+    expect(parsePackSize(undefined)).toBeNull();
+  });
+});
+
+describe("lineFromItem", () => {
+  it("ใช้ packAmount/unit ที่กรอกไว้ก่อนการเดาจากข้อความ size", () => {
+    const l = lineFromItem(item({ packAmount: 250, unit: "ml", size: "1000 g", price: 90 }));
+    expect(l).toMatchObject({ packAmount: 250, unit: "ml", buyPrice: 90 });
+  });
+
+  it("ไม่กรอกก็ตกไปเดาจาก size เหมือนเดิม", () => {
+    expect(lineFromItem(item({ size: "1000 g" }))).toMatchObject({ packAmount: 1000, unit: "g" });
+  });
+
+  it("ไม่ระบุขนาดเลย = ของนับเป็นชิ้น", () => {
+    expect(lineFromItem(item())).toMatchObject({ packAmount: 1, unit: "ชิ้น" });
+  });
+
+  it("ระบุขนาดแต่แกะไม่ออก = 0 (ยังไม่รู้) ไม่ใช่ 1 เงียบๆ", () => {
+    // ตั้งเป็น 1 จะกลายเป็น "ใช้ 50 g = จ่ายราคาเต็ม 50 แพ็ค"
+    expect(lineFromItem(item({ size: "ขวดกลาง" })).packAmount).toBe(0);
+  });
+});
+
+describe("recipeTotals", () => {
+  const r = recipe({
+    lines: [{ id: "l", name: "น้ำมัน", buyPrice: 100, packAmount: 1000, unit: "g", usedAmount: 500 }],
+    laborCost: 50,
+    otherCost: 0,
+  });
+
+  it("ต้นทุนบรรทัด = ราคา ÷ ปริมาณต่อแพ็ค × ปริมาณที่ใช้", () => {
+    expect(recipeTotals(r).materialCost).toBe(50);
+    expect(recipeTotals(r).batchCost).toBe(100);
+    expect(recipeTotals(r).perUnitCost).toBe(10);
+  });
+
+  it("ไม่ตั้งราคาขาย = ไม่คิดกำไรให้", () => {
+    expect(recipeTotals(r).profitPerUnit).toBeNull();
+  });
+});
+
+describe("productionSummary", () => {
+  it("รวมรอบที่ทำและของที่ได้", () => {
+    const r = recipe({
+      lines: [{ id: "l", name: "น้ำมัน", buyPrice: 100, packAmount: 1000, unit: "g", usedAmount: 500 }],
+      laborCost: 50,
+      runs: [
+        { id: "x", date: "2026-08-01", batches: 2, note: "" },
+        { id: "y", date: "2026-08-20", batches: 1, note: "" },
+      ],
+    });
+    expect(productionSummary(r)).toMatchObject({ batches: 3, units: 30, cost: 300, lastDate: "2026-08-20", times: 2 });
+  });
+
+  it("ยังไม่เคยทำ", () => {
+    expect(productionSummary(recipe())).toMatchObject({ batches: 0, units: 0, cost: 0, lastDate: "", times: 0 });
+  });
+});
+
+describe("pricing — คิดราคาขาย", () => {
+  const settings = (over: Partial<PricingSettings> = {}): PricingSettings => ({
+    targetMarginPct: 40, feePct: 0, feePerUnit: 0, rounding: "none", ...over,
+  });
+
+  it("คืน null เมื่อค่าธรรมเนียม + กำไรที่อยากได้ ≥ 100% (หารด้วยศูนย์/ติดลบ) ไม่เดาเลขให้", () => {
+    expect(priceForMargin(100, 60, settings({ feePct: 40 }))).toBeNull();
+    expect(priceForMargin(100, 80, settings({ feePct: 30 }))).toBeNull();
+  });
+
+  it("สูตร: ราคา = (ต้นทุน + ค่าส่งต่อชิ้น) ÷ (1 − ค่าธรรมเนียม% − กำไร%)", () => {
+    expect(priceForMargin(50, 50, settings())).toBe(100);
+    // กำไร % คิดจาก "ราคาขาย" (margin) ไม่ใช่ % ของต้นทุน (markup) — 50 ÷ (1−0.5) = 100
+    expect(priceForMargin(50, 50, settings({ feePerUnit: 10 }))).toBe(120);
+  });
+
+  it("ปัดราคาขึ้นเสมอ กำไรจะได้ไม่หลุดเป้า", () => {
+    expect(roundPrice(101, "10")).toBe(110);
+    expect(roundPrice(101, "9")).toBeGreaterThanOrEqual(101);
+    expect(roundPrice(101, "none")).toBe(101);
+  });
+});

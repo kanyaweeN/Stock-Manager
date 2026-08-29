@@ -13,6 +13,11 @@ export interface ChipCounts {
   outOfStock: number;
   uncategorized: number;
   grouped: number;
+  fav: number;
+  /** ซื้อซ้ำมาแล้วหลายครั้ง (นับจาก priceHistory ดู lib/price.ts) */
+  frequent: number;
+  /** หมดอายุแล้ว + ใกล้หมดอายุ (ดู lib/expiry.ts) */
+  expiring: number;
   categories: number;
 }
 
@@ -49,6 +54,9 @@ export default function FilterChips({ counts, active, onSelect }: Props) {
       {chip("in-stock", counts.inStock, "มีสินค้า")}
       {chip("low", counts.low, "ใกล้หมด", "fchip--warn")}
       {chip("out-of-stock", counts.outOfStock, "หมดแล้ว", "fchip--danger")}
+      {chip("fav", counts.fav, "⭐ ของโปรด", "fchip--fav")}
+      {chip("frequent", counts.frequent, "🔁 ซื้อบ่อย", "fchip--repeat")}
+      {chip("expiring", counts.expiring, "⏰ ใกล้หมดอายุ", "fchip--expiry")}
       {chip("grouped", counts.grouped, "👥 กลุ่ม", "fchip--violet")}
       {chip("uncategorized", counts.uncategorized, "ไม่มีหมวดหมู่")}
       <div className="fchip fchip--static">

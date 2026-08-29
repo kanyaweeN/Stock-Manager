@@ -1,4 +1,4 @@
-import type { PricePoint } from "./types";
+import type { PricePoint, StockItem } from "./types";
 
 /** ปัดเงินเหลือทศนิยม 2 ตำแหน่ง — ราคาต่อชิ้นมักหารไม่ลงตัว (฿54 ÷ 3 ชิ้น = ฿18, แต่ ฿55 ÷ 3 = ฿18.33) */
 export function roundBaht(n: number): number {
@@ -61,4 +61,27 @@ export function avgPrice(history?: PricePoint[]): number | null {
  */
 export function pushPricePoint(history: PricePoint[] | undefined, point: PricePoint): PricePoint[] {
   return [...(history ?? []), point].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+}
+
+// ─────────────────────────────────────────────────────────────
+// ของที่ซื้อบ่อย
+// ─────────────────────────────────────────────────────────────
+
+/** ซื้อซ้ำกี่ครั้งขึ้นไปถึงนับว่า "ซื้อบ่อย" — ปรับที่นี่ที่เดียว (ชิปหน้าแรก + ป้ายบนการ์ด + ของที่เสนอเข้าแผน) */
+export const FREQUENT_MIN_TIMES = 3;
+
+/**
+ * ซื้อของชิ้นนี้ไปกี่ครั้งแล้ว — นับจุดใน `priceHistory` (เพิ่มทุกครั้งที่นำเข้าออเดอร์ Shopee)
+ *
+ * ของเก่าที่ยังไม่มีประวัติราคาแต่รู้วันที่ซื้อ ถือว่าซื้อไป 1 ครั้ง — ไม่ใช่ 0
+ * เพราะ `priceHistory` เพิ่งมีทีหลัง ของที่นำเข้าก่อนหน้านั้นจึงไม่มีจุดสักจุด
+ */
+export function buyTimes(item: Pick<StockItem, "priceHistory" | "purchasedAt">): number {
+  const times = priceStats(item.priceHistory)?.times ?? 0;
+  return times > 0 ? times : item.purchasedAt ? 1 : 0;
+}
+
+/** ซื้อบ่อยไหม — ใช้จำนวนครั้งที่ซื้อจริง ไม่เกี่ยวกับ `fav` (ปักดาวเอง) หรือ `status: "rebuy"` (ติดธงเอง) */
+export function isFrequent(item: Pick<StockItem, "priceHistory" | "purchasedAt">): boolean {
+  return buyTimes(item) >= FREQUENT_MIN_TIMES;
 }

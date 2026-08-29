@@ -1,51 +1,36 @@
 "use client";
 
 import { todayISO } from "./date";
+import { csvRows, downloadFile } from "./download";
 import type { StockDB } from "./db";
 import { lineTotal, linePaid, planTotals } from "./plan";
 import type { PurchasePlan } from "./types";
 import { uid } from "./uid";
 
-function csvCell(v: unknown) {
-  return `"${String(v ?? "").replace(/"/g, '""')}"`;
-}
-
 /** ส่งออกแผนเป็น CSV — 1 แถวต่อของ 1 อย่าง แล้วต่อท้ายด้วยสรุปยอด */
 function exportPlanCsv(plan: PurchasePlan) {
   const t = planTotals(plan);
   const header = "รายการ,จำนวน,ราคา/ชิ้น,ยอดรวม,สถานะ,วันที่ซื้อ,จ่ายจริง,หมายเหตุ\n";
-  const rows = plan.lines
-    .map((l) =>
-      [
-        l.name,
-        l.qty,
-        l.price,
-        lineTotal(l).toFixed(2),
-        l.bought ? "ซื้อแล้ว" : "ยังไม่ซื้อ",
-        l.boughtAt ?? "",
-        l.bought ? linePaid(l).toFixed(2) : "",
-        l.note,
-      ]
-        .map(csvCell)
-        .join(",")
-    )
-    .join("\n");
-  const summary = [
+  const rows = csvRows(
+    plan.lines.map((l) => [
+      l.name,
+      l.qty,
+      l.price,
+      lineTotal(l).toFixed(2),
+      l.bought ? "ซื้อแล้ว" : "ยังไม่ซื้อ",
+      l.boughtAt ?? "",
+      l.bought ? linePaid(l).toFixed(2) : "",
+      l.note,
+    ])
+  );
+  const summary = csvRows([
     ["", "", "", "", "", "", "งบที่วางไว้", t.planned.toFixed(2)],
     ["", "", "", "", "", "", "จ่ายไปแล้ว", t.spent.toFixed(2)],
     ["", "", "", "", "", "", "ยังต้องจ่าย", t.remaining.toFixed(2)],
     ...(plan.budget ? [["", "", "", "", "", "", "งบที่ตั้งไว้", plan.budget]] : []),
-  ]
-    .map((r) => r.map(csvCell).join(","))
-    .join("\n");
+  ]);
 
-  const blob = new Blob(["﻿" + header + rows + "\n" + summary], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `plan-${plan.name || "purchase"}-${todayISO()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadFile(`plan-${plan.name || "purchase"}-${todayISO()}.csv`, header + rows + "\n" + summary);
 }
 
 /** CRUD ของแผนซื้อของ (เพิ่ม/แก้ไข/ลบ/ทำซ้ำ/ติ๊กว่าซื้อแล้ว/ส่งออก CSV) */

@@ -1,4 +1,5 @@
-import type { PlanLine, PricePoint, PricingSettings, PurchasePlan, Recipe, RecipeLine, StockItem } from "./types";
+import type { PlanLine, PlanPriority, PricePoint, PricingSettings, ProductionRun, PurchaseOrder, PurchasePlan, Recipe, RecipeLine, StockItem, UsagePoint } from "./types";
+import { normalizeShopName } from "./orders";
 import { DEFAULT_PRICING, ROUNDING_VALUES } from "./pricing";
 
 export type SkinType = "" | "oily" | "dry" | "combination" | "normal" | "sensitive";
@@ -43,14 +44,11 @@ export interface StockDB {
   plans?: PurchasePlan[];
   /** ตั้งค่าคิดราคาขาย (กำไรที่อยากได้ / ค่าธรรมเนียม / วิธีปัดราคา) — ดู lib/pricing.ts */
   pricing?: PricingSettings;
+  /** ค่าส่ง/ส่วนลดระดับออเดอร์ที่ไม่ได้อยู่ในราคาสินค้า — ดู `orderExtras` ใน lib/summary.ts */
+  orders?: PurchaseOrder[];
+  /** ของที่ลบไปแล้วแต่ยังกู้คืนได้ — **ไม่ได้อยู่ใน `items`** แล้ว (ดู lib/trash.ts) */
+  trash?: StockItem[];
   updatedAt?: string;
-}
-
-/** นับจำนวน "หน่วย" ของสินค้า — สินค้าที่ถูกจัดกลุ่มไว้ (groupId เดียวกัน) นับรวมเป็น 1 หน่วยแทนที่จะนับแยกทีละชิ้น */
-export function countUnits(items: StockItem[]): number {
-  const groupIds = new Set(items.filter((i) => i.groupId).map((i) => i.groupId));
-  const ungroupedCount = items.filter((i) => !i.groupId).length;
-  return ungroupedCount + groupIds.size;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -160,6 +158,27 @@ export const MIGRATIONS: Migration[] = [
     note: "เพิ่มฟีเจอร์คิดราคาขาย — เติม db.pricing (กำไรที่อยากได้ / ค่าธรรมเนียม / วิธีปัดราคา)",
     up: (db) => ({ ...db, pricing: db.pricing ?? { ...DEFAULT_PRICING } }),
   },
+  {
+    to: 9,
+    note: "เพิ่มร้านค้า (item.shop / priceHistory[].shop), วันหมดอายุ (expiryAt/openedAt/paoMonths) และ db.orders (ค่าส่ง/ส่วนลดต่อออเดอร์)",
+    // ฟิลด์ใหม่ทั้งหมดเป็น optional และย้อนเดาจากข้อมูลเก่าไม่ได้ (Shopee ยุคก่อนหน้านี้ไม่ได้เก็บชื่อร้าน
+    // และวันหมดอายุไม่เคยมีที่ให้กรอก) — step นี้จึงมีหน้าที่แค่เปิดช่อง db.orders ให้มีอยู่จริง
+    up: (db) => ({ ...db, orders: asArray(db.orders) }),
+  },
+  {
+    to: 10,
+    note: "เพิ่ม item.usageLog (ประวัติการใช้ ไว้ทำนายว่าจะหมดเมื่อไร) + unit/packAmount/location",
+    // ย้อนสร้าง usageLog ให้ของเก่าไม่ได้ (ไม่เคยมีใครจดว่าจำนวนเปลี่ยนวันไหน) เริ่มนับจากศูนย์
+    // ส่วน unit/packAmount ปล่อยว่างไว้ตั้งใจ — /cost จะไปเดาจาก `size` ต่อเหมือนเดิมจนกว่าจะกรอกเอง
+    up: (db) => mapItems(db, (i) => (Array.isArray(i.usageLog) ? i : { ...i, usageLog: [] })),
+  },
+  {
+    to: 11,
+    note: "เพิ่มถังขยะ (db.trash) + เศษของที่เปิดใช้ (item.openPct) + จำนวนที่ซื้อประจำ (item.reorderQty) + ความสำคัญของบรรทัดในแผน + ประวัติการผลิตของสูตร",
+    // ทุกอย่างเป็น optional ที่ย้อนเดาจากข้อมูลเก่าไม่ได้ — step นี้แค่เปิดช่อง db.trash ให้มีอยู่จริง
+    // (ของที่เคยถูกลบไปก่อนหน้านี้กู้คืนไม่ได้ ไม่เคยมีใครเก็บไว้)
+    up: (db) => ({ ...db, trash: asArray(db.trash) }),
+  },
 ];
 
 /** เวอร์ชันล่าสุด = ปลายทางของ migration step สุดท้าย (คำนวณให้ ไม่ต้องแก้มือ) */
@@ -170,9 +189,14 @@ export const DEFAULT_DB: StockDB = {
   items: [],
   categoryPresets: ["เครื่องใช้", "อุปกรณ์ฝีมือ"],
   avoidIngredients: [],
+  // ต้องมีให้ครบเหมือนที่ `normalizeDB` เติมให้ ไม่งั้น DEFAULT_DB ไม่ใช่ StockDB ที่ normalize แล้ว
+  // (กด "ล้างข้อมูลทั้งหมด" จะได้ก้อนที่ต่างจากก้อนที่ผ่าน migrate มานิดหน่อย)
+  skinProfile: { skinType: "", concerns: [] },
   recipes: [],
   plans: [],
   pricing: { ...DEFAULT_PRICING },
+  orders: [],
+  trash: [],
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -180,11 +204,30 @@ export const DEFAULT_DB: StockDB = {
 // ─────────────────────────────────────────────────────────────
 
 const num = (v: unknown, fallback = 0) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
+/**
+ * เหมือน `num` แต่รับ "สตริงที่เป็นตัวเลข" ด้วย — ใช้เฉพาะ `qty`/`min` ที่เป็นจำนวนของจริง
+ * ไฟล์ที่ผู้ใช้แก้มือหรือประกอบขึ้นเองมักได้ `"5"` แทน `5` ทิ้งเป็น 0 = จำนวนของหายไปเงียบๆ
+ */
+const numLoose = (v: unknown, fallback = 0) => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return fallback;
+};
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
+const isISODate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** เอาหมวดแม่เปล่าๆ ทิ้ง ถ้ามีซับหมวดของหมวดนั้นเลือกไว้อยู่แล้ว (เช่น มีทั้ง "เครื่องใช้" และ "เครื่องใช้ > ของแต่งห้อง") */
 function dropRedundantParentCats(cats: string[]): string[] {
   return cats.filter((c) => !cats.some((other) => other !== c && other.startsWith(`${c} > `)));
+}
+
+/** ทิ้งจุดที่ delta ไม่ใช่ตัวเลข/เป็น 0 (ไม่มีความหมาย) แล้วเรียงตามวันที่ */
+function normalizeUsageLog(raw: unknown): UsagePoint[] {
+  return asArray(raw)
+    .map((p) => (p ?? {}) as Partial<UsagePoint>)
+    .filter((p): p is UsagePoint => typeof p.delta === "number" && Number.isFinite(p.delta) && p.delta !== 0)
+    .map((p) => ({ date: str(p.date), delta: p.delta }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** ทิ้งจุดที่ไม่มีราคาเป็นตัวเลข (ข้อมูลพัง/แก้มือมาผิด) แล้วเรียงตามวันที่ให้เสมอ */
@@ -192,21 +235,74 @@ function normalizePriceHistory(raw: unknown): PricePoint[] {
   return asArray(raw)
     .map((p) => (p ?? {}) as Partial<PricePoint>)
     .filter((p): p is PricePoint => typeof p.price === "number" && Number.isFinite(p.price))
-    .map((p) => ({ date: str(p.date), price: p.price, qty: num(p.qty, 1) > 0 ? num(p.qty, 1) : 1 }))
+    .map((p) => ({
+      date: str(p.date),
+      price: p.price,
+      qty: num(p.qty, 1) > 0 ? num(p.qty, 1) : 1,
+      // เก็บเฉพาะตอนมีค่าจริง — ของเก่าทุกจุดจะได้ไม่พก `shop: ""` ติดไป Drive/แบ็กอัปเปล่าๆ
+      ...(normalizeShopName(p.shop) ? { shop: normalizeShopName(p.shop) } : {}),
+      ...(str(p.orderId) ? { orderId: str(p.orderId) } : {}),
+    }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function normalizeItem(raw: unknown): StockItem {
+function normalizeItem(raw: unknown, idx = 0): StockItem {
   const i = (raw ?? {}) as RawItem & Partial<StockItem>;
   const cats = asArray(i.cats).filter((c): c is string => typeof c === "string" && c !== "");
   return {
     ...(i as StockItem),
+    // ฟิลด์บังคับ 5 ตัวนี้เคยถูกปล่อยผ่านมาดิบๆ จาก spread ข้างบน — ไฟล์กู้คืนที่รูปร่างไม่ตรง
+    // (แก้มือ/มาจากแอปอื่น) จึงเข้ามาเป็น `undefined` ได้ แล้วไปพังทีหลังแบบไกลจากต้นเหตุ:
+    // ตัวเรียง "ชื่อ" เรียก `a.name.localeCompare` แล้วโยนทั้งหน้า ส่วน `qty + delta` ได้ NaN
+    // ที่ถูกเซฟทับลงไฟล์จริง — บีบ type ตั้งแต่ประตูเข้าเลยปลอดภัยกว่า
+    id: str(i.id) || `item-${idx}`,
+    name: str(i.name),
+    qty: Math.max(0, numLoose(i.qty)),
+    min: Math.max(0, numLoose(i.min)),
+    note: str(i.note),
     cats: dropRedundantParentCats(cats),
     ingredients: str(i.ingredients),
     createdAt: str(i.createdAt),
     priceHistory: normalizePriceHistory(i.priceHistory),
     // เก็บเฉพาะตอนเป็น true จริงๆ — ไม่งั้นทุกรายการจะพก `priceUnverified: false` ติดไป Drive/แบ็กอัปเปล่าๆ
     priceUnverified: i.priceUnverified === true ? true : undefined,
+    fav: i.fav === true ? true : undefined,
+    shop: normalizeShopName(i.shop) || undefined,
+    // วันที่ที่อ่านไม่ออกทิ้งไปเลย ดีกว่าปล่อยให้ไปโผล่เป็น "หมดอายุแล้ว" มั่วๆ (ดู lib/expiry.ts)
+    expiryAt: isISODate(i.expiryAt) ? (i.expiryAt as string) : undefined,
+    openedAt: isISODate(i.openedAt) ? (i.openedAt as string) : undefined,
+    paoMonths: num(i.paoMonths) > 0 ? Math.round(num(i.paoMonths)) : undefined,
+    usageLog: normalizeUsageLog(i.usageLog),
+    unit: str(i.unit) || undefined,
+    packAmount: num(i.packAmount) > 0 ? num(i.packAmount) : undefined,
+    location: str(i.location) || undefined,
+    // เกิน 100% หรือติดลบแปลว่ากรอกมั่ว/ไฟล์เพี้ยน — หนีบไว้ ไม่งั้นมูลค่าสต็อกเพี้ยนตาม
+    openPct: i.openPct != null && Number.isFinite(num(i.openPct)) ? Math.min(100, Math.max(0, num(i.openPct))) : undefined,
+    reorderQty: num(i.reorderQty) > 0 ? Math.round(num(i.reorderQty)) : undefined,
+    // ของใน `items` ต้องไม่มี deletedAt ติดมา (ของที่ลบอยู่ใน `trash`) — ล้างทิ้งเสมอ
+    deletedAt: undefined,
+  };
+}
+
+/** ของในถังขยะคือ StockItem ปกติที่ต้องมี `deletedAt` — ตัวที่ไม่มีถือว่าลบตอนไหนไม่รู้ */
+function normalizeTrashItem(raw: unknown, idx = 0): StockItem {
+  const item = normalizeItem(raw, idx);
+  const deletedAt = (raw ?? {}) as { deletedAt?: unknown };
+  return { ...item, deletedAt: str(deletedAt.deletedAt) || "" };
+}
+
+function normalizeOrder(raw: unknown, idx: number): PurchaseOrder {
+  const o = (raw ?? {}) as Partial<PurchaseOrder>;
+  return {
+    id: o.id || `order-${idx}`,
+    date: isISODate(o.date) ? o.date! : "",
+    shop: normalizeShopName(o.shop) || undefined,
+    // ส่วนลดเก็บเป็นเลขบวกเสมอ (ดู PurchaseOrder) — ที่ติดลบมาถือว่ากรอกเครื่องหมายเกิน
+    shipping: Math.max(0, num(o.shipping)),
+    discount: Math.max(0, num(o.discount)),
+    note: str(o.note),
+    createdAt: str(o.createdAt) || undefined,
+    updatedAt: str(o.updatedAt) || undefined,
   };
 }
 
@@ -233,9 +329,21 @@ function normalizeRecipe(raw: unknown, idx: number): Recipe {
     laborCost: num(r.laborCost),
     otherCost: num(r.otherCost),
     sellPrice: typeof r.sellPrice === "number" ? r.sellPrice : undefined,
+    runs: asArray(r.runs).map((run, ri): ProductionRun => {
+      const v = (run ?? {}) as Partial<ProductionRun>;
+      return {
+        id: v.id || `run-${idx}-${ri}`,
+        date: str(v.date),
+        // ทำ 0 รอบไม่มีความหมาย ถือว่ากรอกพลาดแล้วนับเป็น 1
+        batches: num(v.batches, 1) > 0 ? num(v.batches, 1) : 1,
+        note: str(v.note),
+      };
+    }),
     updatedAt: r.updatedAt,
   };
 }
+
+const PLAN_PRIORITIES: PlanPriority[] = ["must", "normal", "maybe"];
 
 function normalizePlan(raw: unknown, idx: number): PurchasePlan {
   const p = (raw ?? {}) as Partial<PurchasePlan>;
@@ -257,6 +365,7 @@ function normalizePlan(raw: unknown, idx: number): PurchasePlan {
         bought: line.bought === true,
         boughtAt: str(line.boughtAt) || undefined,
         paidPrice: typeof line.paidPrice === "number" && Number.isFinite(line.paidPrice) ? line.paidPrice : undefined,
+        priority: PLAN_PRIORITIES.includes(line.priority!) ? line.priority : undefined,
       };
     }),
     createdAt: str(p.createdAt) || undefined,
@@ -292,6 +401,8 @@ function normalizeDB(db: RawDB, version: number): StockDB {
     recipes: asArray(db.recipes).map(normalizeRecipe),
     plans: asArray(db.plans).map(normalizePlan),
     pricing: normalizePricing(db.pricing),
+    orders: asArray(db.orders).map(normalizeOrder),
+    trash: asArray(db.trash).map(normalizeTrashItem),
     updatedAt: typeof db.updatedAt === "string" ? db.updatedAt : undefined,
   };
 }

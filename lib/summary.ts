@@ -7,11 +7,14 @@
  * "มูลค่าของที่เหลือในสต็อก" (`price × qty`) เป็นคนละยอดกัน — ดู `stockValue`
  */
 import { monthISO, thaiMonthLabel } from "./date";
+import { normalizeShopName, shopKey, type OrderExtra } from "./orders";
 import { priceStats, roundBaht } from "./price";
+import { remainingUnits } from "./stock";
 import type { StockItem } from "./types";
 
 export const UNCATEGORIZED = "ไม่มีหมวดหมู่";
 export const UNKNOWN_DATE = "ไม่ทราบวันที่";
+export const UNKNOWN_SHOP = "ไม่ทราบร้าน";
 
 /** การซื้อ 1 ครั้ง (1 จุดใน `priceHistory`) — หน่วยเล็กที่สุดที่ทุกยอดในหน้าสรุปคิดมาจากมัน */
 export interface SpendEvent {
@@ -24,6 +27,8 @@ export interface SpendEvent {
   qty: number;
   /** เงินที่จ่ายครั้งนั้น = ราคาต่อแพ็ค × qty */
   spend: number;
+  /** ร้านที่ซื้อครั้งนั้น — `""` = ไม่ทราบ (ของเก่าที่นำเข้าก่อนมีฟิลด์นี้) */
+  shop: string;
 }
 
 /**
@@ -38,13 +43,22 @@ export function spendEvents(items: StockItem[]): SpendEvent[] {
     if (history.length > 0) {
       for (const p of history) {
         const qty = p.qty > 0 ? p.qty : 1;
-        out.push({ itemId: i.id, name: i.name, cats, date: p.date || i.purchasedAt || "", qty, spend: p.price * qty });
+        out.push({
+          itemId: i.id,
+          name: i.name,
+          cats,
+          date: p.date || i.purchasedAt || "",
+          qty,
+          spend: p.price * qty,
+          // จุดที่ไม่รู้ร้าน ตกกลับมาใช้ร้านล่าสุดของสินค้า ดีกว่าทิ้งเป็น "ไม่ทราบร้าน" ทั้งก้อน
+          shop: p.shop || i.shop || "",
+        });
       }
       continue;
     }
     if (typeof i.price === "number" && Number.isFinite(i.price)) {
       const qty = i.buyQty && i.buyQty > 0 ? i.buyQty : 1;
-      out.push({ itemId: i.id, name: i.name, cats, date: i.purchasedAt || "", qty, spend: i.price * qty });
+      out.push({ itemId: i.id, name: i.name, cats, date: i.purchasedAt || "", qty, spend: i.price * qty, shop: i.shop || "" });
     }
   }
   return out;
@@ -89,13 +103,37 @@ export function byCategory(events: SpendEvent[]): SpendRow[] {
   return groupSpend(events, (e) => e.cats);
 }
 
-/** ยอดรายเดือน เรียงเดือนใหม่→เก่า (กองที่ไม่ทราบวันที่ไว้ท้ายสุด) */
-export function byMonth(events: SpendEvent[]): SpendRow[] {
-  return groupSpend(
+/**
+ * ยอดรายเดือน เรียงเดือนใหม่→เก่า (กองที่ไม่ทราบวันที่ไว้ท้ายสุด)
+ *
+ * ค่าส่ง/ส่วนลดของออเดอร์ถูกบวกเข้ายอดของเดือนนั้นด้วย แต่**ไม่**เพิ่ม `times`/`qty`
+ * เพราะมันไม่ใช่ "ครั้งที่ซื้อของ" — เดือนที่มีแต่ค่าส่งจึงขึ้นแถวที่ครั้งที่ซื้อเป็น 0 ได้
+ */
+export function byMonth(events: SpendEvent[], extras: OrderExtra[] = []): SpendRow[] {
+  const rows = groupSpend(
     events,
     (e) => [e.date ? e.date.slice(0, 7) : "unknown"],
     (key) => (key === "unknown" ? UNKNOWN_DATE : thaiMonthLabel(key))
-  ).sort((a, b) => {
+  );
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  for (const x of extras) {
+    const key = x.date ? x.date.slice(0, 7) : "unknown";
+    const row = byKey.get(key);
+    if (row) {
+      row.spend += x.net;
+      continue;
+    }
+    const fresh: SpendRow = {
+      key,
+      label: key === "unknown" ? UNKNOWN_DATE : thaiMonthLabel(key),
+      times: 0,
+      qty: 0,
+      spend: x.net,
+    };
+    byKey.set(key, fresh);
+    rows.push(fresh);
+  }
+  return rows.sort((a, b) => {
     if (a.key === "unknown") return 1;
     if (b.key === "unknown") return -1;
     return b.key.localeCompare(a.key);
@@ -108,9 +146,25 @@ export function byItem(events: SpendEvent[]): SpendRow[] {
   return groupSpend(events, (e) => [e.itemId], (id) => nameOf.get(id) || "(ไม่มีชื่อ)");
 }
 
+/** ยอดตามร้านที่ซื้อ — ตอบว่าเงินไหลไปร้านไหนมากที่สุด (ของที่ไม่รู้ร้านกองรวมกันแถวเดียว) */
+export function byShop(events: SpendEvent[]): SpendRow[] {
+  // เก็บชื่อที่ผู้ใช้พิมพ์ไว้โชว์ (ตัวแรกที่เจอ) แทนที่จะโชว์คีย์ที่ถูกบีบเป็นตัวพิมพ์เล็กหมด
+  const display = new Map<string, string>();
+  for (const e of events) {
+    const key = shopKey(e.shop || "");
+    if (key && !display.has(key)) display.set(key, normalizeShopName(e.shop));
+  }
+  return groupSpend(
+    events,
+    (e) => [shopKey(e.shop || "") || UNKNOWN_SHOP],
+    (key) => display.get(key) || UNKNOWN_SHOP
+  );
+}
+
 export function totalSpend(events: SpendEvent[]): number {
   return events.reduce((s, e) => s + e.spend, 0);
 }
+
 
 export interface SpendOverview {
   /** ยอดที่จ่ายไปในเดือนปฏิทินนี้ */
@@ -131,9 +185,20 @@ export interface SpendOverview {
   /** มูลค่าของที่ยังเหลือในสต็อกตอนนี้ = ราคาต่อชิ้น × จำนวนคงเหลือ (คนละยอดกับเงินที่จ่ายไป) */
   stockValue: number;
   stockQty: number;
+  /** ค่าส่ง − ส่วนลด รวมทุกออเดอร์ที่บันทึกไว้ (รวมอยู่ใน `total`/`thisMonth`/... แล้ว) */
+  extrasTotal: number;
+  /** ค่าส่งรวมล้วนๆ — ใช้บอกว่า "จ่ายค่าส่งไปเท่าไรแล้ว" */
+  shippingTotal: number;
+  /** ส่วนลด/โค้ดรวมล้วนๆ (เลขบวก) */
+  discountTotal: number;
 }
 
-export function spendOverview(events: SpendEvent[], items: StockItem[], now: Date = new Date()): SpendOverview {
+export function spendOverview(
+  events: SpendEvent[],
+  items: StockItem[],
+  extras: OrderExtra[] = [],
+  now: Date = new Date()
+): SpendOverview {
   const thisKey = monthISO(0, now);
   const lastKey = monthISO(-1, now);
   const yearKey = thisKey.slice(0, 4);
@@ -153,6 +218,24 @@ export function spendOverview(events: SpendEvent[], items: StockItem[], now: Dat
     if (key.slice(0, 4) === yearKey) thisYear += e.spend;
   }
 
+  // ค่าส่ง/ส่วนลดเป็นเงินที่ออกจากกระเป๋าจริง จึงต้องเข้าทุกยอดเหมือนราคาสินค้า
+  // (แต่ไม่เข้า `times` — มันไม่ใช่ "ครั้งที่ซื้อของ" ดู byMonth)
+  let extrasTotal = 0;
+  let shippingTotal = 0;
+  let discountTotal = 0;
+  for (const x of extras) {
+    extrasTotal += x.net;
+    shippingTotal += x.shipping;
+    discountTotal += x.discount;
+    total += x.net;
+    if (!x.date) continue;
+    const key = x.date.slice(0, 7);
+    perMonth.set(key, (perMonth.get(key) || 0) + x.net);
+    if (key === thisKey) thisMonth += x.net;
+    if (key === lastKey) lastMonth += x.net;
+    if (key.slice(0, 4) === yearKey) thisYear += x.net;
+  }
+
   // เดือนที่ยังไม่จบเอามาเฉลี่ยไม่ได้ แต่ถ้ามีข้อมูลแค่เดือนนี้เดือนเดียวก็ต้องใช้มันไปก่อน
   const past = [...perMonth.entries()].filter(([k]) => k !== thisKey).map(([, v]) => v);
   const base = past.length > 0 ? past : perMonth.has(thisKey) ? [thisMonth] : [];
@@ -161,8 +244,10 @@ export function spendOverview(events: SpendEvent[], items: StockItem[], now: Dat
   let stockValue = 0;
   let stockQty = 0;
   for (const i of items) {
+    // นับเศษของขวดที่เปิดอยู่ด้วย ไม่งั้นขวดที่ใช้ไปครึ่งนึงยังตีมูลค่าเท่าขวดใหม่
+    const left = remainingUnits(i);
     stockQty += i.qty;
-    stockValue += (i.price ?? 0) * i.qty;
+    stockValue += (i.price ?? 0) * left;
   }
 
   return {
@@ -176,7 +261,65 @@ export function spendOverview(events: SpendEvent[], items: StockItem[], now: Dat
     times: events.length,
     stockValue: roundBaht(stockValue),
     stockQty,
+    extrasTotal: roundBaht(extrasTotal),
+    shippingTotal: roundBaht(shippingTotal),
+    discountTotal: roundBaht(discountTotal),
   };
+}
+
+/** ผลเทียบราคาสินค้า 1 ชิ้นข้ามร้าน — มีความหมายก็ต่อเมื่อเคยซื้อจากอย่างน้อย 2 ร้าน */
+export interface ShopGap {
+  name: string;
+  cheapShop: string;
+  cheapPrice: number;
+  pricyShop: string;
+  pricyPrice: number;
+  /** แพงกว่ากี่บาทต่อชิ้น */
+  gap: number;
+}
+
+/**
+ * หาของที่ราคาต่างกันมากที่สุดระหว่างร้าน — คำถามที่ตอบไม่ได้เลยก่อนมี `PricePoint.shop`
+ *
+ * เทียบด้วย**ราคาเฉลี่ยถ่วงน้ำหนักต่อร้าน** ไม่ใช่ราคาครั้งเดียว เพราะซื้อร้านเดิมหลายครั้ง
+ * ราคาก็ขยับได้ และจุดที่ไม่รู้ร้านถูกข้ามไปเลย (เอามาเทียบไม่ได้ว่าเป็นร้านไหน)
+ */
+export function widestShopGap(items: StockItem[]): ShopGap | null {
+  let best: ShopGap | null = null;
+  for (const i of items) {
+    // จัดกลุ่มด้วย `shopKey` (ไม่สนช่องว่าง/ตัวพิมพ์) แต่เก็บชื่อที่ผู้ใช้พิมพ์ไว้โชว์ —
+    // ถ้าจัดกลุ่มด้วยชื่อที่โชว์ ร้านเดียวกันที่พิมพ์คนละแบบจะถูกเอามาเทียบราคากับตัวเอง
+    const perShop = new Map<string, { spent: number; qty: number; name: string }>();
+    for (const p of i.priceHistory ?? []) {
+      if (!p.shop || typeof p.price !== "number" || !Number.isFinite(p.price)) continue;
+      const qty = p.qty > 0 ? p.qty : 1;
+      const key = shopKey(p.shop);
+      if (!key) continue;
+      const cur = perShop.get(key) || { spent: 0, qty: 0, name: normalizeShopName(p.shop) };
+      cur.spent += p.price * qty;
+      cur.qty += qty;
+      perShop.set(key, cur);
+    }
+    if (perShop.size < 2) continue;
+    const avgs = [...perShop.values()]
+      .map((v) => ({ shop: v.name, avg: v.spent / v.qty }))
+      .sort((a, b) => a.avg - b.avg);
+    const cheap = avgs[0];
+    const pricy = avgs[avgs.length - 1];
+    const gap = roundBaht(pricy.avg - cheap.avg);
+    if (gap <= 0) continue;
+    if (!best || gap > best.gap) {
+      best = {
+        name: i.name,
+        cheapShop: cheap.shop,
+        cheapPrice: roundBaht(cheap.avg),
+        pricyShop: pricy.shop,
+        pricyPrice: roundBaht(pricy.avg),
+        gap,
+      };
+    }
+  }
+  return best;
 }
 
 export type InsightTone = "info" | "good" | "warn";
@@ -285,7 +428,27 @@ export function summaryInsights(
     });
   }
 
-  // 5) ข้อมูลที่ยังขาด = เหตุผลว่าทำไมยอดอาจต่ำกว่าความจริง
+  // 5) ร้านไหนขายถูกกว่า — เทียบได้ก็ต่อเมื่อของชิ้นเดียวกันเคยซื้อจากหลายร้าน
+  const gap = widestShopGap(items);
+  if (gap) {
+    out.push({
+      key: "shop-gap",
+      tone: "good",
+      text: `"${gap.name}" ที่ร้าน ${gap.cheapShop} ถูกกว่าร้าน ${gap.pricyShop} อยู่ ${money(gap.gap)}/ชิ้น (${money(gap.cheapPrice)} เทียบกับ ${money(gap.pricyPrice)}) — รอบหน้าสั่งร้านแรกคุ้มกว่า`,
+    });
+  }
+
+  // 6) ค่าส่ง/ส่วนลด = เงินที่จ่ายจริงแต่ไม่ได้อยู่ในราคาสินค้า
+  if (overview.shippingTotal > 0 || overview.discountTotal > 0) {
+    const share = overview.total > 0 ? Math.round((overview.shippingTotal / overview.total) * 100) : 0;
+    out.push({
+      key: "extras",
+      tone: share >= 15 ? "warn" : "info",
+      text: `ค่าส่งรวม ${money(overview.shippingTotal)}${share > 0 ? ` (${share}% ของยอดทั้งหมด)` : ""}${overview.discountTotal > 0 ? ` · ส่วนลด/โค้ดช่วยประหยัดไป ${money(overview.discountTotal)}` : ""}`,
+    });
+  }
+
+  // 7) ข้อมูลที่ยังขาด = เหตุผลว่าทำไมยอดอาจต่ำกว่าความจริง
   const noPrice = items.filter((i) => i.price == null && !(i.priceHistory ?? []).length).length;
   if (noPrice > 0) {
     out.push({

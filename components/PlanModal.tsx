@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { MaterialThumb } from "@/components/MaterialLabel";
+import ModalShell from "@/components/ModalShell";
+import StockPicker, { StockPickerEmpty, StockPickerRow, StockPickerShell } from "@/components/StockPicker";
+import {
+  fromPlanDraft,
+  toPlanDraft,
+  fromPlanLineDraft,
+  toPlanLineDraft,
+  type PlanDraft,
+  type PlanLineDraft,
+} from "@/lib/planDraft";
 import { baht } from "@/lib/cost";
 import { todayISO } from "@/lib/date";
 import {
@@ -9,10 +19,12 @@ import {
   emptyPlanLine,
   lineTotal,
   planLineFromItem,
+  PLAN_PRIORITY_LABELS,
   planTotals,
+  suggestDetail,
   suggestForPlan,
 } from "@/lib/plan";
-import type { PlanLine, PurchasePlan, StockItem } from "@/lib/types";
+import type { PlanPriority, PurchasePlan, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -22,119 +34,20 @@ interface Props {
   onSave: (plan: PurchasePlan) => void;
 }
 
-/** เก็บตัวเลขเป็นสตริงระหว่างกรอก จะได้ลบให้ว่างได้โดยไม่โดนบังคับเป็น 0 (เหมือน RecipeModal) */
-interface LineDraft {
-  id: string;
-  itemId?: string;
-  name: string;
-  qty: string;
-  price: string;
-  note: string;
-  bought: boolean;
-  boughtAt: string;
-  paidPrice: string;
-}
-
-interface Draft {
-  id: string;
-  name: string;
-  note: string;
-  dueDate: string;
-  budget: string;
-  lines: LineDraft[];
-  createdAt?: string;
-}
-
-const n = (v: string) => {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : 0;
-};
-
-const toDraftLine = (l: PlanLine): LineDraft => ({
-  id: l.id,
-  itemId: l.itemId,
-  name: l.name,
-  qty: String(l.qty || 1),
-  price: l.price ? String(l.price) : "",
-  note: l.note,
-  bought: l.bought,
-  boughtAt: l.boughtAt ?? "",
-  paidPrice: l.paidPrice != null ? String(l.paidPrice) : "",
-});
-
-const toLine = (l: LineDraft): PlanLine => ({
-  id: l.id,
-  itemId: l.itemId,
-  name: l.name.trim(),
-  qty: Math.max(1, n(l.qty) || 1),
-  price: n(l.price),
-  note: l.note.trim(),
-  bought: l.bought,
-  boughtAt: l.bought ? l.boughtAt || todayISO() : undefined,
-  paidPrice: l.bought && l.paidPrice.trim() ? n(l.paidPrice) : undefined,
-});
-
-function toDraft(plan: PurchasePlan): Draft {
-  return {
-    id: plan.id,
-    name: plan.name,
-    note: plan.note,
-    dueDate: plan.dueDate ?? "",
-    budget: plan.budget != null ? String(plan.budget) : "",
-    lines: plan.lines.map(toDraftLine),
-    createdAt: plan.createdAt,
-  };
-}
-
-function fromDraft(d: Draft): PurchasePlan {
-  return {
-    id: d.id,
-    name: d.name.trim(),
-    note: d.note.trim(),
-    dueDate: d.dueDate || undefined,
-    // งบ 0 = ไม่ได้ตั้งงบ (planTotals ก็มองแบบเดียวกัน) จะได้ไม่โชว์การ์ด "เกินงบ ฿0"
-    budget: n(d.budget) > 0 ? n(d.budget) : undefined,
-    lines: d.lines.map(toLine).filter((l) => l.name),
-    createdAt: d.createdAt,
-  };
-}
-
 export default function PlanModal({ open, plan, items, onClose, onSave }: Props) {
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickQuery, setPickQuery] = useState("");
   const [suggestOpen, setSuggestOpen] = useState(false);
 
   useEffect(() => {
-    if (open && plan) setDraft(toDraft(plan));
+    if (open && plan) setDraft(toPlanDraft(plan));
     setPickerOpen(false);
-    setPickQuery("");
     setSuggestOpen(false);
   }, [open, plan]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
-  const preview = useMemo(() => (draft ? fromDraft(draft) : null), [draft]);
+  const preview = useMemo(() => (draft ? fromPlanDraft(draft) : null), [draft]);
   const totals = useMemo(() => (preview ? planTotals(preview) : null), [preview]);
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
-
-  const searchResults = useMemo(() => {
-    const q = pickQuery.trim().toLowerCase();
-    return [...items]
-      .filter((i) =>
-        !q ||
-        i.name.toLowerCase().includes(q) ||
-        i.cats.some((c) => c.toLowerCase().includes(q)) ||
-        (i.variant ?? "").toLowerCase().includes(q)
-      )
-      .sort((a, b) => a.name.localeCompare(b.name, "th"))
-      .slice(0, 50);
-  }, [items, pickQuery]);
 
   const suggestions = useMemo(
     () => (preview ? suggestForPlan(items, preview) : []),
@@ -145,38 +58,32 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
 
   const usedItemIds = new Set(draft.lines.map((l) => l.itemId).filter(Boolean));
 
-  const patchLine = (id: string, patch: Partial<LineDraft>) =>
+  const patchLine = (id: string, patch: Partial<PlanLineDraft>) =>
     setDraft({ ...draft, lines: draft.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) });
 
   const addFromItem = (item: StockItem) =>
-    setDraft((d) => (d ? { ...d, lines: [...d.lines, toDraftLine(planLineFromItem(item))] } : d));
+    setDraft((d) => (d ? { ...d, lines: [...d.lines, toPlanLineDraft(planLineFromItem(item))] } : d));
 
   const addAllSuggestions = () =>
     setDraft((d) =>
-      d ? { ...d, lines: [...d.lines, ...suggestions.map((s) => toDraftLine(planLineFromItem(s.item)))] } : d
+      d ? { ...d, lines: [...d.lines, ...suggestions.map((s) => toPlanLineDraft(planLineFromItem(s.item)))] } : d
     );
 
-  const addBlankLine = () => setDraft({ ...draft, lines: [...draft.lines, toDraftLine(emptyPlanLine())] });
+  const addBlankLine = () => setDraft({ ...draft, lines: [...draft.lines, toPlanLineDraft(emptyPlanLine())] });
   const removeLine = (id: string) => setDraft({ ...draft, lines: draft.lines.filter((l) => l.id !== id) });
 
   /** ติ๊กว่าซื้อแล้ว = ลงวันที่ให้เป็นวันนี้อัตโนมัติ (แก้ทีหลังได้) */
-  const toggleBought = (l: LineDraft) =>
+  const toggleBought = (l: PlanLineDraft) =>
     patchLine(l.id, l.bought ? { bought: false } : { bought: true, boughtAt: l.boughtAt || todayISO() });
 
   const handleSave = () => {
     if (!draft.name.trim()) return;
-    onSave(fromDraft(draft));
+    onSave(fromPlanDraft(draft));
   };
 
   return (
-    <div className="modal-backdrop open">
-      <div className="modal modal-wide">
-        <div className="modal-header">
-          {/* แผนจากพรีเซ็ตมีชื่อมาให้แล้วแต่ยังไม่เคยบันทึก — ดูที่ updatedAt ที่ usePlanActions.save ประทับให้แทน */}
-          <h2>{plan?.updatedAt ? "แก้ไขแผนซื้อของ" : "แผนซื้อของใหม่"}</h2>
-          <button className="modal-close" title="ปิด" onClick={onClose}>×</button>
-        </div>
-
+    // แผนจากพรีเซ็ตมีชื่อมาให้แล้วแต่ยังไม่เคยบันทึก — ดูที่ updatedAt ที่ usePlanActions.save ประทับให้แทน
+    <ModalShell open={open} title={plan?.updatedAt ? "แก้ไขแผนซื้อของ" : "แผนซื้อของใหม่"} onClose={onClose} wide>
         <div className="modal-body">
           <div className="field">
             <label>ชื่อแผน</label>
@@ -225,10 +132,10 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
 
           <div className="plan-lines">
             {draft.lines.map((l) => {
-              const line = toLine(l);
+              const line = fromPlanLineDraft(l);
               const linked = l.itemId ? itemById.get(l.itemId) : undefined;
               return (
-                <div className={`plan-line ${l.bought ? "is-bought" : ""}`} key={l.id}>
+                <div className={`plan-line ${l.bought ? "is-bought" : ""} plan-line--${l.priority}`} key={l.id}>
                   <div className="plan-line__head">
                     <label className="plan-check" title={l.bought ? "ยกเลิกว่าซื้อแล้ว" : "ทำเครื่องหมายว่าซื้อแล้ว"}>
                       <input type="checkbox" checked={l.bought} onChange={() => toggleBought(l)} />
@@ -284,6 +191,17 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
                         onChange={(e) => patchLine(l.id, { price: e.target.value })}
                       />
                     </label>
+                    <label className="cost-num">
+                      <span>ความสำคัญ</span>
+                      <select
+                        value={l.priority}
+                        onChange={(e) => patchLine(l.id, { priority: e.target.value as PlanPriority })}
+                      >
+                        {(Object.keys(PLAN_PRIORITY_LABELS) as PlanPriority[]).map((k) => (
+                          <option key={k} value={k}>{PLAN_PRIORITY_LABELS[k]}</option>
+                        ))}
+                      </select>
+                    </label>
                     <label className="cost-num plan-num-wide">
                       <span>หมายเหตุ</span>
                       <input
@@ -323,78 +241,54 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
           </div>
 
           {pickerOpen && (
-            <div className="stock-picker">
-              <div className="stock-picker__head">
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="ค้นหาชื่อสินค้าในสต็อก / หมวดหมู่..."
-                  value={pickQuery}
-                  onChange={(e) => setPickQuery(e.target.value)}
-                />
-                <button className="btn-ghost btn-sm" onClick={() => setPickerOpen(false)}>ปิด</button>
-              </div>
-              <div className="stock-picker__list">
-                {searchResults.map((i) => (
-                  <button className="stock-picker__row" key={i.id} onClick={() => addFromItem(i)}>
-                    {i.img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className="stock-picker__thumb" src={i.img} alt="" />
-                    ) : (
-                      <span className="stock-picker__thumb stock-picker__thumb--empty">📦</span>
-                    )}
-                    <span className="stock-picker__name">
-                      {usedItemIds.has(i.id) && "✓ "}
-                      {i.name}
-                      {i.variant && <small> · {i.variant}</small>}
-                    </span>
-                    <span className="stock-picker__meta">
-                      {i.price != null ? `฿${i.price}` : "ยังไม่ใส่ราคา"} · เหลือ {i.qty}
-                    </span>
-                  </button>
-                ))}
-                {searchResults.length === 0 && (
-                  <div className="empty" style={{ padding: 14, fontSize: 12 }}>
-                    {items.length === 0 ? "ยังไม่มีสินค้าในสต็อก — กรอกชื่อของเองได้เลย" : "ไม่เจอสินค้าที่ค้นหา"}
-                  </div>
-                )}
-              </div>
-              <p className="text-xs plan-picker__hint">กดเพิ่มได้หลายชิ้นติดกัน — หน้าต่างนี้ไม่ปิดเอง</p>
-            </div>
+            <StockPicker
+              items={items}
+              onPick={addFromItem}
+              onClose={() => setPickerOpen(false)}
+              emptyStockText="ยังไม่มีสินค้าในสต็อก — กรอกชื่อของเองได้เลย"
+              namePrefix={(i) => (usedItemIds.has(i.id) ? "✓ " : null)}
+              meta={(i) => (
+                <>
+                  {i.price != null ? `฿${i.price}` : "ยังไม่ใส่ราคา"} · เหลือ {i.qty}
+                </>
+              )}
+              footer={<p className="text-xs plan-picker__hint">กดเพิ่มได้หลายชิ้นติดกัน — หน้าต่างนี้ไม่ปิดเอง</p>}
+            />
           )}
 
           {suggestOpen && (
-            <div className="stock-picker">
-              <div className="stock-picker__head">
-                <strong className="text-xs">ของที่น่าซื้อ ({suggestions.length})</strong>
-                <button className="btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={addAllSuggestions}>
-                  เพิ่มทั้งหมด
-                </button>
-                <button className="btn-ghost btn-sm" onClick={() => setSuggestOpen(false)}>ปิด</button>
-              </div>
-              <div className="stock-picker__list">
-                {suggestions.map((s) => (
-                  <button className="stock-picker__row" key={s.item.id} onClick={() => addFromItem(s.item)}>
-                    {s.item.img ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className="stock-picker__thumb" src={s.item.img} alt="" />
-                    ) : (
-                      <span className="stock-picker__thumb stock-picker__thumb--empty">📦</span>
-                    )}
-                    <span className="stock-picker__name">{s.item.name}</span>
-                    <span className="stock-picker__meta">
-                      {SUGGEST_LABELS[s.reason]} · เหลือ {s.item.qty}
-                      {s.item.min > 0 ? `/${s.item.min}` : ""}
-                    </span>
+            <StockPickerShell
+              head={
+                <>
+                  <strong className="text-xs">ของที่น่าซื้อ ({suggestions.length})</strong>
+                  <button className="btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={addAllSuggestions}>
+                    เพิ่มทั้งหมด
                   </button>
-                ))}
-                {suggestions.length === 0 && (
-                  <div className="empty" style={{ padding: 14, fontSize: 12 }}>
-                    ไม่มีของที่ใกล้หมดหรือทำเครื่องหมายว่าต้องซื้อซ้ำ (ที่ยังไม่อยู่ในแผนนี้)
-                  </div>
-                )}
-              </div>
-            </div>
+                  <button className="btn-ghost btn-sm" onClick={() => setSuggestOpen(false)}>ปิด</button>
+                </>
+              }
+            >
+              {suggestions.map((s) => (
+                <StockPickerRow
+                  key={s.item.id}
+                  img={s.item.img}
+                  onClick={() => addFromItem(s.item)}
+                  name={s.item.name}
+                  meta={
+                    <>
+                      {SUGGEST_LABELS[s.reason]}
+                      {suggestDetail(s) ? ` (${suggestDetail(s)})` : ""} · เหลือ {s.item.qty}
+                      {s.item.min > 0 ? `/${s.item.min}` : ""}
+                    </>
+                  }
+                />
+              ))}
+              {suggestions.length === 0 && (
+                <StockPickerEmpty>
+                  ไม่มีของที่ใกล้หมด ซื้อบ่อย หรือทำเครื่องหมายว่าต้องซื้อซ้ำ (ที่ยังไม่อยู่ในแผนนี้)
+                </StockPickerEmpty>
+              )}
+            </StockPickerShell>
           )}
 
           <div className="modal-actions-inline">
@@ -430,6 +324,18 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
               <span>ยังต้องจ่ายอีก</span>
               <strong>{baht(totals.remaining)}</strong>
             </div>
+            {totals.mustRemaining !== totals.remaining && (
+              <div className="cost-summary__row">
+                <span>เฉพาะของที่ &quot;ต้องซื้อ&quot;</span>
+                <strong>{baht(totals.mustRemaining)}</strong>
+              </div>
+            )}
+            {totals.maybeRemaining > 0 && (
+              <div className="cost-summary__row">
+                <span>ตัดออกได้ถ้างบไม่พอ (&quot;ถ้ามีงบ&quot;)</span>
+                <strong>−{baht(totals.maybeRemaining)}</strong>
+              </div>
+            )}
             <div className="cost-summary__row">
               <span>รวมทั้งแผน (ถ้าซื้อครบ)</span>
               <strong>{baht(totals.projected)}</strong>
@@ -447,7 +353,6 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
           <button className="btn-ghost" onClick={onClose}>ยกเลิก</button>
           <button className="btn-primary" onClick={handleSave} disabled={!draft.name.trim()}>บันทึกแผน</button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

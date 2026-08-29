@@ -12,7 +12,8 @@ import type { Recipe } from "@/lib/types";
 export default function CostPage() {
   const { db, setDb } = useStockDB();
   const actions = useRecipeActions(setDb);
-  const recipes = db.recipes ?? [];
+  // ห่อด้วย useMemo เพราะ `?? []` สร้างอาร์เรย์ใหม่ทุก render ทำให้ useMemo ที่อ้างถึงมันคิดใหม่ทุกครั้ง
+  const recipes = useMemo(() => db.recipes ?? [], [db.recipes]);
   const pricing = db.pricing ?? DEFAULT_PRICING;
 
   const [editing, setEditing] = useState<Recipe | null>(null);
@@ -173,6 +174,9 @@ export default function CostPage() {
         items={db.items}
         onClose={() => setEditing(null)}
         onSave={handleSave}
+        runs={editing ? recipes.find((r) => r.id === editing.id)?.runs : undefined}
+        onLogRun={actions.logRun}
+        onRemoveRun={actions.removeRun}
       />
     </div>
   );

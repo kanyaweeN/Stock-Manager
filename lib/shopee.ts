@@ -79,10 +79,103 @@ function extractOrderDate(text: string): string | undefined {
   return dates.sort()[0];
 }
 
+/** ป้ายที่อยู่ติดกับชื่อร้านแต่ไม่ใช่ชื่อร้าน — ต้องข้ามตอนไล่หาชื่อร้านย้อนขึ้นไป */
+const SHOP_BADGE = /^(preferred\+?|mall|shopee mall|ร้านค้าแนะนำ|แชท|แชทเลย|พูดคุย|chat|ติดตาม|ร้านแนะนำ)$/i;
+/** ปุ่มที่ Shopee วางไว้ "หลัง" ชื่อร้านเสมอในหัวการ์ดออเดอร์ — ใช้เป็นหมุดหาชื่อร้าน */
+const SHOP_MARKER = /^(ดูร้านค้า|ดูร้าน|view shop)$/i;
+/** ไล่ย้อนขึ้นไปหาชื่อร้านได้ไกลสุดกี่ leaf ก่อนถึงหมุด (เผื่อมีป้าย Preferred/Mall คั่น) */
+const SHOP_LOOKBACK = 6;
+
+/**
+ * หาว่าสินค้าแต่ละแถวมาจากร้านไหน — **best-effort** เพราะ Shopee สุ่มชื่อ class
+ *
+ * อาศัยลำดับใน DOM แทนโครงสร้าง: หัวการ์ดออเดอร์คือ `[ป้าย] ชื่อร้าน [แชท] [ดูร้านค้า]`
+ * แล้วตามด้วยแถวสินค้าของออเดอร์นั้น ⇒ ชื่อร้านของสินค้าแถวหนึ่ง = ชื่อร้านของหมุด
+ * "ดูร้านค้า" ตัวสุดท้ายที่อยู่**ก่อน**แถวนั้น (คืน undefined ถ้าหาไม่เจอ ให้ผู้ใช้กรอกเองในหน้ารีวิว)
+ */
+function buildShopLookup(doc: Document): (a: Element) => string | undefined {
+  const leafIndex = new Map<Element, number>();
+  const texts: string[] = [];
+  for (const el of doc.querySelectorAll("span, div, a, h1, h2, h3, strong, p")) {
+    if (el.children.length > 0) continue;
+    const t = (el.textContent || "").replace(/\s+/g, " ").trim();
+    if (!t) continue;
+    leafIndex.set(el, texts.length);
+    texts.push(t);
+  }
+
+  // หมุด "ดูร้านค้า" ทุกตัวพร้อมชื่อร้านที่อยู่ก่อนหน้า — เรียงตามลำดับใน DOM อยู่แล้ว
+  const headers: { at: number; shop: string }[] = [];
+  texts.forEach((t, i) => {
+    if (!SHOP_MARKER.test(t)) return;
+    for (let j = i - 1; j >= 0 && j >= i - SHOP_LOOKBACK; j--) {
+      const candidate = texts[j];
+      if (SHOP_BADGE.test(candidate) || SHOP_MARKER.test(candidate)) continue;
+      // ตัวเลข/ราคา/จำนวน/สถานะออเดอร์ ไม่ใช่ชื่อร้าน
+      if (/^฿|^x\s?\d+$|^\d+(\.\d+)?$/i.test(candidate)) continue;
+      if (candidate.length < 2 || candidate.length > 60) continue;
+      headers.push({ at: i, shop: candidate });
+      return;
+    }
+  });
+
+  return (a) => {
+    let first: number | undefined;
+    for (const el of a.querySelectorAll("span, div, p")) {
+      const idx = leafIndex.get(el);
+      if (idx != null) {
+        first = idx;
+        break;
+      }
+    }
+    if (first == null) return undefined;
+    let shop: string | undefined;
+    for (const h of headers) {
+      if (h.at >= first) break;
+      shop = h.shop;
+    }
+    return shop;
+  };
+}
+
+const money = String.raw`฿\s?-?\s?([\d,]+(?:\.\d+)?)`;
+
+/** บวกทุกตัวที่เจอ (หน้าที่มีหลายออเดอร์ต้องรวมกัน เหมือน `extractGoodsSubtotal`) — undefined ถ้าไม่เจอเลย */
+function sumMoney(text: string, pattern: string): number | undefined {
+  const matches = [...text.matchAll(new RegExp(pattern, "g"))];
+  if (matches.length === 0) return undefined;
+  const sum = matches.reduce((s, m) => s + Number(m[1].replace(/,/g, "")), 0);
+  return Number.isFinite(sum) ? sum : undefined;
+}
+
+/**
+ * ค่าส่ง/ส่วนลดระดับออเดอร์ที่ **ไม่ได้อยู่ในราคาสินค้า** — `/summary` เคยมองข้ามเงินก้อนนี้ไปทั้งหมด
+ * เพราะรวมยอดจากจุดราคาของสินค้าล้วนๆ ยอด "จ่ายไปแล้ว" เลยต่ำกว่าเงินที่ออกจากกระเป๋าจริง
+ *
+ * ทั้งหมดเป็น best-effort จากป้ายภาษาไทยบนหน้าออเดอร์ — ผู้ใช้แก้ตัวเลขเองได้ในหน้ารีวิวก่อนนำเข้า
+ * `ค่าจัดส่ง` ต้องกัน `ส่วนลดค่าจัดส่ง` ที่มีคำเดียวกันอยู่ข้างใน ไม่งั้นนับซ้ำเป็นค่าส่งสองเด้ง
+ */
+function extractOrderCharges(text: string): { shipping?: number; discount?: number; grandTotal?: number } {
+  const shipRaw = sumMoney(text, String.raw`(?<!ส่วนลด)ค่า(?:จัดส่ง|ส่ง)\s*${money}`);
+  const shipDiscount = sumMoney(text, String.raw`ส่วนลดค่า(?:จัดส่ง|ส่ง)\s*${money}`);
+  const otherDiscount = sumMoney(text, String.raw`ส่วนลด(?!ค่าจัดส่ง|ค่าส่ง)[^฿]{0,24}${money}`);
+  const grandTotal = sumMoney(text, String.raw`(?:ยอดรวมทั้งหมด|ยอดชำระเงินทั้งหมด|รวมการสั่งซื้อ)\s*${money}`);
+
+  // ค่าส่งที่จ่ายจริง = ค่าส่งเต็ม − ส่วนลดค่าส่ง (ติดลบไม่ได้)
+  const shipping = shipRaw == null ? undefined : Math.max(0, shipRaw - (shipDiscount ?? 0));
+  return { shipping, discount: otherDiscount, grandTotal };
+}
+
 export interface ShopeePageData {
   items: ImportCandidate[];
   /** ยอด "รวมค่าสินค้า" บนหน้า — ใช้เทียบกับผลรวมที่แกะได้ (undefined = หน้านั้นไม่มีให้เทียบ) */
   goodsSubtotal?: number;
+  /** ค่าส่งที่จ่ายจริงทั้งหน้า (หักส่วนลดค่าส่งแล้ว) */
+  shipping?: number;
+  /** ส่วนลด/โค้ดระดับออเดอร์ทั้งหน้า (เลขบวก) */
+  discount?: number;
+  /** ยอดชำระทั้งหมดตามที่หน้าออเดอร์บอก — ใช้เทียบว่าค่าส่ง/ส่วนลดที่แกะได้ครบไหม */
+  grandTotal?: number;
 }
 
 /**
@@ -93,6 +186,8 @@ export function extractShopeePage(html: string): ShopeePageData {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const pageText = (doc.body?.textContent || "").replace(/\s+/g, " ");
   const orderDate = extractOrderDate(pageText);
+
+  const shopOf = buildShopLookup(doc);
 
   const anchors = [...doc.querySelectorAll("a")].filter((a) => {
     const imgs = [...a.querySelectorAll("img")];
@@ -218,7 +313,7 @@ export function extractShopeePage(html: string): ShopeePageData {
     seen.add(key);
     results.push({
       name, qty, img: absSrc, link, cats: [], status: "", include: true,
-      price, lineTotal, size, variant, purchasedAt: orderDate,
+      price, lineTotal, size, variant, purchasedAt: orderDate, shop: shopOf(a),
     });
   }
 
@@ -228,5 +323,5 @@ export function extractShopeePage(html: string): ShopeePageData {
     if (ingredients) results[0].ingredients = ingredients;
   }
 
-  return { items: results, goodsSubtotal: extractGoodsSubtotal(pageText) };
+  return { items: results, goodsSubtotal: extractGoodsSubtotal(pageText), ...extractOrderCharges(pageText) };
 }

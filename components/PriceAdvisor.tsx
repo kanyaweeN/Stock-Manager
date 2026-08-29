@@ -62,8 +62,13 @@ export default function PriceAdvisor({ cost, unitLabel = "ชิ้น", sellPri
   };
   const patchRounding = (v: PriceRounding) => setSettings({ ...settings, rounding: v });
 
-  /** กดเลือกราคาจากตาราง = เอาราคาไปใส่ + ย้ายเป้ากำไรมาที่แถวนั้น จะได้ไม่ขัดกับหัวข้อด้านบน */
-  const useRow = (price: number, targetMarginPct: number) => {
+  /**
+   * กดเลือกราคาจากตาราง = เอาราคาไปใส่ + ย้ายเป้ากำไรมาที่แถวนั้น จะได้ไม่ขัดกับหัวข้อด้านบน
+   *
+   * **ห้ามตั้งชื่อขึ้นต้นด้วย `use`** — นี่เป็น event handler ธรรมดา ไม่ใช่ React hook
+   * ชื่อเดิม (`useRow`) ทำให้ทั้ง lint และคนอ่านเข้าใจผิดว่าเป็น hook ที่ถูกเรียกใน callback
+   */
+  const applyRow = (price: number, targetMarginPct: number) => {
     setDraft((d) => ({ ...d, margin: String(targetMarginPct) }));
     setSettings({ ...settings, targetMarginPct });
     onUsePrice?.(price);
@@ -138,7 +143,7 @@ export default function PriceAdvisor({ cost, unitLabel = "ชิ้น", sellPri
                 </td>
                 {onUsePrice && (
                   <td>
-                    <button className="btn-ghost btn-sm" onClick={() => useRow(o.price, o.targetMarginPct)}>ใช้</button>
+                    <button className="btn-ghost btn-sm" onClick={() => applyRow(o.price, o.targetMarginPct)}>ใช้</button>
                   </td>
                 )}
               </tr>

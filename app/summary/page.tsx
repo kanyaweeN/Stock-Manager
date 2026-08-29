@@ -3,11 +3,14 @@
 import { useMemo, useState } from "react";
 import { baht } from "@/lib/cost";
 import { daysAgoISO, formatThaiShortDate, todayISO } from "@/lib/date";
+import { extrasInRange, orderExtras, orderNet, sortOrders, totalExtras } from "@/lib/orders";
 import { useStockDB } from "@/lib/StockDBProvider";
+import { useOrderActions } from "@/lib/useOrderActions";
 import {
   byCategory,
   byItem,
   byMonth,
+  byShop,
   eventsInRange,
   spendEvents,
   spendOverview,
@@ -30,7 +33,8 @@ const RANGE_OPTIONS: { value: RangeMode; label: string }[] = [
 ];
 
 export default function SummaryPage() {
-  const { db } = useStockDB();
+  const { db, setDb } = useStockDB();
+  const orderActions = useOrderActions(setDb);
 
   const [rangeMode, setRangeMode] = useState<RangeMode>("30d");
   const [from, setFrom] = useState(daysAgoISO(29));
@@ -38,7 +42,8 @@ export default function SummaryPage() {
   const [yearFilter, setYearFilter] = useState("all");
 
   const events = useMemo(() => spendEvents(db.items), [db.items]);
-  const overview = useMemo(() => spendOverview(events, db.items), [events, db.items]);
+  const extras = useMemo(() => orderExtras(db.orders), [db.orders]);
+  const overview = useMemo(() => spendOverview(events, db.items, extras), [events, db.items, extras]);
 
   const years = useMemo(() => {
     const set = new Set<string>();
@@ -60,6 +65,11 @@ export default function SummaryPage() {
     [events, range]
   );
 
+  const rangeExtras = useMemo(
+    () => (range ? extrasInRange(extras, range.from, range.to) : extras),
+    [extras, range]
+  );
+
   const rangeLabel = useMemo(() => {
     if (rangeMode === "custom") return `${formatThaiShortDate(from) || from} – ${formatThaiShortDate(to) || to}`;
     return RANGE_OPTIONS.find((o) => o.value === rangeMode)?.label ?? "";
@@ -72,12 +82,18 @@ export default function SummaryPage() {
 
   const catRows = useMemo(() => byCategory(rangeEvents), [rangeEvents]);
   const itemRows = useMemo(() => byItem(rangeEvents).slice(0, 10), [rangeEvents]);
+  const shopRows = useMemo(() => byShop(rangeEvents), [rangeEvents]);
+  /** ยอด "ค่าสินค้า" ล้วนๆ — ใช้เป็นตัวหารของสัดส่วนในตาราง ค่าส่ง/ส่วนลดไม่มีหมวดหมู่จึงเข้าตารางไม่ได้ */
   const rangeTotal = useMemo(() => totalSpend(rangeEvents), [rangeEvents]);
+  const rangeExtrasTotal = useMemo(() => totalExtras(rangeExtras), [rangeExtras]);
+
+  const orders = useMemo(() => sortOrders(db.orders ?? []), [db.orders]);
 
   const monthRows = useMemo(() => {
-    const scoped = yearFilter === "all" ? events : events.filter((e) => e.date.slice(0, 4) === yearFilter);
-    return byMonth(scoped);
-  }, [events, yearFilter]);
+    const inYear = (d: string) => yearFilter === "all" || d.slice(0, 4) === yearFilter;
+    const scoped = events.filter((e) => inYear(e.date));
+    return byMonth(scoped, extras.filter((x) => inYear(x.date)));
+  }, [events, extras, yearFilter]);
 
   const renderTable = (rows: SpendRow[], firstColLabel: string, showDot: boolean, showShare = false) => {
     if (rows.length === 0) return <div className="empty">ยังไม่มีรายการซื้อในช่วงที่เลือก</div>;
@@ -156,6 +172,12 @@ export default function SummaryPage() {
           <div className="l">มูลค่าของที่เหลือ ({overview.stockQty} ชิ้น)</div>
         </div>
       </div>
+      {(overview.shippingTotal > 0 || overview.discountTotal > 0) && (
+        <p className="sub sub-tight text-xs">
+          รวมค่าส่ง {baht(overview.shippingTotal)} และหักส่วนลด/โค้ด {baht(overview.discountTotal)} ไว้ในยอดข้างบนแล้ว —
+          เงินก้อนนี้ผูกกับ<b>ออเดอร์</b> ไม่ใช่สินค้าชิ้นไหน จึงไม่ปรากฏในตารางแยกตามหมวดหมู่/ร้าน/รายชิ้น
+        </p>
+      )}
 
       {insights.length > 0 && (
         <ul className="insight-list">
@@ -186,7 +208,10 @@ export default function SummaryPage() {
       <div className="stats">
         <div className="stat stat--blue"><div className="n">{rangeEvents.length}</div><div className="l">ครั้งที่ซื้อ</div></div>
         <div className="stat stat--orange"><div className="n">{rangeEvents.reduce((s, e) => s + e.qty, 0)}</div><div className="l">จำนวนที่ซื้อรวม</div></div>
-        <div className="stat stat--green"><div className="n">{baht(rangeTotal)}</div><div className="l">จ่ายไปในช่วงนี้</div></div>
+        <div className="stat stat--green">
+          <div className="n">{baht(rangeTotal + rangeExtrasTotal)}</div>
+          <div className="l">จ่ายไปในช่วงนี้{rangeExtrasTotal !== 0 ? ` (ค่าสินค้า ${baht(rangeTotal)} + ค่าส่ง/ส่วนลด ${baht(rangeExtrasTotal)})` : ""}</div>
+        </div>
         <div className="stat stat--violet">
           <div className="n">{baht(rangeEvents.length ? rangeTotal / rangeEvents.length : 0)}</div>
           <div className="l">เฉลี่ยต่อครั้ง</div>
@@ -197,8 +222,73 @@ export default function SummaryPage() {
       <p className="sub sub-tight text-xs">ของที่ติดหลายหมวดถูกนับในทุกหมวด ยอดรวมของทุกแถวจึงมากกว่ายอดจริงได้</p>
       {renderTable(catRows, "หมวดหมู่", true, true)}
 
+      <h3 className="summary-sub-title">จ่ายให้ร้านไหนมากที่สุด</h3>
+      <p className="sub sub-tight text-xs">
+        คิดจากร้านที่บันทึกไว้ในประวัติราคาแต่ละครั้ง — ครั้งที่ซื้อก่อนมีการเก็บชื่อร้านจะกองอยู่แถว &quot;ไม่ทราบร้าน&quot;
+      </p>
+      {renderTable(shopRows, "ร้านค้า", true, true)}
+
       <h3 className="summary-sub-title">จ่ายให้ของชิ้นไหนมากที่สุด</h3>
       {renderTable(itemRows, "สินค้า", false, true)}
+
+      <h2 className="summary-section-title">ค่าส่ง / ส่วนลด รายออเดอร์</h2>
+      <p className="sub sub-tight text-xs">
+        บันทึกให้ตอนนำเข้าจาก Shopee — แก้ตัวเลขได้ทันที (บันทึกเองอัตโนมัติ ไม่ต้องกดอะไร)
+        ถ้าเผลอนำเข้าออเดอร์เดิมซ้ำจนค่าส่งถูกนับสองรอบ ให้ลบก้อนที่เกินทิ้งที่นี่ —
+        ลบแล้ว<b>สินค้ากับประวัติราคาไม่หาย</b> หายเฉพาะเงินก้อนนี้
+      </p>
+      {orders.length === 0 ? (
+        <div className="empty">
+          ยังไม่มีออเดอร์ที่บันทึกค่าส่ง/ส่วนลดไว้ — กรอกช่อง &quot;ค่าใช้จ่ายของออเดอร์นี้&quot; ตอนนำเข้าจาก Shopee แล้วจะขึ้นที่นี่
+        </div>
+      ) : (
+        <div className="order-list">
+          {orders.map((o) => (
+            <div className="order-row" key={o.id}>
+              <input
+                type="date"
+                value={o.date}
+                onChange={(e) => orderActions.patchOrder(o.id, { date: e.target.value })}
+              />
+              <input
+                type="text"
+                placeholder="ร้านค้า"
+                value={o.shop || ""}
+                onChange={(e) => orderActions.patchOrder(o.id, { shop: e.target.value })}
+              />
+              <label className="order-row__num">
+                ค่าส่ง
+                <input
+                  type="number"
+                  min={0}
+                  value={o.shipping}
+                  onChange={(e) => orderActions.patchOrder(o.id, { shipping: Number(e.target.value) || 0 })}
+                />
+              </label>
+              <label className="order-row__num">
+                ส่วนลด
+                <input
+                  type="number"
+                  min={0}
+                  value={o.discount}
+                  onChange={(e) => orderActions.patchOrder(o.id, { discount: Number(e.target.value) || 0 })}
+                />
+              </label>
+              <span className={`order-row__net ${orderNet(o) < 0 ? "is-saving" : ""}`}>
+                {orderNet(o) >= 0 ? "+" : "−"}{baht(Math.abs(orderNet(o)))}
+              </span>
+              <button
+                type="button"
+                className="icon-btn del"
+                title="ลบค่าส่ง/ส่วนลดของออเดอร์นี้"
+                onClick={() => orderActions.removeOrder(o)}
+              >
+                🗑️
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <h2 className="summary-section-title">ยอดรายเดือน</h2>
       <div className="toolbar">

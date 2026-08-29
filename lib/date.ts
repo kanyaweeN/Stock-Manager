@@ -66,6 +66,19 @@ export function endOfMonthISO(offset = 0, now: Date = new Date()): string {
 }
 
 /**
+ * ห่างกันกี่วันระหว่างสองวันที่ (`to` − `from`) — null ถ้าอ่านวันใดวันหนึ่งไม่ออก
+ * เทียบวันชนวันเหมือน `daysUntil` ไม่เอาเวลามาเกี่ยว
+ */
+export function daysBetween(fromISO: string | undefined, toISO: string | undefined): number | null {
+  const a = (fromISO || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const b = (toISO || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!a || !b) return null;
+  const from = new Date(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
+  const to = new Date(Number(b[1]), Number(b[2]) - 1, Number(b[3]));
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+/**
  * เหลืออีกกี่วันถึงวันที่กำหนด (ติดลบ = เลยกำหนดมาแล้ว) — null ถ้าอ่านวันที่ไม่ออก
  * เทียบแบบวันชนวัน ไม่เอาเวลามาเกี่ยว จะได้ไม่เพี้ยนตามชั่วโมงที่เปิดแอป
  */

@@ -57,7 +57,7 @@ export function useGoogleSheetsSync(db: StockDB) {
       // ถ้า silent มาสำเร็จช้ากว่า timeout ก็ยังอัปเดตให้ภายหลังได้ ไม่ต้องรอ user กดใหม่
       silent.then(onSuccess).catch(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const saveSettings = (nextClientId: string, nextSheetId: string) => {

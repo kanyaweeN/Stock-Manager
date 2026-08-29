@@ -2,30 +2,30 @@
 
 import { todayISO } from "./date";
 import type { StockDB } from "./db";
+import { csvRows, downloadFile } from "./download";
+import { effectiveExpiry } from "./expiry";
 import { priceStats, pushPricePoint } from "./price";
+import { pushToTrash, takeFromTrash } from "./trash";
+import { pushUsage } from "./usage";
 import { uid } from "./uid";
-import type { ImportCandidate, StockItem } from "./types";
+import type { ImportCandidate, PurchaseOrder, StockItem } from "./types";
 
+/** ส่งออกสต็อกเป็น CSV — 1 แถวต่อสินค้า 1 ชิ้น (ของในถังขยะไม่ถูกส่งออก) */
 function exportCsv(items: StockItem[]) {
-  const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,ราคาต่อชิ้น,ราคาเฉลี่ย,ซื้อไปกี่ครั้ง,ขนาด,หมายเหตุ,ส่วนผสม\n";
-  const rows = items
-    .map((i) => {
+  const header = "ชื่อสินค้า,หมวดหมู่,จำนวน,ขั้นต่ำ,ราคาต่อชิ้น,ราคาเฉลี่ย,ซื้อไปกี่ครั้ง,ขนาด,ร้านค้า,ที่เก็บ,เปิดแล้วเหลือ %,ซื้อทีละ,วันหมดอายุ,หมายเหตุ,ส่วนผสม\n";
+  const rows = csvRows(
+    items.map((i) => {
       const stats = priceStats(i.priceHistory);
       return [
         i.name, i.cats.join("; "), i.qty, i.min,
         i.price ?? "", stats?.avg ?? "", stats?.times ?? "",
-        i.size ?? "", i.note, i.ingredients ?? "",
-      ]
-        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",");
+        i.size ?? "", i.shop ?? "", i.location ?? "",
+        i.openPct ?? "", i.reorderQty ?? "", effectiveExpiry(i)?.date ?? "",
+        i.note, i.ingredients ?? "",
+      ];
     })
-    .join("\n");
-  const blob = new Blob(["﻿" + header + rows], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `stock-${todayISO()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  );
+  downloadFile(`stock-${todayISO()}.csv`, header + rows);
 }
 
 /** รวม CRUD ทั้งหมดของรายการสินค้า (เพิ่ม/แก้ไข/ลบ/ปรับจำนวน/นำเข้าจาก Shopee/ส่งออก CSV) */
@@ -43,25 +43,59 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     }
   };
 
+  /** ลบ = ย้ายเข้าถังขยะ (กู้คืนได้ที่หน้าตั้งค่า) ไม่ใช่ลบถาวร — ดู lib/trash.ts */
   const remove = (item: StockItem) => {
-    if (confirm(`ลบ "${item.name}" ออกจากสต็อก?`)) {
-      setItems((prev) => prev.filter((i) => i.id !== item.id));
-    }
+    if (!confirm(`ลบ "${item.name}" ออกจากสต็อก?\n\nย้ายไปถังขยะ กู้คืนได้ที่ ตั้งค่า > สำรอง/กู้คืน`)) return;
+    setDb((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => i.id !== item.id),
+      trash: pushToTrash(prev.trash, [item]),
+    }));
   };
 
   /**
    * ลบหลายรายการพร้อมกัน — ยืนยันครั้งเดียวโดยไล่ชื่อให้ดูก่อน (ลบทีละสิบยี่สิบอันแล้วถามทีละอันคงไม่ไหว)
-   * ไม่มี undo และไม่มีถังขยะ เลยต้องเห็นชื่อจริงก่อนกดตกลง
+   * ยังต้องเห็นชื่อจริงก่อนกดตกลง ถึงจะกู้คืนจากถังขยะได้ก็ตาม เพราะถังขยะเก็บได้จำกัด (`TRASH_MAX`)
    */
   const removeMany = (items: StockItem[]): boolean => {
     if (items.length === 0) return false;
     const SHOW = 8;
     const names = items.slice(0, SHOW).map((i) => `• ${i.name}`).join("\n");
     const more = items.length > SHOW ? `\n…และอีก ${items.length - SHOW} รายการ` : "";
-    if (!confirm(`ลบ ${items.length} รายการนี้ออกจากสต็อก?\n\n${names}${more}\n\nลบแล้วกู้คืนไม่ได้`)) return false;
+    if (!confirm(`ลบ ${items.length} รายการนี้ออกจากสต็อก?\n\n${names}${more}\n\nย้ายไปถังขยะ กู้คืนได้ที่ ตั้งค่า > สำรอง/กู้คืน`)) return false;
     const ids = new Set(items.map((i) => i.id));
-    setItems((prev) => prev.filter((i) => !ids.has(i.id)));
+    setDb((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => !ids.has(i.id)),
+      trash: pushToTrash(prev.trash, prev.items.filter((i) => ids.has(i.id))),
+    }));
     return true;
+  };
+
+  /** กู้ของกลับเข้าสต็อก — ต่อท้ายลิสต์เหมือนของที่เพิ่มใหม่ (ดู `sorters` ใน useProductFilters) */
+  const restoreFromTrash = (id: string) => {
+    setDb((prev) => {
+      const { item, trash } = takeFromTrash(prev.trash, id, new Set(prev.items.map((i) => i.id)), uid);
+      if (!item) return prev;
+      return { ...prev, items: [...prev.items, item], trash };
+    });
+  };
+
+  const deleteForever = (item: StockItem) => {
+    if (!confirm(`ลบ "${item.name}" ทิ้งถาวร?\n\nรอบนี้กู้คืนไม่ได้จริงๆ`)) return;
+    setDb((prev) => ({ ...prev, trash: (prev.trash ?? []).filter((i) => i.id !== item.id) }));
+  };
+
+  /**
+   * ล้างถังขยะทิ้งถาวร — รับ `count` มาจากผู้เรียกเพื่อ**ถามยืนยันนอก updater ของ `setDb`**
+   *
+   * ห้ามเรียก `confirm()` ข้างใน updater เด็ดขาด: updater ต้องเป็นฟังก์ชันบริสุทธิ์
+   * React เรียกซ้ำได้ (StrictMode เรียกสองรอบใน dev) ผู้ใช้จะเจอกล่องยืนยันเด้งสองครั้ง
+   */
+  const emptyTrash = (count: number) => {
+    if (count <= 0) return;
+    if (!confirm(`ล้างถังขยะ ${count} รายการทิ้งถาวร?\n\nรอบนี้กู้คืนไม่ได้จริงๆ`)) return;
+    setDb((prev) => ({ ...prev, trash: [] }));
   };
 
   /** ผสาน sourceId เข้ากับ targetId — บวกจำนวนรวมกัน เก็บข้อมูลอื่นๆ ของ target ไว้ แล้วลบ source ทิ้ง */
@@ -80,19 +114,60 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, cats } : i)));
   };
 
-  const inc = (id: string) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i)));
-  const dec = (id: string) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, qty: Math.max(0, i.qty - 1) } : i)));
+  /** ปัก/เอาดาวออก — เก็บเฉพาะตอนเป็นของโปรดจริงๆ (ดู normalizeItem ใน lib/db.ts) */
+  const toggleFav = (id: string) =>
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, fav: i.fav ? undefined : true } : i)));
 
-  const importFromShopee = (chosen: ImportCandidate[]) => {
+  /**
+   * ปรับจำนวนทีละ 1 พร้อมจดลงประวัติการใช้ — ประวัตินี้คือข้อมูลเดียวที่บอกได้ว่า
+   * "ของจะหมดอีกกี่วัน" (ดู lib/usage.ts) ตัว `qty` เฉยๆ บอกไม่ได้ว่าใช้เร็วแค่ไหน
+   *
+   * `dec` ตอนของหมดอยู่แล้วไม่จด เพราะจำนวนไม่ได้ลดจริง (`Math.max(0, ...)` กันไว้)
+   * จดไปจะกลายเป็นการใช้ปลอมๆ ที่ดันอัตราการใช้ให้สูงเกินจริง
+   */
+  const changeQty = (id: string, delta: number) =>
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        const qty = Math.max(0, i.qty + delta);
+        const real = qty - i.qty;
+        if (real === 0) return i;
+        return {
+          ...i,
+          qty,
+          // ใช้จนหมดแล้ว = ไม่มีขวดที่เปิดค้างอยู่อีก ต้องล้าง `openPct` ทิ้ง
+          // ไม่งั้นพอซื้อรอบใหม่ ของใหม่ที่ยังไม่ได้แกะจะถูกคิดว่าเหลือแค่ n% ตามค่าเก่าที่ค้าง
+          openPct: qty === 0 ? undefined : i.openPct,
+          usageLog: pushUsage(i.usageLog, real),
+        };
+      })
+    );
+
+  const inc = (id: string) => changeQty(id, 1);
+  const dec = (id: string) => changeQty(id, -1);
+
+  /**
+   * นำเข้ารายการจากออเดอร์ Shopee
+   *
+   * `extras` คือค่าส่ง/ส่วนลดระดับออเดอร์ที่ไม่ได้อยู่ในราคาสินค้า — ถ้ามีจริง (ไม่ใช่ 0 ทั้งคู่)
+   * จะบันทึกเป็น `PurchaseOrder` 1 ก้อนใน `db.orders` แล้วปั๊ม `orderId` ลงจุดราคาทุกจุดของรอบนี้
+   * หน้าสรุปยอดจะได้บวกเงินก้อนนี้ **ครั้งเดียวต่อออเดอร์** ไม่ใช่ซ้ำตามจำนวนชิ้นในออเดอร์
+   */
+  const importFromShopee = (
+    chosen: ImportCandidate[],
+    extras?: { shipping: number; discount: number; date?: string; shop?: string; note?: string }
+  ) => {
     if (chosen.length === 0) return;
     const now = new Date().toISOString();
     // วันที่ซื้อต้องอิงเวลาเครื่อง ไม่ใช่ UTC (ดู lib/date.ts) — `now` เป็น timestamp เต็มของ createdAt ไม่เกี่ยวกัน
     const today = todayISO();
+    const hasExtras = !!extras && (extras.shipping > 0 || extras.discount > 0);
+    const orderId = hasExtras ? uid() : undefined;
     // ซื้อซ้ำ (มี existingId + mergeExisting) ให้บวกจำนวนเข้ารายการเดิมแทนสร้างใหม่
     const toMerge = new Map(chosen.filter((c) => c.existingId && c.mergeExisting).map((c) => [c.existingId!, c]));
     const toAdd = chosen.filter((c) => !(c.existingId && c.mergeExisting));
 
-    setItems((prev) => [
+    const nextItems = (prev: StockItem[]): StockItem[] => [
       ...prev.map((i) => {
         const m = toMerge.get(i.id);
         if (!m) return i;
@@ -117,7 +192,13 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
           // จำนวนที่ซื้อ "ครั้งล่าสุด" — ออเดอร์เก่าที่เพิ่งเอามาลงย้อนหลังไม่ใช่ครั้งล่าสุด
           buyQty: isLatestPurchase ? m.qty : i.buyQty,
           priceHistory: logPrice
-            ? pushPricePoint(i.priceHistory, { date: boughtAt, price: m.price!, qty: m.qty || 1 })
+            ? pushPricePoint(i.priceHistory, {
+                date: boughtAt,
+                price: m.price!,
+                qty: m.qty || 1,
+                ...(m.shop ? { shop: m.shop } : {}),
+                ...(orderId ? { orderId } : {}),
+              })
             : i.priceHistory,
           // ราคาใหม่มาจากโค้ดที่หารต่อชิ้นแล้ว ไม่ต้องเตือนให้ตรวจอีก (เฉพาะตอนที่ทับราคาปัจจุบันจริงๆ)
           priceUnverified: logPrice && isLatestPurchase ? undefined : i.priceUnverified,
@@ -127,6 +208,8 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
           note: use("note") && m.note ? m.note : i.note,
           ingredients: use("ingredients") && m.ingredients ? m.ingredients : i.ingredients,
           status: use("status") && m.status ? m.status : i.status,
+          // ร้านของ "ครั้งล่าสุด" เดินตาม purchasedAt — ออเดอร์เก่าที่ลงย้อนหลังลงได้แค่ในประวัติราคา
+          shop: use("shop") && m.shop && isLatestPurchase ? m.shop : i.shop,
           purchasedAt: isLatestPurchase ? boughtAt : i.purchasedAt,
         };
       }),
@@ -144,14 +227,49 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
         source: "shopee" as const,
         price: c.price,
         buyQty: c.qty,
-        priceHistory: c.price != null ? [{ date: c.purchasedAt || today, price: c.price, qty: c.qty || 1 }] : [],
+        priceHistory: c.price != null
+          ? [{
+              date: c.purchasedAt || today,
+              price: c.price,
+              qty: c.qty || 1,
+              ...(c.shop ? { shop: c.shop } : {}),
+              ...(orderId ? { orderId } : {}),
+            }]
+          : [],
         size: c.size,
         variant: c.variant,
+        shop: c.shop,
         purchasedAt: c.purchasedAt || today,
         createdAt: now,
       })),
-    ]);
+    ];
+
+    setDb((prev) => {
+      const items = nextItems(prev.items);
+      if (!hasExtras) return { ...prev, items };
+      const order: PurchaseOrder = {
+        id: orderId!,
+        date: extras!.date || chosen.find((c) => c.purchasedAt)?.purchasedAt || today,
+        shop: extras!.shop || chosen.find((c) => c.shop)?.shop,
+        shipping: Math.max(0, extras!.shipping),
+        discount: Math.max(0, extras!.discount),
+        note: extras!.note || "",
+        createdAt: now,
+      };
+      return { ...prev, items, orders: [...(prev.orders ?? []), order] };
+    });
   };
 
-  return { save, remove, removeMany, groupItems, ungroup, setCatsForItems, inc, dec, importFromShopee, exportCsv };
+  /** ปักดาวให้หลายรายการพร้อมกัน — ยังไม่โปรดครบทุกอัน = ปักให้ทั้งหมด, โปรดครบแล้ว = เอาออกทั้งหมด */
+  const toggleFavForItems = (ids: string[]) => {
+    setItems((prev) => {
+      const allFav = prev.filter((i) => ids.includes(i.id)).every((i) => i.fav);
+      return prev.map((i) => (ids.includes(i.id) ? { ...i, fav: allFav ? undefined : true } : i));
+    });
+  };
+
+  return {
+    save, remove, removeMany, restoreFromTrash, deleteForever, emptyTrash,
+    groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, importFromShopee, exportCsv,
+  };
 }

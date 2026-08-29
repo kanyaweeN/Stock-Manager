@@ -8,13 +8,20 @@ import ProductGrid from "@/components/ProductGrid";
 import ProductModal from "@/components/ProductModal";
 import ImportModal from "@/components/ImportModal";
 import RecipeModal from "@/components/RecipeModal";
+import PlanModal from "@/components/PlanModal";
+import ModalShell from "@/components/ModalShell";
+import AddToTargetModal from "@/components/AddToTargetModal";
+import SelectActionBar from "@/components/SelectActionBar";
 import { useStockDB } from "@/lib/StockDBProvider";
-import { countUnits } from "@/lib/db";
 import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/cost";
+import { formatThaiShortDate } from "@/lib/date";
+import { defaultDueDate, emptyPlan, isPlanDone, planLineFromItem, planTotals, sortPlans } from "@/lib/plan";
 import { useProductFilters } from "@/lib/useProductFilters";
 import { useProductActions } from "@/lib/useProductActions";
+import { useSelection } from "@/lib/useSelection";
 import { useRecipeActions } from "@/lib/useRecipeActions";
-import type { Recipe, StockItem } from "@/lib/types";
+import { usePlanActions } from "@/lib/usePlanActions";
+import type { PurchasePlan, Recipe, StockItem } from "@/lib/types";
 
 export default function Home() {
   const { db, setDb } = useStockDB();
@@ -28,17 +35,21 @@ export default function Home() {
     excludeTag, setExcludeTag,
     availableTags, withIngredientsCount,
     categorySuggestions, filtered,
-    outOfStockCount, lowCount, totalUnits, uncategorizedCount, groupedCount,
+    outOfStockCount, lowCount, totalUnits, uncategorizedCount, groupedCount, favCount, frequentCount, expiringCount,
   } = useProductFilters(db.items, db.categoryPresets);
   const actions = useProductActions(setDb);
+  const {
+    selectMode, setSelectMode, selectedIds, selectedItems,
+    toggleSelect, allFilteredSelected, toggleSelectAllFiltered, exitSelectMode,
+  } = useSelection(db.items, filtered);
   const recipeActions = useRecipeActions(setDb);
+  const planActions = usePlanActions(setDb);
   const recipes = db.recipes ?? [];
+  const plans = useMemo(() => sortPlans(db.plans ?? []), [db.plans]);
 
   const [modalItem, setModalItem] = useState<StockItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [groupNameOpen, setGroupNameOpen] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState("");
   const [moveCatOpen, setMoveCatOpen] = useState(false);
@@ -46,6 +57,9 @@ export default function Home() {
   const [recipeDraft, setRecipeDraft] = useState<Recipe | null>(null);
   /** สินค้าที่กำลังจะใส่เข้าสูตร — เปิดกล่องให้เลือกว่าจะใส่สูตรไหน (null = ไม่ได้เปิด) */
   const [recipeTargetItems, setRecipeTargetItems] = useState<StockItem[] | null>(null);
+  const [planDraft, setPlanDraft] = useState<PurchasePlan | null>(null);
+  /** สินค้าที่กำลังจะจดเข้าแผนซื้อของ — เปิดกล่องให้เลือกว่าจะใส่แผนไหน (null = ไม่ได้เปิด) */
+  const [planTargetItems, setPlanTargetItems] = useState<StockItem[] | null>(null);
 
   const openAdd = () => { setModalItem(null); setModalOpen(true); };
   const openEdit = (item: StockItem) => { setModalItem(item); setModalOpen(true); };
@@ -55,30 +69,6 @@ export default function Home() {
     setModalOpen(false);
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  /**
-   * เลือกทั้งหมด = เฉพาะรายการที่มองเห็นอยู่ตอนนี้ (ผ่านตัวกรอง/คำค้นแล้ว) ไม่ใช่ทั้งสต็อก
-   * จะได้ใช้คู่กับตัวกรองเพื่อ "ลบทั้งหมดในหมวดนี้" ได้ และไม่เผลอลบของที่มองไม่เห็น
-   */
-  const allFilteredSelected = filtered.length > 0 && filtered.every((i) => selectedIds.has(i.id));
-  const toggleSelectAllFiltered = () => {
-    setSelectedIds(allFilteredSelected ? new Set() : new Set(filtered.map((i) => i.id)));
-  };
-
-  const exitSelectMode = () => {
-    setSelectMode(false);
-    setSelectedIds(new Set());
-  };
-
-  const selectedItems = db.items.filter((i) => selectedIds.has(i.id));
 
   const openGroupNamePrompt = () => {
     setGroupNameInput(selectedItems[0]?.name || "");
@@ -125,6 +115,34 @@ export default function Home() {
   const handleSaveRecipe = (recipe: Recipe) => {
     recipeActions.save(recipe);
     setRecipeDraft(null);
+  };
+
+  const startNewPlanWith = (chosen: StockItem[]) => {
+    setPlanTargetItems(null);
+    setPlanDraft({ ...emptyPlan("", defaultDueDate()), lines: chosen.map(planLineFromItem) });
+  };
+
+  /** จดสินค้าไว้ในแผนซื้อของ — ถ้ายังไม่มีแผนเลยก็ข้ามไปสร้างแผนใหม่ให้เลย ไม่ต้องเลือก */
+  const openAddToPlan = (chosen: StockItem[]) => {
+    if (chosen.length === 0) return;
+    if (plans.length === 0) startNewPlanWith(chosen);
+    else setPlanTargetItems(chosen);
+  };
+
+  /**
+   * ของที่ผูกกับแผนนั้นอยู่แล้วจะไม่เพิ่มซ้ำ — บรรทัดที่ itemId เดียวกันคือยอดเดียวกันที่ถูกนับสองรอบ
+   * (ยังไม่บันทึกให้ตรงนี้ เปิด PlanModal ให้แก้จำนวน/ราคาก่อนแล้วค่อยกดบันทึกเอง)
+   */
+  const addToExistingPlan = (plan: PurchasePlan) => {
+    const inPlan = new Set(plan.lines.map((l) => l.itemId).filter(Boolean));
+    const chosen = (planTargetItems ?? []).filter((i) => !inPlan.has(i.id));
+    setPlanTargetItems(null);
+    setPlanDraft({ ...plan, lines: [...plan.lines, ...chosen.map(planLineFromItem)] });
+  };
+
+  const handleSavePlan = (plan: PurchasePlan) => {
+    planActions.save(plan);
+    setPlanDraft(null);
   };
 
   const categoryCount = useMemo(() => new Set(db.items.flatMap((i) => i.cats)).size, [db.items]);
@@ -177,13 +195,18 @@ export default function Home() {
 
       <FilterChips
         counts={{
-          all: countUnits(db.items),
+          // นับแถวดิบเหมือนชิปอื่นทุกตัว — เดิมใช้ `countUnits` (กลุ่มนับรวมเป็น 1) ทำให้
+          // "ทั้งหมด" น้อยกว่า "มีสินค้า" ได้เมื่อมีการจัดกลุ่มไว้ ซึ่งอ่านแล้วขัดกัน
+          all: db.items.length,
           totalUnits,
           inStock: db.items.length - outOfStockCount,
           low: lowCount,
           outOfStock: outOfStockCount,
           uncategorized: uncategorizedCount,
           grouped: groupedCount,
+          fav: favCount,
+          frequent: frequentCount,
+          expiring: expiringCount,
           categories: categoryCount,
         }}
         active={activeChip}
@@ -191,42 +214,20 @@ export default function Home() {
       />
 
       {selectMode && (
-        <div className="select-action-bar">
-          <span>เลือกไว้ {selectedIds.size} รายการ</span>
-          <button className="btn-ghost" onClick={toggleSelectAllFiltered}>
-            {allFilteredSelected ? "ล้างที่เลือก" : `เลือกทั้งหมด (${filtered.length})`}
-          </button>
-          <button
-            className="btn-primary"
-            disabled={selectedIds.size < 2}
-            onClick={openGroupNamePrompt}
-          >
-            👥 จัดกลุ่มที่เลือก
-          </button>
-          <button
-            className="btn-ghost"
-            disabled={selectedIds.size < 1}
-            onClick={openMoveCatPrompt}
-          >
-            🏷️ ย้ายหมวดหมู่
-          </button>
-          <button
-            className="btn-ghost"
-            disabled={selectedIds.size < 1}
-            onClick={() => { openAddToRecipe(selectedItems); exitSelectMode(); }}
-          >
-            🧮 ใส่ในสูตรต้นทุน
-          </button>
-          <button
-            className="btn-danger"
-            disabled={selectedIds.size < 1}
-            // ยกเลิกใน confirm แล้วต้องไม่หลุดออกจากโหมดเลือก ไม่งั้นที่เลือกไว้หายหมดฟรีๆ
-            onClick={() => { if (actions.removeMany(selectedItems)) exitSelectMode(); }}
-          >
-            🗑️ ลบที่เลือก
-          </button>
-          <button className="btn-ghost" onClick={exitSelectMode}>ยกเลิก</button>
-        </div>
+        <SelectActionBar
+          selectedCount={selectedIds.size}
+          filteredCount={filtered.length}
+          allFilteredSelected={allFilteredSelected}
+          onToggleSelectAll={toggleSelectAllFiltered}
+          onGroup={openGroupNamePrompt}
+          onMoveCats={openMoveCatPrompt}
+          onToggleFav={() => { actions.toggleFavForItems([...selectedIds]); exitSelectMode(); }}
+          onAddToRecipe={() => { openAddToRecipe(selectedItems); exitSelectMode(); }}
+          onAddToPlan={() => { openAddToPlan(selectedItems); exitSelectMode(); }}
+          // ยกเลิกใน confirm แล้วต้องไม่หลุดออกจากโหมดเลือก ไม่งั้นที่เลือกไว้หายหมดฟรีๆ
+          onRemove={() => { if (actions.removeMany(selectedItems)) exitSelectMode(); }}
+          onCancel={exitSelectMode}
+        />
       )}
 
       <ProductGrid
@@ -237,7 +238,9 @@ export default function Home() {
         onDec={actions.dec}
         onEdit={openEdit}
         onDelete={actions.remove}
+        onToggleFav={actions.toggleFav}
         onAddToRecipe={(item) => openAddToRecipe([item])}
+        onAddToPlan={(item) => openAddToPlan([item])}
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
@@ -259,119 +262,129 @@ export default function Home() {
         items={db.items}
         onClose={() => setRecipeDraft(null)}
         onSave={handleSaveRecipe}
+        runs={recipeDraft ? recipes.find((r) => r.id === recipeDraft.id)?.runs : undefined}
+        onLogRun={recipeActions.logRun}
+        onRemoveRun={recipeActions.removeRun}
+      />
+      <PlanModal
+        open={planDraft !== null}
+        plan={planDraft}
+        items={db.items}
+        onClose={() => setPlanDraft(null)}
+        onSave={handleSavePlan}
       />
 
+      {planTargetItems && (
+        <AddToTargetModal
+          title={`จด ${planTargetItems.length} รายการไว้ในแผนไหน?`}
+          items={planTargetItems}
+          itemLine={(i) => `${i.name}${i.price != null ? ` · ฿${i.price}` : ""} · เหลือ ${i.qty}`}
+          pickLabel="เลือกแผนที่มีอยู่"
+          targets={plans}
+          targetKey={(p) => p.id}
+          targetName={(p) => {
+            const already = planTargetItems.filter((i) => p.lines.some((l) => l.itemId === i.id)).length;
+            return (
+              <>
+                {isPlanDone(p) && "✅ "}
+                {p.name || "(ไม่มีชื่อ)"}
+                {already > 0 && <small> · มีอยู่แล้ว {already}</small>}
+              </>
+            );
+          }}
+          targetMeta={(p) => {
+            const t = planTotals(p);
+            return `${t.lines} รายการ · ยังต้องจ่าย ${baht(t.remaining)}${p.dueDate ? ` · ภายใน ${formatThaiShortDate(p.dueDate)}` : ""}`;
+          }}
+          onPick={addToExistingPlan}
+          newLabel="+ แผนใหม่"
+          onNew={() => startNewPlanWith(planTargetItems)}
+          onClose={() => setPlanTargetItems(null)}
+        />
+      )}
+
       {recipeTargetItems && (
-        <div className="modal-backdrop open">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>ใส่ {recipeTargetItems.length} รายการในสูตรไหน?</h2>
-              <button className="modal-close" title="ปิด" onClick={() => setRecipeTargetItems(null)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="category-list" style={{ marginBottom: 12 }}>
-                {recipeTargetItems.map((i) => (
-                  <div className="category-row" key={i.id}>
-                    <span>{i.name}{i.price != null ? ` · ฿${i.price}` : ""}{i.size ? ` · ${i.size}` : ""}</span>
-                  </div>
-                ))}
-              </div>
-              <label className="text-xs" style={{ color: "var(--muted)" }}>เลือกสูตรที่มีอยู่</label>
-              <div className="stock-picker__list">
-                {recipes.map((r) => (
-                  <button className="stock-picker__row" key={r.id} onClick={() => addToExistingRecipe(r)}>
-                    <span className="stock-picker__name">{r.name || "(ไม่มีชื่อ)"}</span>
-                    <span className="stock-picker__meta">
-                      วัตถุดิบ {r.lines.length} · {baht(recipeTotals(r).perUnitCost)}/{r.yieldUnit}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-ghost" onClick={() => setRecipeTargetItems(null)}>ยกเลิก</button>
-              <button className="btn-primary" onClick={() => startNewRecipeWith(recipeTargetItems)}>+ สูตรใหม่</button>
-            </div>
-          </div>
-        </div>
+        <AddToTargetModal
+          title={`ใส่ ${recipeTargetItems.length} รายการในสูตรไหน?`}
+          items={recipeTargetItems}
+          itemLine={(i) => `${i.name}${i.price != null ? ` · ฿${i.price}` : ""}${i.size ? ` · ${i.size}` : ""}`}
+          pickLabel="เลือกสูตรที่มีอยู่"
+          targets={recipes}
+          targetKey={(r) => r.id}
+          targetName={(r) => r.name || "(ไม่มีชื่อ)"}
+          targetMeta={(r) => `วัตถุดิบ ${r.lines.length} · ${baht(recipeTotals(r).perUnitCost)}/${r.yieldUnit}`}
+          onPick={addToExistingRecipe}
+          newLabel="+ สูตรใหม่"
+          onNew={() => startNewRecipeWith(recipeTargetItems)}
+          onClose={() => setRecipeTargetItems(null)}
+        />
       )}
 
       <ImportModal
         open={importOpen}
         categories={categorySuggestions}
         items={db.items}
+        orders={db.orders}
         onClose={() => setImportOpen(false)}
         onImport={actions.importFromShopee}
       />
 
       {groupNameOpen && (
-        <div className="modal-backdrop open">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>จัดกลุ่ม {selectedItems.length} รายการ</h2>
-              <button className="modal-close" title="ปิด" onClick={() => setGroupNameOpen(false)}>×</button>
+        <ModalShell open title={`จัดกลุ่ม ${selectedItems.length} รายการ`} onClose={() => setGroupNameOpen(false)}>
+          <div className="modal-body">
+            <p className="sub sub-tight text-xs">
+              ทุกรายการที่เลือกไว้จะยังอยู่แยกกันเหมือนเดิม (จำนวน/ราคาของใครของมัน) แค่ติดป้ายกลุ่มเดียวกันไว้ให้รู้ว่าเป็นสินค้าตัวเดียวกัน
+            </p>
+            <div className="category-list" style={{ marginBottom: 12 }}>
+              {selectedItems.map((i) => (
+                <div className="category-row" key={i.id}><span>{i.name} · {i.qty} ชิ้น</span></div>
+              ))}
             </div>
-            <div className="modal-body">
-              <p className="sub sub-tight text-xs">
-                ทุกรายการที่เลือกไว้จะยังอยู่แยกกันเหมือนเดิม (จำนวน/ราคาของใครของมัน) แค่ติดป้ายกลุ่มเดียวกันไว้ให้รู้ว่าเป็นสินค้าตัวเดียวกัน
-              </p>
-              <div className="category-list" style={{ marginBottom: 12 }}>
-                {selectedItems.map((i) => (
-                  <div className="category-row" key={i.id}><span>{i.name} · {i.qty} ชิ้น</span></div>
-                ))}
-              </div>
-              <div className="field">
-                <label>ชื่อกลุ่ม</label>
-                <input
-                  type="text"
-                  value={groupNameInput}
-                  onChange={(e) => setGroupNameInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") confirmGroupSelected(); }}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-ghost" onClick={() => setGroupNameOpen(false)}>ยกเลิก</button>
-              <button className="btn-primary" onClick={confirmGroupSelected}>จัดกลุ่ม</button>
+            <div className="field">
+              <label>ชื่อกลุ่ม</label>
+              <input
+                type="text"
+                value={groupNameInput}
+                onChange={(e) => setGroupNameInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") confirmGroupSelected(); }}
+                autoFocus
+              />
             </div>
           </div>
-        </div>
+          <div className="modal-actions">
+            <button className="btn-ghost" onClick={() => setGroupNameOpen(false)}>ยกเลิก</button>
+            <button className="btn-primary" onClick={confirmGroupSelected}>จัดกลุ่ม</button>
+          </div>
+        </ModalShell>
       )}
 
       {moveCatOpen && (
-        <div className="modal-backdrop open">
-          <div className="modal">
-            <div className="modal-header">
-              <h2>ย้ายหมวดหมู่ {selectedItems.length} รายการ</h2>
-              <button className="modal-close" title="ปิด" onClick={() => setMoveCatOpen(false)}>×</button>
+        <ModalShell open title={`ย้ายหมวดหมู่ ${selectedItems.length} รายการ`} onClose={() => setMoveCatOpen(false)}>
+          <div className="modal-body">
+            <p className="sub sub-tight text-xs">
+              หมวดหมู่ใหม่ที่เลือกจะไปแทนที่หมวดหมู่เดิมของทุกรายการที่เลือกไว้ (เลือกว่างไว้เพื่อลบหมวดหมู่ออกทั้งหมด)
+            </p>
+            <div className="category-list" style={{ marginBottom: 12 }}>
+              {selectedItems.map((i) => (
+                <div className="category-row" key={i.id}><span>{i.name}</span></div>
+              ))}
             </div>
-            <div className="modal-body">
-              <p className="sub sub-tight text-xs">
-                หมวดหมู่ใหม่ที่เลือกจะไปแทนที่หมวดหมู่เดิมของทุกรายการที่เลือกไว้ (เลือกว่างไว้เพื่อลบหมวดหมู่ออกทั้งหมด)
-              </p>
-              <div className="category-list" style={{ marginBottom: 12 }}>
-                {selectedItems.map((i) => (
-                  <div className="category-row" key={i.id}><span>{i.name}</span></div>
-                ))}
-              </div>
-              <div className="field">
-                <label>หมวดหมู่ใหม่</label>
-                <CategoryMultiSelect
-                  categories={categorySuggestions}
-                  selected={moveCatValue}
-                  onChange={setMoveCatValue}
-                  allowCreate
-                  emptyLabel="ไม่มีหมวดหมู่"
-                />
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="btn-ghost" onClick={() => setMoveCatOpen(false)}>ยกเลิก</button>
-              <button className="btn-primary" onClick={confirmMoveCat}>ย้ายหมวดหมู่</button>
+            <div className="field">
+              <label>หมวดหมู่ใหม่</label>
+              <CategoryMultiSelect
+                categories={categorySuggestions}
+                selected={moveCatValue}
+                onChange={setMoveCatValue}
+                allowCreate
+                emptyLabel="ไม่มีหมวดหมู่"
+              />
             </div>
           </div>
-        </div>
+          <div className="modal-actions">
+            <button className="btn-ghost" onClick={() => setMoveCatOpen(false)}>ยกเลิก</button>
+            <button className="btn-primary" onClick={confirmMoveCat}>ย้ายหมวดหมู่</button>
+          </div>
+        </ModalShell>
       )}
     </div>
   );

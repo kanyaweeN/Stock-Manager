@@ -76,6 +76,39 @@ export function recipeTotals(recipe: Recipe, pricing?: PricingSettings): RecipeT
   };
 }
 
+export interface ProductionSummary {
+  /** ทำไปแล้วกี่รอบสูตร (รวมทุกครั้ง) */
+  batches: number;
+  /** ได้ของออกมากี่ชิ้น = รอบ × yieldQty */
+  units: number;
+  /** ต้นทุนที่ลงไปแล้วทั้งหมด = รอบ × ต้นทุนต่อรอบ (คิดจากราคาวัตถุดิบ**ปัจจุบัน**) */
+  cost: number;
+  /** ครั้งล่าสุดทำเมื่อไร (`""` = ยังไม่เคยทำ/ไม่ทราบวันที่) */
+  lastDate: string;
+  /** บันทึกไว้กี่ครั้ง (คนละตัวกับ `batches` — 1 ครั้งทำหลายรอบได้) */
+  times: number;
+}
+
+/**
+ * สรุปว่าสูตรนี้ทำไปแล้วเท่าไร — **ต้นทุนคิดจากราคาวัตถุดิบปัจจุบัน ไม่ใช่ราคา ณ วันที่ทำ**
+ *
+ * สูตรเก็บแค่ราคาล่าสุดของวัตถุดิบ (`RecipeLine.buyPrice`) ไม่ได้ถ่ายรูปราคาไว้ตอนทำ
+ * ตัวเลขนี้จึงเป็น "ถ้าทำเท่านี้ด้วยราคาวันนี้จะเป็นเงินเท่าไร" ไม่ใช่เงินที่จ่ายจริงย้อนหลัง
+ */
+export function productionSummary(recipe: Recipe, pricing?: PricingSettings): ProductionSummary {
+  const runs = recipe.runs ?? [];
+  const batches = runs.reduce((s, r) => s + (r.batches > 0 ? r.batches : 1), 0);
+  const yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1;
+  const dates = runs.map((r) => r.date).filter(Boolean).sort();
+  return {
+    batches,
+    units: batches * yieldQty,
+    cost: batches * recipeTotals(recipe, pricing).batchCost,
+    lastDate: dates[dates.length - 1] || "",
+    times: runs.length,
+  };
+}
+
 /** แสดงเงินแบบไทย ทศนิยม 2 ตำแหน่ง (ตัด .00 ทิ้งถ้าเป็นจำนวนเต็ม) */
 export function baht(n: number): string {
   const rounded = Math.round(n * 100) / 100;
@@ -150,12 +183,19 @@ export function parsePackSize(size?: string): { amount: number; unit: string } |
 
 /**
  * สร้างบรรทัดวัตถุดิบจากสินค้าในสต็อก — ดึงราคา/ขนาดบรรจุมาให้อัตโนมัติ
- * ถ้าแกะขนาดไม่ออก จะตั้ง packAmount = 0 (= ยังไม่รู้) แล้วให้ UI เตือนให้กรอกเอง
+ *
+ * ใช้ `item.packAmount`/`item.unit` ที่กรอกไว้ตรงๆ ก่อนเสมอ แล้วค่อยตกไปเดาจากข้อความ
+ * `item.size` ด้วย `parsePackSize` — ค่าที่ผู้ใช้กรอกเองย่อมแม่นกว่าการแกะสตริง และ
+ * ของที่เขียนขนาดไม่เป็นแพตเทิร์น ("ขวดกลาง") เดายังไงก็ไม่ออก
+ *
+ * ถ้าไม่รู้จริงๆ จะตั้ง packAmount = 0 (= ยังไม่รู้) แล้วให้ UI เตือนให้กรอกเอง
  * ไม่ตั้งเป็น 1 เงียบๆ เพราะจะกลายเป็น "ใช้ 50 g = จ่ายราคาเต็ม 50 แพ็ค"
  */
 export function lineFromItem(item: StockItem): RecipeLine {
-  const pack = parsePackSize(item.size);
-  const countable = !item.size?.trim(); // ไม่ได้ระบุขนาดไว้เลย = ของนับเป็นชิ้น
+  const pack = item.packAmount && item.packAmount > 0
+    ? { amount: item.packAmount, unit: item.unit?.trim() || "ชิ้น" }
+    : parsePackSize(item.size);
+  const countable = !item.packAmount && !item.size?.trim(); // ไม่ได้ระบุขนาดไว้เลย = ของนับเป็นชิ้น
   return {
     id: uid(),
     itemId: item.id,

@@ -4,6 +4,8 @@ import type { StockItem } from "./types";
 /**
  * ส่งออกรายการสินค้าไปดูเป็นตารางใน Google Sheet — **ทางเดียว (push อย่างเดียว)**
  *
+ * ส่งออกเฉพาะของที่อยู่ในสต็อกจริง — ของใน `db.trash` ไม่ถูกส่งไป (มันคือของที่ลบแล้ว)
+ *
  * การซิงก์ข้อมูลจริงย้ายไปอยู่ที่ `lib/googleDrive.ts` (JSON ทั้งก้อน) แล้ว
  * ที่นี่จึงไม่มี pull อีกต่อไป เพราะชีตเก็บได้แค่ `items` — ดึงกลับมาทีไรก็ทับ
  * สูตรต้นทุน/โปรไฟล์ผิว/ฟิลด์ที่ไม่มีคอลัมน์ทิ้งทุกที
@@ -17,10 +19,17 @@ const HEADER = [
   "id", "name", "cat", "qty", "min", "note", "img", "link", "status", "price", "size", "variant", "ingredients",
   "source", "groupId", "groupName", "purchasedAt", "createdAt",
   "buyQty", "avgPrice", "priceHistory",
+  "shop", "expiryAt", "openedAt", "paoMonths",
+  "unit", "packAmount", "location", "usageLog",
+  "openPct", "reorderQty",
 ] as const;
 
-/** 1→A (พอสำหรับ 26 คอลัมน์ — เกินกว่านี้ต้องเปลี่ยนวิธีคิดเป็นฐาน 26) */
-const col = (n: number) => String.fromCharCode(64 + n);
+/** 1→A, 26→Z, 27→AA — ต้องเป็นฐาน 26 จริงๆ เพราะจำนวนคอลัมน์ชนขอบ 26 พอดีตั้งแต่รอบที่เพิ่มร้าน/วันหมดอายุ */
+const col = (n: number) => {
+  let out = "";
+  for (let v = n; v > 0; v = Math.floor((v - 1) / 26)) out = String.fromCharCode(65 + ((v - 1) % 26)) + out;
+  return out;
+};
 const LAST_COL = col(HEADER.length);
 const ITEMS_RANGE = `A1:${LAST_COL}100000`;
 /** เก็บ categoryPresets ไว้ช่องถัดจากตารางสินค้า — ชีตเก่าที่ยังเก็บไว้ช่องอื่นจะอ่านไม่เจอ แล้วใช้ค่าในเครื่องแทน (ดู useGoogleSheetsSync.pull) */
@@ -54,6 +63,17 @@ function itemsToRows(items: StockItem[]): string[][] {
         stats ? String(stats.avg) : "",
         // ประวัติราคาแบนเป็นข้อความบรรทัดเดียว — ชีตเป็น export อย่างเดียวอยู่แล้ว ไม่ต้อง parse กลับ
         (i.priceHistory ?? []).map((p) => `${p.date || "?"}@${p.price}x${p.qty}`).join("; "),
+        i.shop || "",
+        i.expiryAt || "",
+        i.openedAt || "",
+        i.paoMonths != null ? String(i.paoMonths) : "",
+        i.unit || "",
+        i.packAmount != null ? String(i.packAmount) : "",
+        i.location || "",
+        // แบนเป็นข้อความบรรทัดเดียวเหมือน priceHistory — ชีตเป็น export อย่างเดียว ไม่ต้อง parse กลับ
+        (i.usageLog ?? []).map((u) => `${u.date || "?"}:${u.delta > 0 ? "+" : ""}${u.delta}`).join("; "),
+        i.openPct != null ? String(i.openPct) : "",
+        i.reorderQty != null ? String(i.reorderQty) : "",
       ];
     }),
   ];

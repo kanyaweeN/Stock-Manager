@@ -3,7 +3,11 @@ import type { useGoogleDriveSync } from "@/lib/useGoogleDriveSync";
 type DriveSync = ReturnType<typeof useGoogleDriveSync>;
 
 export default function DriveTab(sync: DriveSync) {
-  const { clientId, token, remoteTime, message, busy, checking, origin, saveClientId, connect, push, pull, forget } = sync;
+  const {
+    clientId, token, remoteTime, message, busy, checking, origin,
+    autoSync, setAutoSync, dirty, autoPaused,
+    saveClientId, connect, push, pull, forget,
+  } = sync;
 
   return (
     <div className="field tab-panel">
@@ -36,12 +40,27 @@ export default function DriveTab(sync: DriveSync) {
         </button>
         {token && (
           <>
-            <button className="btn-ghost" onClick={push} disabled={busy}>⬆️ ส่งขึ้น Drive</button>
-            <button className="btn-ghost" onClick={pull} disabled={busy}>⬇️ ดึงจาก Drive</button>
+            <button className="btn-ghost" onClick={() => push()} disabled={busy}>⬆️ ส่งขึ้น Drive</button>
+            <button className="btn-ghost" onClick={() => pull()} disabled={busy}>⬇️ ดึงจาก Drive</button>
             <button className="btn-ghost" onClick={forget}>🚫 เลิกจำการเชื่อมต่อ</button>
           </>
         )}
       </div>
+      {token && (
+        <div className="field">
+          <label className="check-row">
+            <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+            <span>ส่งขึ้น Drive อัตโนมัติเมื่อข้อมูลเปลี่ยน (หน่วง 30 วินาที และตอนสลับ/ปิดแท็บ)</span>
+          </label>
+          <p className="sub sub-tight text-xs">
+            {autoPaused
+              ? "⛔️ หยุดไว้ชั่วคราวเพราะรอบล่าสุดดูเสี่ยงหรือส่งไม่สำเร็จ — ตรวจข้อความด้านล่างแล้วกด \"ส่งขึ้น Drive\" เองเพื่อเริ่มใหม่"
+              : dirty
+                ? "⏳ มีข้อมูลที่แก้แล้วยังไม่ได้ส่งขึ้น Drive"
+                : "✅ ข้อมูลตรงกับไฟล์บน Drive แล้ว"}
+          </p>
+        </div>
+      )}
       {remoteTime && (
         <p className="sub text-xs">ไฟล์บน Drive แก้ล่าสุด: {new Date(remoteTime).toLocaleString("th-TH")}</p>
       )}

@@ -18,6 +18,8 @@
   --ok-soft: #e6f7ee;
   --violet: #7c3aed;
   --violet-soft: #f1eaff;
+  --fav: #e0a106;
+  --fav-soft: #fff5d9;
   --shadow-1: 0 1px 2px rgba(16, 24, 40, .05);
   --shadow-2: 0 1px 2px rgba(16, 24, 40, .05), 0 10px 28px -14px rgba(16, 24, 40, .3);
   --side-w: 216px;
@@ -44,6 +46,8 @@
     --ok-soft: #0f2a1e;
     --violet: #a985ff;
     --violet-soft: #241a3d;
+    --fav: #f0c03c;
+    --fav-soft: #2e2408;
     --shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
     --shadow-2: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px -16px rgba(0, 0, 0, .8);
   }
@@ -225,6 +229,13 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
 .fchip--danger::before { background: var(--danger); }
 .fchip--danger .fchip__n { color: var(--danger); }
 .fchip--violet::before { background: var(--violet); }
+.fchip--fav::before { background: var(--fav); }
+.fchip--fav .fchip__n { color: var(--fav); }
+.fchip--repeat::before { background: var(--ok); }
+.fchip--repeat .fchip__n { color: var(--ok); }
+/* ใกล้หมดอายุ — ใช้โทนเดียวกับ "ใกล้หมด" เพราะเป็นคำเตือนระดับเดียวกัน (ยังไม่ถึงขั้นแดง) */
+.fchip--expiry::before { background: var(--low); }
+.fchip--expiry .fchip__n { color: var(--low); }
 .fchip--static { cursor: default; opacity: .85; }
 .fchip--static:hover { border-color: var(--border); }
 .fchip.is-active { background: var(--accent-soft); border-color: var(--accent); }
@@ -777,6 +788,75 @@ td.thumb-cell { width: 46px; }
 .import-order-date {
   padding: 0 2px; margin-bottom: 10px; color: var(--muted);
 }
+
+/* กล่องสรุปวันหมดอายุ "ที่ใช้จริง" ใต้ช่องกรอกในหน้าแก้ไขสินค้า */
+.expiry-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  font-size: 12.5px; line-height: 1.45;
+}
+.expiry-note.is-ok { background: var(--ok-soft); color: var(--ok); }
+.expiry-note.is-soon { background: var(--low-bg); color: var(--low); }
+.expiry-note.is-expired { background: var(--danger-soft); color: var(--danger); }
+
+/* ถังขยะในหน้าตั้งค่า */
+.trash-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.trash-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+}
+.trash-row__name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-row__meta { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* ประวัติการผลิตในหน้าสูตรต้นทุน */
+.run-add { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 10px; }
+.run-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.run-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 10px; background: var(--bg); border-radius: 8px; font-size: 12.5px;
+}
+.run-row__date { color: var(--muted); }
+.run-row__batches { font-weight: 600; }
+.run-row .icon-btn { margin-left: auto; }
+
+/* ความสำคัญของบรรทัดในแผน — แถบซ้ายบางๆ พอให้กวาดตาเห็นว่าตัดอะไรออกได้ */
+.plan-line--must { border-left: 3px solid var(--danger); }
+.plan-line--maybe { border-left: 3px solid var(--border-strong); opacity: .85; }
+
+/* รายการออเดอร์ (ค่าส่ง/ส่วนลด) ที่แก้/ลบได้ในหน้าสรุปยอด */
+.order-list { display: flex; flex-direction: column; gap: 8px; }
+.order-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+}
+.order-row input[type="text"] { flex: 1 1 140px; min-width: 0; }
+.order-row__num {
+  display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.order-row__num input { width: 84px; }
+.order-row__net { margin-left: auto; font-weight: 700; color: var(--low); white-space: nowrap; }
+.order-row__net.is-saving { color: var(--ok); }
+
+@media (max-width: 640px) {
+  .order-row__net { margin-left: 0; }
+}
+
+/* ค่าส่ง/ส่วนลดของออเดอร์ในหน้านำเข้า */
+.import-extras {
+  padding: 10px 12px; margin-bottom: 12px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+}
+.import-extras__title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.import-extras__row { display: flex; flex-wrap: wrap; gap: 12px; }
+.import-extras__row label {
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted);
+}
+.import-extras__row input { width: 110px; }
+.import-extras__check {
+  margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12.5px; line-height: 1.45;
+}
+.import-extras__check.is-ok { background: var(--ok-soft); color: var(--ok); }
+.import-extras__check.is-warn { background: var(--low-bg); color: var(--low); }
 .import-price-mode {
   display: flex; align-items: flex-start; gap: 8px;
   padding: 8px 12px; margin-bottom: 12px;
@@ -785,6 +865,21 @@ td.thumb-cell { width: 46px; }
 }
 .import-price-mode input { margin-top: 3px; flex-shrink: 0; }
 .import-price-total { color: var(--muted); white-space: nowrap; }
+
+/* แถวติ๊กถูกพร้อมคำอธิบาย (เช่น เปิด/ปิดซิงก์อัตโนมัติในหน้าตั้งค่า) */
+.check-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13px; line-height: 1.45; cursor: pointer;
+}
+.check-row input { margin-top: 3px; flex-shrink: 0; }
+
+/* แถบเตือนบนสุดของทุกหน้า — ใช้ตอนซิงก์ขึ้น Drive หยุดเอง ข้อมูลใหม่จึงยังไม่มีสำเนาบนคลาวด์ */
+.sync-alert {
+  display: block; margin-bottom: 14px; padding: 9px 13px;
+  background: var(--low-bg); border: 1px solid var(--low); border-radius: 10px;
+  color: var(--low); font-size: 13px; font-weight: 600; text-decoration: none;
+}
+.sync-alert:hover { filter: brightness(1.05); }
 .import-list-wrap { max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .img-preview { max-width: 100%; max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }
 
@@ -899,7 +994,10 @@ td.thumb-cell { width: 46px; }
   display: flex; align-items: center; gap: 6px;
 }
 .product-card__flags .badge-out,
-.product-card__flags .badge-low {
+.product-card__flags .badge-low,
+.product-card__flags .badge-frequent,
+.product-card__flags .badge-expiry,
+.product-card__flags .badge-runout {
   margin-left: 0; padding: 3px 9px; border-radius: 999px;
   background: var(--card); box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
 }
@@ -932,6 +1030,18 @@ td.thumb-cell { width: 46px; }
 .product-card__min { font-size: 11px; font-weight: 500; color: var(--muted); }
 .product-card__actions { display: flex; gap: 2px; }
 
+/* ปุ่มดาว "ของโปรด" — บนการ์ดอยู่ท้ายแถวล่างคู่กับเมนู ⋯ (จอมือถือย้ายไปมุมขวาบน ดู @media 640) */
+.fav-btn {
+  margin-left: auto;
+  width: 30px; height: 30px; padding: 0; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--card); color: var(--muted);
+  font-size: 16px; line-height: 1;
+}
+.fav-btn:hover { background: var(--fav-soft); color: var(--fav); border-color: var(--fav); }
+.fav-btn--on { background: var(--fav-soft); border-color: var(--fav); color: var(--fav); }
+.fav-btn + .card-menu { margin-left: 0; }
+.product-card--fav { border-color: color-mix(in srgb, var(--fav) 45%, var(--border)); }
+
 /* เมนู ⋯ ต่อการ์ด — เก็บ แก้ไข/ลบ/ใส่สูตร ที่เดิมเป็นไอคอน 3 ตัวเรียงกัน */
 .card-menu { position: relative; margin-left: auto; }
 .card-menu__btn {
@@ -949,18 +1059,39 @@ td.thumb-cell { width: 46px; }
   display: inline-block; padding: 1px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 600; background: var(--bg); color: var(--muted); border: 1px solid var(--border);
 }
+/* ร้านที่ซื้อครั้งล่าสุด — โทนเดียวกับ variant-tag แต่เน้นกว่านิดเพื่อให้กวาดตาหาร้านได้ */
+.shop-tag {
+  display: inline-block; max-width: 100%; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 600;
+  background: var(--violet-soft); color: var(--violet);
+  border: 1px solid color-mix(in srgb, var(--violet) 35%, transparent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .group-tag {
   display: inline-block; padding: 1px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 600; background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .badge-out { color: var(--danger); font-size: 11px; font-weight: 600; }
+/* จะใช้หมดอีกกี่วัน — ประมาณจากอัตราการใช้ (ดู lib/usage.ts) คนละเรื่องกับวันหมดอายุ */
+.badge-runout { color: var(--violet); font-size: 11px; font-weight: 600; cursor: help; }
+/* วันหมดอายุ — เหลืองตอนใกล้หมด, แดงตอนเลยวันไปแล้ว (ดู lib/expiry.ts) */
+.badge-expiry { color: var(--low); font-size: 11px; font-weight: 600; cursor: help; }
+.badge-expiry--gone { color: var(--danger); }
+/* ซื้อบ่อย — นับจาก priceHistory ให้อัตโนมัติ (ดู FREQUENT_MIN_TIMES ใน lib/price.ts) */
+.badge-frequent { color: var(--ok); font-size: 11px; font-weight: 600; cursor: help; }
 .product-card__price-row { display: flex; align-items: baseline; gap: 8px; }
 .product-card__price { font-weight: 700; color: var(--accent); font-size: 16px; letter-spacing: -.01em; }
 .product-card__avg { font-size: 12px; color: var(--violet); font-weight: 600; }
 .product-card__price-warn { font-size: 12px; cursor: help; }
 .product-card__size { font-size: 12px; color: var(--muted); }
 .product-card__bought { font-size: 12px; color: var(--muted); margin-top: 2px; }
+/* เศษของขวดที่เปิดอยู่ — อยู่แถวล่างคู่กับ "ขั้นต่ำ" ไม่ใช่ป้ายเตือน จึงไม่ใช้สีเตือน */
+.product-card__open { font-size: 11px; font-weight: 600; color: var(--violet); }
+.product-card__location {
+  font-size: 12px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .qty-btn { border-radius: 999px; width: 26px; height: 26px; }
 
 /* จอมือถือ: การ์ดกริดกลายเป็นรายการแนวนอน — ปุ่ม −/+ อยู่ขอบขวาในระยะนิ้วโป้ง */
@@ -976,7 +1107,10 @@ td.thumb-cell { width: 46px; }
   .product-card__img-placeholder { font-size: 26px; }
   .product-card__flags { position: static; flex-wrap: wrap; }
   .product-card__flags .badge-out,
-  .product-card__flags .badge-low { padding: 1px 7px; background: var(--bg); box-shadow: none; }
+  .product-card__flags .badge-low,
+  .product-card__flags .badge-frequent,
+  .product-card__flags .badge-expiry,
+  .product-card__flags .badge-runout { padding: 1px 7px; background: var(--bg); box-shadow: none; }
   .product-card__flags .status-badge { margin-left: 0; box-shadow: none; }
   .product-card__body { padding: 0; gap: 3px; min-width: 0; justify-content: center; }
   .product-card__title { font-size: 14px; }
@@ -994,6 +1128,13 @@ td.thumb-cell { width: 46px; }
   .product-card__min { display: none; }
   .card-menu { margin-left: 0; }
   .product-card__select { top: auto; left: auto; right: 8px; bottom: 8px; }
+  .fav-btn {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    margin-left: 0; width: 26px; height: 26px; font-size: 14px;
+  }
+  /* เว้นที่ให้ดาวที่มุมขวาบน ไม่งั้นชื่อ/ป้ายสถานะแถวบนสุดจะไหลไปอยู่ใต้ปุ่ม
+     (ใช้ max-width ไม่ใช่ padding เพราะ padding ไปดัน min-content ของการ์ดให้ล้นคอลัมน์กริด) */
+  .product-card__title, .product-card__flags { max-width: calc(100% - 30px); }
   .product-group__peek-card:nth-child(2) { transform: translate(6px, 8px); }
 }
 

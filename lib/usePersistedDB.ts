@@ -99,31 +99,63 @@ export function usePersistedStockDB() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // ขอให้เบราว์เซอร์อย่าเคลียร์ OPFS/localStorage ทิ้งตอนพื้นที่ไม่พอ (fire-and-forget ไม่ต้องรอคำตอบ)
+      navigator.storage?.persist?.().catch(() => {});
+
       let loadedDb: StockDB = DEFAULT_DB;
+      let source = "";
+
       try {
+        // ตัวช้าที่วิ่งต่อหลังหมดเวลาต้องไม่ผูก handle กลับเข้ามา
+        // ไม่งั้น persist() รอบถัดไปจะเขียน db เปล่าทับไฟล์ที่มีข้อมูลจริง = ข้อมูลหายถาวร
+        let timedOut = false;
         await Promise.race([
           (async () => {
             const nav = navigator as ExperimentalNavigator;
             const root = await nav.storage.getDirectory();
             const handle = await root.getFileHandle(DB_FILENAME, { create: true });
-            opfsHandleRef.current = handle;
             const text = await (await handle.getFile()).text();
-            if (text.trim()) loadedDb = migrateDB(JSON.parse(text));
+            if (timedOut || cancelled) return;
+            opfsHandleRef.current = handle;
+            if (text.trim()) {
+              loadedDb = migrateDB(JSON.parse(text));
+              source = "ไฟล์ OPFS";
+            }
           })(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("OPFS timeout")), 2500)),
+          new Promise((_, reject) =>
+            setTimeout(() => {
+              timedOut = true;
+              reject(new Error("OPFS timeout"));
+            }, 2500)
+          ),
         ]);
-        if (!cancelled) setStatus({ type: "ok", msg: `✅ พร้อมใช้งาน (ไฟล์ OPFS) · ${loadedDb.items.length} รายการ` });
       } catch {
         opfsHandleRef.current = null;
+      }
+
+      // ไฟล์ OPFS ว่าง/อ่านไม่ได้ (เช่นโดนเคลียร์) → กู้จาก localStorage แทนที่จะเปิดมาเป็นแอปเปล่า
+      if (!source) {
         try {
           const ls = localStorage.getItem(LS_KEY);
-          if (ls) loadedDb = migrateDB(JSON.parse(ls));
-          if (!cancelled) setStatus({ type: "ok", msg: `✅ พร้อมใช้งาน (localStorage) · ${loadedDb.items.length} รายการ` });
-        } catch (e2) {
-          if (!cancelled) setStatus({ type: "err", msg: "⚠ โหลดข้อมูลไม่ได้: " + (e2 as Error).message });
+          if (ls?.trim()) {
+            loadedDb = migrateDB(JSON.parse(ls));
+            source = "localStorage";
+          }
+        } catch (e) {
+          if (!cancelled) setStatus({ type: "err", msg: "⚠ โหลดข้อมูลสำรองไม่ได้: " + (e as Error).message });
         }
       }
+
       if (!cancelled) {
+        setStatus(
+          source
+            ? { type: "ok", msg: `✅ พร้อมใช้งาน (${source}) · ${loadedDb.items.length} รายการ` }
+            : // ข้อมูลถูกผูกกับ origin (โดเมน+พอร์ต) — เปิดคนละพอร์ตจะเจอแอปเปล่า จึงต้องบอกให้ชัดว่าข้อมูลไม่ได้หาย
+              {
+                type: "ok",
+                msg: `✅ พร้อมใช้งาน — ยังไม่มีข้อมูลที่ ${location.origin} (ข้อมูลเก็บแยกตามพอร์ต ถ้าเคยใช้พอร์ตอื่นให้กลับไปเปิดพอร์ตนั้น)`,
+              }
+        );
         setDb(loadedDb);
         setLoaded(true);
       }
@@ -138,8 +170,16 @@ export function usePersistedStockDB() {
   const persistRef = useRef(persist);
   persistRef.current = persist;
 
+  // รอบแรกหลังโหลดเสร็จคือ "เขียนสิ่งที่เพิ่งอ่านมากลับที่เดิม" — ไม่มีประโยชน์
+  // แต่อันตรายมากถ้าโหลดมาไม่ครบ: แค่เปิดหน้าทิ้งไว้ก็เขียนทับของดีด้วยของเปล่า
+  const skipFirstPersistRef = useRef(true);
+
   useEffect(() => {
     if (!loaded) return;
+    if (skipFirstPersistRef.current) {
+      skipFirstPersistRef.current = false;
+      return;
+    }
     pendingRef.current = db;
     const t = setTimeout(() => {
       pendingRef.current = null;

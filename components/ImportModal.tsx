@@ -1,131 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import {
+  MERGE_FIELD_LABELS,
+  applyPriceMode,
+  isBackdated,
+  linkToExisting,
+  mergeWithinBatch,
+  newFieldValue,
+  oldFieldValue,
+  orderMetaFrom,
+  type MergeField,
+} from "@/lib/importMerge";
 import { roundBaht } from "@/lib/price";
+import { findDuplicateOrder } from "@/lib/orders";
 import { extractShopeePage } from "@/lib/shopee";
 import { STATUS_OPTIONS } from "@/lib/statusOptions";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
+import ModalShell from "@/components/ModalShell";
 import { ClearIcon, PasteIcon } from "@/components/icons";
-import type { ImportCandidate, ItemStatus, StockItem } from "@/lib/types";
+import type { ImportCandidate, ItemStatus, PurchaseOrder, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
   categories: string[];
   items: StockItem[];
+  /** ออเดอร์ที่เคยบันทึกไว้ — ใช้เตือนตอนนำเข้าหน้าเดิมซ้ำ (ค่าส่งจะถูกนับสองรอบแบบเงียบๆ) */
+  orders?: PurchaseOrder[];
   onClose: () => void;
-  onImport: (candidates: ImportCandidate[]) => void;
+  onImport: (
+    candidates: ImportCandidate[],
+    extras?: { shipping: number; discount: number; date?: string; shop?: string; note?: string }
+  ) => void;
 }
 
-type MergeField = "qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients";
-const MERGE_FIELD_LABELS: Record<MergeField, string> = {
-  qty: "จำนวน",
-  price: "ราคา",
-  img: "รูปภาพ",
-  variant: "แท็กรอง",
-  size: "ขนาด",
-  note: "หมายเหตุ",
-  status: "สถานะ",
-  ingredients: "ส่วนผสม",
-};
-
-function norm(s: string) {
-  return s.trim().toLowerCase();
-}
-
-/**
- * เช็คว่าสินค้าที่แยกได้ตรงกับสินค้าที่มีอยู่แล้วไหม (ดูจากลิงก์ก่อน ถ้าไม่มีลิงก์ค่อยดูชื่อ) — เผื่อกรณีซื้อซ้ำ
- * ต้องเช็คตัวเลือกสินค้า (variant) ด้วย ไม่งั้นสินค้าชื่อ/ลิงก์เดียวกันแต่คนละสี/ไซซ์จะถูกมองว่าซื้อซ้ำผิดๆ
- */
-function findExisting(c: ImportCandidate, items: StockItem[]): StockItem | undefined {
-  const sameVariant = (i: StockItem) => norm(i.variant || "") === norm(c.variant || "");
-  if (c.link) {
-    const byLink = items.find((i) => i.link && norm(i.link) === norm(c.link) && sameVariant(i));
-    if (byLink) return byLink;
-  }
-  return items.find((i) => norm(i.name) === norm(c.name) && sameVariant(i));
-}
-
-/** ค่าใหม่ของฟิลด์นี้จากรายการนำเข้า (เทียบกับของเดิม) ถ้ามีค่าจริงและต่างจากเดิมจึงถือเป็นฟิลด์ที่ "มีค่าใหม่" ให้เลือกอัปเดตได้ */
-function newFieldValue(field: MergeField, c: ImportCandidate, existing: StockItem): string | number | undefined {
-  if (field === "qty") return c.qty;
-  if (field === "price") return c.price;
-  if (field === "img") return c.img && c.img !== existing.img ? c.img : undefined;
-  if (field === "variant") return c.variant && c.variant !== existing.variant ? c.variant : undefined;
-  if (field === "size") return c.size && c.size !== existing.size ? c.size : undefined;
-  if (field === "note") return c.note && c.note !== existing.note ? c.note : undefined;
-  if (field === "status") return c.status && c.status !== existing.status ? c.status : undefined;
-  if (field === "ingredients") return c.ingredients && c.ingredients !== existing.ingredients ? c.ingredients : undefined;
-  return undefined;
-}
-
-/**
- * บางครั้ง Shopee แยกสินค้าเดียวกัน (ลิงก์เดียวกัน) ออกเป็นหลาย anchor ในหน้าเดียว
- * (เช่น มีทั้งเวอร์ชัน mobile/desktop ซ้อนกันในหน้าเดียว) — รวมแถวพวกนี้เป็นแถวเดียวก่อนแสดงผล
- * ต้องดูลิงก์ด้วย ไม่ใช่แค่ชื่อ+ตัวเลือกสินค้า เพราะซื้อของเดียวกันจากคนละร้านคือคนละคำสั่งซื้อ ไม่ควรรวมกันเอง
- */
-function mergeWithinBatch(list: ImportCandidate[]): ImportCandidate[] {
-  const keyOf = (c: ImportCandidate) => `${norm(c.link)}||${norm(c.name)}||${norm(c.variant || "")}`;
-  const order: string[] = [];
-  const merged = new Map<string, ImportCandidate>();
-  for (const c of list) {
-    const key = keyOf(c);
-    const existing = merged.get(key);
-    if (existing) {
-      const qty = existing.qty + c.qty;
-      const lineTotal = (existing.lineTotal ?? 0) + (c.lineTotal ?? 0) || undefined;
-      merged.set(key, {
-        ...existing,
-        qty,
-        lineTotal,
-        // รวมยอดแล้วหารใหม่ ไม่หยิบราคาเดิมมาดื้อๆ — จำนวนเปลี่ยนไปแล้วราคาต่อชิ้นต้องคิดจากยอดรวมใหม่
-        price: lineTotal != null && qty > 0 ? roundBaht(lineTotal / qty) : existing.price ?? c.price,
-        img: existing.img || c.img,
-        link: existing.link || c.link,
-      });
-    } else {
-      merged.set(key, c);
-      order.push(key);
-    }
-  }
-  return order.map((k) => merged.get(k)!);
-}
-
-/**
- * คิดช่อง `price` (ต่อชิ้น) ใหม่จากยอดรวมทั้งแถวที่แกะมาได้
- * `perUnit = false` = หน้าที่วางมาโชว์ราคาต่อชิ้นอยู่แล้ว ใช้ตัวเลขนั้นตรงๆ ไม่ต้องหาร
- */
-function applyPriceMode(list: ImportCandidate[], perUnit: boolean): ImportCandidate[] {
-  return list.map((c) =>
-    c.lineTotal == null ? c : { ...c, price: perUnit && c.qty > 0 ? roundBaht(c.lineTotal / c.qty) : c.lineTotal }
-  );
-}
-
-/** ออเดอร์ที่กำลังนำเข้าเก่ากว่าครั้งล่าสุดที่บันทึกไว้ = กำลังลงข้อมูลย้อนหลัง */
-function isBackdated(c: ImportCandidate, existing: StockItem): boolean {
-  return !!c.purchasedAt && !!existing.purchasedAt && c.purchasedAt < existing.purchasedAt;
-}
-
-function computeMergeFields(c: ImportCandidate, existing: StockItem): NonNullable<ImportCandidate["mergeFields"]> {
-  const mergeFields: NonNullable<ImportCandidate["mergeFields"]> = {};
-  (Object.keys(MERGE_FIELD_LABELS) as MergeField[]).forEach((f) => {
-    mergeFields[f] = newFieldValue(f, c, existing) !== undefined;
-  });
-  return mergeFields;
-}
-
-function oldFieldValue(field: MergeField, existing: StockItem): string | number | undefined {
-  if (field === "qty") return existing.qty;
-  if (field === "price") return existing.price;
-  if (field === "img") return existing.img;
-  if (field === "variant") return existing.variant;
-  if (field === "size") return existing.size;
-  if (field === "note") return existing.note;
-  if (field === "status") return existing.status;
-  if (field === "ingredients") return existing.ingredients;
-  return undefined;
-}
-
-export default function ImportModal({ open, categories, items, onClose, onImport }: Props) {
+export default function ImportModal({ open, categories, items, orders, onClose, onImport }: Props) {
   const [html, setHtml] = useState("");
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
   const [step, setStep] = useState<"input" | "review">("input");
@@ -133,34 +42,22 @@ export default function ImportModal({ open, categories, items, onClose, onImport
   const [pricePerUnit, setPricePerUnit] = useState(true);
   /** ยอด "รวมค่าสินค้า" ที่หน้าออเดอร์บอกไว้ — ใช้เทียบว่าแกะรายการมาครบไหม */
   const [goodsSubtotal, setGoodsSubtotal] = useState<number | undefined>(undefined);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  if (!open) return null;
+  /*
+   * ค่าส่ง/ส่วนลดของออเดอร์ — เก็บเป็น "ข้อความ" ไม่ใช่ตัวเลข เพราะช่องกรอกต้องลบให้ว่างได้
+   * (บังคับเป็น number แล้วลบเลขตัวสุดท้ายไม่ได้ มันเด้งกลับเป็น 0 ทันที)
+   */
+  const [shipping, setShipping] = useState("");
+  const [discount, setDiscount] = useState("");
+  /** ยอดชำระทั้งหมดที่หน้าออเดอร์บอก — ใช้เทียบว่าค่าส่ง/ส่วนลดที่กรอกครบหรือยัง */
+  const [grandTotal, setGrandTotal] = useState<number | undefined>(undefined);
 
   const handleParse = () => {
     const page = extractShopeePage(html);
     setGoodsSubtotal(page.goodsSubtotal);
-    const parsed = applyPriceMode(mergeWithinBatch(page.items), pricePerUnit).map((c) => {
-      const existing = findExisting(c, items);
-      if (!existing) return c;
-      // ข้อมูล Shopee ไม่มีหมวดหมู่/หมายเหตุอยู่แล้ว ถ้าเป็นการซื้อซ้ำให้ดึงค่าที่ตั้งไว้ของสินค้าเดิมมาโชว์ก่อนเลย ไม่ต้องเลือกหมวดหมู่ใหม่ทุกครั้ง
-      return {
-        ...c,
-        cats: existing.cats,
-        note: c.note || existing.note,
-        existingId: existing.id,
-        mergeExisting: true,
-        mergeFields: computeMergeFields(c, existing),
-      };
-    });
-    setCandidates(parsed);
+    setShipping(page.shipping != null ? String(page.shipping) : "");
+    setDiscount(page.discount != null ? String(page.discount) : "");
+    setGrandTotal(page.grandTotal);
+    setCandidates(linkToExisting(applyPriceMode(mergeWithinBatch(page.items), pricePerUnit), items));
     setStep("review");
   };
 
@@ -210,7 +107,30 @@ export default function ImportModal({ open, categories, items, onClose, onImport
     return { parsed, expected: goodsSubtotal, ok: Math.abs(parsed - goodsSubtotal) < 0.5 };
   })();
 
-  const orderDate = candidates.find((c) => c.purchasedAt)?.purchasedAt;
+  /** แถวที่จะนำเข้าจริง — วันที่/ร้านของออเดอร์ต้องมาจากตรงนี้ ไม่ใช่จากแถวที่ผู้ใช้ติ๊กออกไปแล้ว */
+  const chosen = candidates.filter((c) => c.include && c.name.trim());
+  const { date: orderDate, shop: orderShop } = orderMetaFrom(chosen, candidates);
+
+  const shippingNum = Math.max(0, Number(shipping) || 0);
+  const discountNum = Math.max(0, Number(discount) || 0);
+
+  /**
+   * เทียบ "ราคาสินค้า + ค่าส่ง − ส่วนลด" กับยอดชำระทั้งหมดบนหน้าออเดอร์
+   * ต่างกัน = ยังมีค่าใช้จ่ายที่แกะไม่เจอ (หรือแกะเกิน) ให้ผู้ใช้แก้ตัวเลขเองก่อนนำเข้า
+   */
+  const duplicateOrder = findDuplicateOrder(orders, {
+    date: orderDate,
+    shop: orderShop,
+    shipping: shippingNum,
+    discount: discountNum,
+  });
+
+  const payableCheck = (() => {
+    if (grandTotal == null || candidates.length === 0) return null;
+    const goods = candidates.reduce((s, c) => s + (c.price ?? 0) * c.qty, 0);
+    const computed = goods + shippingNum - discountNum;
+    return { computed, expected: grandTotal, ok: Math.abs(computed - grandTotal) < 0.5 };
+  })();
 
   const handleClose = () => {
     setHtml("");
@@ -219,6 +139,9 @@ export default function ImportModal({ open, categories, items, onClose, onImport
     setBulkCats([]);
     setPricePerUnit(true);
     setGoodsSubtotal(undefined);
+    setShipping("");
+    setDiscount("");
+    setGrandTotal(undefined);
     onClose();
   };
 
@@ -232,19 +155,17 @@ export default function ImportModal({ open, categories, items, onClose, onImport
   };
 
   const handleConfirm = () => {
-    const chosen = candidates.filter((c) => c.include && c.name.trim());
-    onImport(chosen);
+    onImport(chosen, {
+      shipping: shippingNum,
+      discount: discountNum,
+      date: orderDate,
+      shop: orderShop,
+    });
     handleClose();
   };
 
   return (
-    <div className="modal-backdrop open">
-      <div className="modal modal-wide">
-        <div className="modal-header">
-          <h2>นำเข้ารายการจาก Shopee</h2>
-          <button className="modal-close" title="ปิด" onClick={handleClose}>×</button>
-        </div>
-
+    <ModalShell open={open} title="นำเข้ารายการจาก Shopee" onClose={handleClose} wide>
         <div className="modal-body">
         {step === "input" ? (
           <>
@@ -305,6 +226,56 @@ export default function ImportModal({ open, categories, items, onClose, onImport
             {orderDate && (
               <div className="import-order-date text-xs">
                 📅 วันที่สั่งซื้อที่แกะได้: <strong>{orderDate}</strong> — จะใช้เป็นวันที่ซื้อของทุกรายการแทนวันนี้
+              </div>
+            )}
+
+            {candidates.length > 0 && (
+              <div className="import-extras">
+                <div className="import-extras__title">
+                  ค่าใช้จ่ายของออเดอร์นี้ (ไม่ได้อยู่ในราคาสินค้า)
+                  <span className="sub text-xs"> — แกะให้อัตโนมัติแบบเดาๆ ตรวจแล้วแก้ได้</span>
+                </div>
+                <div className="import-extras__row">
+                  <label>
+                    ค่าส่ง
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="฿0"
+                      value={shipping}
+                      onChange={(e) => setShipping(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    ส่วนลด/โค้ด
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="฿0"
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                    />
+                  </label>
+                </div>
+                {duplicateOrder && (shippingNum > 0 || discountNum > 0) && (
+                  <div className="import-extras__check is-warn">
+                    ⚠️ <strong>เคยบันทึกออเดอร์นี้ไว้แล้ว</strong> (วันเดียวกัน ร้านเดียวกัน ยอดเท่ากัน) —
+                    นำเข้าซ้ำจะทำให้ค่าส่ง/ส่วนลดถูกนับสองรอบ ถ้าแค่อยากลงสินค้าเพิ่ม ให้ตั้งค่าส่งกับส่วนลดเป็น 0
+                    (สินค้ายังนำเข้าได้ตามปกติ)
+                  </div>
+                )}
+                {payableCheck && (
+                  <div className={`import-extras__check ${payableCheck.ok ? "is-ok" : "is-warn"}`}>
+                    {payableCheck.ok
+                      ? `✅ ราคาสินค้า + ค่าส่ง − ส่วนลด = ฿${roundBaht(payableCheck.computed).toLocaleString("th-TH")} ตรงกับยอดชำระบนหน้าออเดอร์`
+                      : `⚠️ คิดได้ ฿${roundBaht(payableCheck.computed).toLocaleString("th-TH")} แต่หน้าออเดอร์บอกยอดชำระ ฿${roundBaht(payableCheck.expected).toLocaleString("th-TH")} — ลองแก้ค่าส่ง/ส่วนลดให้ตรง`}
+                  </div>
+                )}
+                <p className="sub text-xs" style={{ margin: "6px 0 0" }}>
+                  เงินก้อนนี้ถูกบันทึกเป็นของ<strong>ทั้งออเดอร์</strong> ไม่ได้หารลงสินค้าแต่ละชิ้น —
+                  หน้าสรุปยอดจะบวกเข้ายอดรวมกับยอดรายเดือน แต่ไม่เข้ายอดรายหมวด/รายชิ้น
+                  (กรอก 0 ทั้งคู่ = ไม่บันทึกออเดอร์)
+                </p>
               </div>
             )}
 
@@ -433,6 +404,12 @@ export default function ImportModal({ open, categories, items, onClose, onImport
                       />
                       <input
                         type="text"
+                        placeholder="ร้านค้า (ไม่บังคับ — แกะให้อัตโนมัติ)"
+                        value={c.shop || ""}
+                        onChange={(e) => updateCandidate(idx, { shop: e.target.value })}
+                      />
+                      <input
+                        type="text"
                         placeholder="หมายเหตุ (ไม่บังคับ)"
                         value={c.note || ""}
                         onChange={(e) => updateCandidate(idx, { note: e.target.value })}
@@ -484,7 +461,6 @@ export default function ImportModal({ open, categories, items, onClose, onImport
           <button className="btn-ghost" onClick={handleClose}>ยกเลิก</button>
           <button className="btn-primary" onClick={handleConfirm} disabled={step === "input"}>นำเข้ารายการที่เลือก</button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

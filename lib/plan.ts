@@ -1,5 +1,8 @@
 import { endOfMonthISO, monthISO, thaiMonthLabel } from "./date";
-import type { PlanLine, PurchasePlan, StockItem } from "./types";
+import type { PlanLine, PlanPriority, PurchasePlan, StockItem } from "./types";
+import { isFrequent } from "./price";
+import { isLow, isOutOfStock } from "./stock";
+import { daysUntilEmpty, runningOut } from "./usage";
 import { uid } from "./uid";
 
 /** ยอดของบรรทัดตาม "งบที่ตั้งไว้" = ราคาต่อชิ้น × จำนวนที่จะซื้อ */
@@ -10,6 +13,17 @@ export function lineTotal(line: PlanLine): number {
 /** ยอดที่จ่ายจริงของบรรทัด — ใช้ราคาที่จ่ายจริงถ้ากรอกไว้ ไม่งั้นถือว่าจ่ายตามงบที่ตั้ง */
 export function linePaid(line: PlanLine): number {
   return (line.paidPrice ?? line.price ?? 0) * (line.qty || 0);
+}
+
+export const PLAN_PRIORITY_LABELS: Record<PlanPriority, string> = {
+  must: "ต้องซื้อ",
+  normal: "ปกติ",
+  maybe: "ถ้ามีงบ",
+};
+
+/** ไม่ได้เลือกไว้ = ปกติ — อ่านผ่านตัวนี้เสมอ อย่าอ่าน `line.priority` ดิบๆ */
+export function priorityOf(line: PlanLine): PlanPriority {
+  return line.priority ?? "normal";
 }
 
 export interface PlanTotals {
@@ -34,6 +48,10 @@ export interface PlanTotals {
   budgetLeft: number | null;
   /** ส่วนที่คาดว่าจะเกินงบ (null ถ้าไม่ได้ตั้งงบ, 0 = ไม่เกิน) */
   overBudget: number | null;
+  /** ยังต้องจ่ายเฉพาะของที่ติด "ต้องซื้อ" = ขั้นต่ำที่ต้องมีเงินเท่าไร ตัดที่เหลือออกได้หมด */
+  mustRemaining: number;
+  /** ยังต้องจ่ายเฉพาะของที่ติด "ถ้ามีงบ" = ตัดออกก่อนเป็นอันดับแรกเมื่อเงินไม่พอ */
+  maybeRemaining: number;
 }
 
 export function planTotals(plan: PurchasePlan): PlanTotals {
@@ -43,6 +61,8 @@ export function planTotals(plan: PurchasePlan): PlanTotals {
   let qty = 0;
   let boughtQty = 0;
   let boughtLines = 0;
+  let mustRemaining = 0;
+  let maybeRemaining = 0;
 
   for (const l of plan.lines) {
     planned += lineTotal(l);
@@ -53,6 +73,9 @@ export function planTotals(plan: PurchasePlan): PlanTotals {
       boughtLines += 1;
     } else {
       remaining += lineTotal(l);
+      const p = priorityOf(l);
+      if (p === "must") mustRemaining += lineTotal(l);
+      else if (p === "maybe") maybeRemaining += lineTotal(l);
     }
   }
 
@@ -63,6 +86,8 @@ export function planTotals(plan: PurchasePlan): PlanTotals {
     planned,
     spent,
     remaining,
+    mustRemaining,
+    maybeRemaining,
     lines: plan.lines.length,
     boughtLines,
     qty,
@@ -117,15 +142,19 @@ export function emptyPlan(name = "", dueDate?: string): PurchasePlan {
 
 /**
  * สร้างบรรทัดจากสินค้าในสต็อก — ตั้งราคาจากราคาที่ซื้อครั้งล่าสุด
- * และตั้งจำนวนที่จะซื้อจากส่วนที่ขาดจุดต่ำสุด (เหลือ 1 ขั้นต่ำ 3 ⇒ ซื้อ 2) อย่างน้อย 1
+ * และตั้งจำนวนที่จะซื้อจาก `item.reorderQty` ถ้ากรอกไว้ ไม่งั้นคิดจากส่วนที่ขาดจุดต่ำสุด
+ * (เหลือ 1 ขั้นต่ำ 3 ⇒ ซื้อ 2) อย่างน้อย 1
  */
 export function planLineFromItem(item: StockItem): PlanLine {
   const short = (item.min || 0) - (item.qty || 0);
+  // "ปกติซื้อทีละเท่าไร" ที่ผู้ใช้กรอกไว้เองชนะการคำนวณจากขั้นต่ำเสมอ — ของบางอย่าง
+  // ยังไงก็ซื้อยกแพ็ค 6 ขวด ไม่ได้ซื้อทีละขวดตามส่วนที่ขาด
+  const qty = item.reorderQty && item.reorderQty > 0 ? item.reorderQty : Math.max(1, short);
   return {
     id: uid(),
     itemId: item.id,
     name: item.name,
-    qty: Math.max(1, short),
+    qty,
     price: item.price ?? 0,
     note: "",
     bought: false,
@@ -172,7 +201,7 @@ export const PLAN_PRESETS: PlanPreset[] = [
 // ─────────────────────────────────────────────────────────────
 
 /** เหตุผลที่ระบบแนะนำให้ซื้อของชิ้นนี้ */
-export type SuggestReason = "out" | "low" | "rebuy";
+export type SuggestReason = "out" | "low" | "running-out" | "rebuy" | "frequent";
 
 export interface PlanSuggestion {
   item: StockItem;
@@ -182,23 +211,29 @@ export interface PlanSuggestion {
 export const SUGGEST_LABELS: Record<SuggestReason, string> = {
   out: "ของหมด",
   low: "ใกล้หมด",
+  "running-out": "กำลังจะหมด",
   rebuy: "ทำเครื่องหมายว่าต้องซื้อซ้ำ",
+  frequent: "ซื้อบ่อย",
 };
 
 /**
- * ของที่น่าใส่ในแผน — หมด/ใกล้หมด/ติดธง "ซื้อซ้ำ" โดยตัดตัวที่อยู่ในแผนแล้วออก
- * เรียงของหมดขึ้นก่อน แล้วค่อยใกล้หมด
+ * ของที่น่าใส่ในแผน — หมด/ใกล้หมด/กำลังจะหมด/ติดธง "ซื้อซ้ำ"/ซื้อบ่อย โดยตัดตัวที่อยู่ในแผนแล้วออก
+ * เรียงของหมดขึ้นก่อน แล้วค่อยใกล้หมด ส่วน "ซื้อบ่อย" อยู่ท้ายสุดเพราะยังมีของอยู่ในสต็อก
+ * (นับจากประวัติราคาให้อัตโนมัติ ไม่ได้ติดธงเอง — ดู isFrequent ใน lib/price.ts)
  */
 export function suggestForPlan(items: StockItem[], plan: PurchasePlan): PlanSuggestion[] {
   const inPlan = new Set(plan.lines.map((l) => l.itemId).filter(Boolean));
-  const rank: Record<SuggestReason, number> = { out: 0, low: 1, rebuy: 2 };
+  const rank: Record<SuggestReason, number> = { out: 0, low: 1, "running-out": 2, rebuy: 3, frequent: 4 };
 
   return items
     .filter((i) => !inPlan.has(i.id))
     .map((i): PlanSuggestion | null => {
-      if (i.qty <= 0) return { item: i, reason: "out" };
-      if (i.min > 0 && i.qty <= i.min) return { item: i, reason: "low" };
+      if (isOutOfStock(i)) return { item: i, reason: "out" };
+      if (isLow(i)) return { item: i, reason: "low" };
+      // ยังไม่ถึงขั้นต่ำ แต่อัตราการใช้บอกว่าอีกไม่กี่วันก็หมด — จุดเดียวที่เตือนได้ "ก่อน" ของหมด
+      if (runningOut(i)) return { item: i, reason: "running-out" };
       if (i.status === "rebuy") return { item: i, reason: "rebuy" };
+      if (isFrequent(i)) return { item: i, reason: "frequent" };
       return null;
     })
     .filter((s): s is PlanSuggestion => s !== null)
@@ -216,6 +251,13 @@ export function boughtHint(line: PlanLine, item: StockItem | undefined, plan: Pu
   const since = (plan.createdAt ?? "").slice(0, 10);
   if (since && item.purchasedAt < since) return null;
   return item.purchasedAt;
+}
+
+/** คำอธิบายท้ายเหตุผลที่แนะนำ เช่น "อีกประมาณ 9 วัน" — คืน `""` ถ้าไม่มีอะไรจะเสริม */
+export function suggestDetail(s: PlanSuggestion): string {
+  if (s.reason !== "running-out") return "";
+  const left = daysUntilEmpty(s.item);
+  return left == null ? "" : `อีกประมาณ ${left} วัน`;
 }
 
 /** วันที่เริ่มต้นของแผนใหม่ที่ไม่ได้เลือกพรีเซ็ต = สิ้นเดือนนี้ */

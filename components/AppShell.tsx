@@ -21,7 +21,7 @@ const NAV = [
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { db, status } = useStockDB();
+  const { db, status, driveSync } = useStockDB();
 
   const counts: Record<string, number> = {
     "/": db.items.length,
@@ -58,7 +58,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="shell__main">{children}</main>
+      <main className="shell__main">
+        {/* ซิงก์อัตโนมัติหยุดเอง = ข้อมูลใหม่ยังไม่ขึ้น Drive ต้องเห็นทุกหน้า ไม่ใช่เฉพาะตอนเปิดหน้าตั้งค่า */}
+        {driveSync.autoPaused && (
+          <Link href="/config" className="sync-alert">
+            ⚠️ ซิงก์ขึ้น Google Drive อัตโนมัติหยุดอยู่ — แตะเพื่อดูรายละเอียดและส่งขึ้นเอง
+          </Link>
+        )}
+        {children}
+      </main>
 
       <nav className="shell__tabbar">
         {NAV.map((n) => (

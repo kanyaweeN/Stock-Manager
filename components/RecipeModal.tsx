@@ -1,11 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { amountText, baht, emptyLine, lineCost, lineFromItem, lineIssue, recipeTotals, unitCost } from "@/lib/cost";
+import ModalShell from "@/components/ModalShell";
+import StockPicker from "@/components/StockPicker";
+import {
+  fromRecipeDraft,
+  toRecipeDraft,
+  fromRecipeLineDraft,
+  toRecipeLineDraft,
+  type RecipeDraft,
+  type RecipeLineDraft,
+} from "@/lib/recipeDraft";
+import { amountText, baht, emptyLine, lineCost, lineFromItem, lineIssue, productionSummary, recipeTotals, unitCost } from "@/lib/cost";
+import { formatThaiShortDate, todayISO } from "@/lib/date";
 import { MaterialThumb } from "@/components/MaterialLabel";
 import PriceAdvisor from "@/components/PriceAdvisor";
 import { usePricingSettings } from "@/lib/usePricingSettings";
-import type { Recipe, RecipeLine, StockItem } from "@/lib/types";
+import type { ProductionRun, Recipe, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -13,213 +24,111 @@ interface Props {
   items: StockItem[];
   onClose: () => void;
   onSave: (recipe: Recipe) => void;
+  /**
+   * ประวัติการผลิต**สดจาก db** — ต้องรับแยกจาก `recipe`
+   *
+   * `recipe` เป็นสแนปช็อตที่ผู้เรียกจับไว้ตอนเปิดหน้าต่าง (และ `useEffect` ใช้มันรีเซ็ต
+   * ฟอร์ม) ถ้าอัปเดตตัวมันให้สดตาม db ทุกครั้ง ฟอร์มจะถูกรีเซ็ตทิ้งกลางคันทุกครั้งที่จดรอบ
+   * — จึงแยกเฉพาะส่วนที่ต้องสดออกมาเป็น prop ของตัวเอง
+   *
+   * `undefined` = สูตรนี้ยังไม่ถูกบันทึกลง db (สูตรใหม่ที่ยังไม่กดบันทึก) จึงยังจดรอบไม่ได้
+   */
+  runs?: ProductionRun[];
+  /**
+   * จดว่าทำสูตรนี้ไปแล้ว — แยกจาก `onSave` เพราะเขียนลง `db.recipes` ทันทีโดยไม่ต้องรอ
+   * กดบันทึกสูตร (ไม่งั้นกดจดแล้วปิดหน้าต่างไปเลย = หาย) และ**ไม่ตัดสต็อกวัตถุดิบ**
+   */
+  onLogRun?: (recipeId: string, run: { date: string; batches: number; note: string }) => void;
+  onRemoveRun?: (recipeId: string, runId: string) => void;
 }
 
-/** เก็บค่าตัวเลขเป็นสตริงระหว่างกรอก จะได้พิมพ์ "0.5" หรือลบให้ว่างได้โดยไม่โดนบังคับเป็น 0 */
-interface LineDraft {
-  id: string;
-  itemId?: string;
-  name: string;
-  buyPrice: string;
-  packAmount: string;
-  unit: string;
-  usedAmount: string;
-}
-
-interface Draft {
-  id: string;
-  name: string;
-  note: string;
-  lines: LineDraft[];
-  yieldQty: string;
-  yieldUnit: string;
-  laborCost: string;
-  otherCost: string;
-  sellPrice: string;
-}
-
-const n = (v: string) => {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : 0;
-};
-
-const toDraftLine = (l: RecipeLine): LineDraft => ({
-  id: l.id,
-  itemId: l.itemId,
-  name: l.name,
-  buyPrice: l.buyPrice ? String(l.buyPrice) : "",
-  packAmount: l.packAmount ? String(l.packAmount) : "", // 0 = ยังไม่รู้ขนาดแพ็ค ปล่อยว่างให้กรอกเอง
-  unit: l.unit,
-  usedAmount: l.usedAmount ? String(l.usedAmount) : "",
-});
-
-const toLine = (l: LineDraft): RecipeLine => ({
-  id: l.id,
-  itemId: l.itemId,
-  name: l.name.trim(),
-  buyPrice: n(l.buyPrice),
-  // ห้าม fallback เป็น 1 — ช่องว่างแปลว่า "ยังไม่รู้ขนาดแพ็ค" ถ้าหารด้วย 1 เงียบๆ ต้นทุนจะพุ่งเป็นราคาเต็มคูณจำนวนที่ใช้
-  packAmount: n(l.packAmount),
-  unit: l.unit.trim() || "ชิ้น",
-  usedAmount: n(l.usedAmount),
-});
-
-function toDraft(recipe: Recipe): Draft {
-  return {
-    id: recipe.id,
-    name: recipe.name,
-    note: recipe.note,
-    lines: recipe.lines.map(toDraftLine),
-    yieldQty: String(recipe.yieldQty || 1),
-    yieldUnit: recipe.yieldUnit || "ชิ้น",
-    laborCost: recipe.laborCost ? String(recipe.laborCost) : "",
-    otherCost: recipe.otherCost ? String(recipe.otherCost) : "",
-    sellPrice: recipe.sellPrice != null ? String(recipe.sellPrice) : "",
-  };
-}
-
-function fromDraft(d: Draft): Recipe {
-  return {
-    id: d.id,
-    name: d.name.trim(),
-    note: d.note.trim(),
-    lines: d.lines.map(toLine).filter((l) => l.name || l.usedAmount > 0),
-    yieldQty: Math.max(1, n(d.yieldQty) || 1),
-    yieldUnit: d.yieldUnit.trim() || "ชิ้น",
-    laborCost: n(d.laborCost),
-    otherCost: n(d.otherCost),
-    sellPrice: d.sellPrice.trim() ? n(d.sellPrice) : undefined,
-  };
-}
-
-export default function RecipeModal({ open, recipe, items, onClose, onSave }: Props) {
-  const [draft, setDraft] = useState<Draft | null>(null);
+export default function RecipeModal({ open, recipe, items, runs, onClose, onSave, onLogRun, onRemoveRun }: Props) {
+  const [draft, setDraft] = useState<RecipeDraft | null>(null);
   /** กำลังเลือกสินค้าจากสต็อกให้บรรทัดไหน — "new" = เพิ่มบรรทัดใหม่, null = ไม่ได้เปิดตัวเลือก */
   const [pickerFor, setPickerFor] = useState<"new" | string | null>(null);
-  const [pickQuery, setPickQuery] = useState("");
 
   useEffect(() => {
-    if (open && recipe) setDraft(toDraft(recipe));
+    if (open && recipe) setDraft(toRecipeDraft(recipe));
     setPickerFor(null);
-    setPickQuery("");
   }, [open, recipe]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
   const [pricing] = usePricingSettings();
-  const preview = useMemo(() => (draft ? fromDraft(draft) : null), [draft]);
+  const preview = useMemo(() => (draft ? fromRecipeDraft(draft) : null), [draft]);
   // ส่ง pricing เข้าไปด้วย กำไรที่โชว์จะได้หักค่าธรรมเนียมตรงกับตัวเลขในบล็อก "ควรขายเท่าไร" ข้างล่าง
   const totals = useMemo(() => (preview ? recipeTotals(preview, pricing) : null), [preview, pricing]);
 
   const itemById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const searchResults = useMemo(() => {
-    const q = pickQuery.trim().toLowerCase();
-    return [...items]
-      .filter((i) =>
-        !q ||
-        i.name.toLowerCase().includes(q) ||
-        i.cats.some((c) => c.toLowerCase().includes(q)) ||
-        (i.variant ?? "").toLowerCase().includes(q)
-      )
-      .sort((a, b) => a.name.localeCompare(b.name, "th"))
-      .slice(0, 50);
-  }, [items, pickQuery]);
+  /** จดรอบได้ก็ต่อเมื่อสูตรถูกบันทึกลง db แล้ว (ผู้เรียกส่ง `runs` มาให้) */
+  const canLogRuns = !!recipe && !!onLogRun && !!runs;
+  const production = useMemo(
+    () => (preview && runs ? productionSummary({ ...preview, runs }, pricing) : null),
+    [preview, runs, pricing]
+  );
+
+  const [runBatches, setRunBatches] = useState("1");
+
+  const handleLogRun = () => {
+    if (!recipe || !onLogRun) return;
+    const batches = Math.max(1, Math.round(Number(runBatches) || 1));
+    onLogRun(recipe.id, { date: todayISO(), batches, note: "" });
+    setRunBatches("1");
+  };
 
   if (!open || !draft || !preview || !totals) return null;
 
-  const patchLine = (id: string, patch: Partial<LineDraft>) =>
+  const patchLine = (id: string, patch: Partial<RecipeLineDraft>) =>
     setDraft({ ...draft, lines: draft.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) });
 
-  const openPicker = (target: "new" | string) => {
-    setPickerFor(target);
-    setPickQuery("");
-  };
+  const openPicker = (target: "new" | string) => setPickerFor(target);
 
   /** เลือกสินค้าจากสต็อก — ดึงชื่อ/ราคา/ขนาดบรรจุมาเติมให้ แต่คงปริมาณที่ใช้ที่กรอกไว้แล้ว */
   const pickItem = (item: StockItem) => {
     if (pickerFor === "new") {
-      setDraft({ ...draft, lines: [...draft.lines, toDraftLine(lineFromItem(item))] });
+      setDraft({ ...draft, lines: [...draft.lines, toRecipeLineDraft(lineFromItem(item))] });
     } else if (pickerFor) {
       const lineId = pickerFor;
       setDraft({
         ...draft,
         lines: draft.lines.map((l) =>
           l.id === lineId
-            ? { ...toDraftLine({ ...lineFromItem(item), id: l.id }), usedAmount: l.usedAmount }
+            ? { ...toRecipeLineDraft({ ...lineFromItem(item), id: l.id }), usedAmount: l.usedAmount }
             : l
         ),
       });
     }
     setPickerFor(null);
-    setPickQuery("");
   };
 
   const unlinkItem = (id: string) => patchLine(id, { itemId: undefined });
 
-  const addLine = () => setDraft({ ...draft, lines: [...draft.lines, toDraftLine(emptyLine())] });
+  const addLine = () => setDraft({ ...draft, lines: [...draft.lines, toRecipeLineDraft(emptyLine())] });
   const removeLine = (id: string) => setDraft({ ...draft, lines: draft.lines.filter((l) => l.id !== id) });
 
   const handleSave = () => {
     if (!draft.name.trim()) return;
-    onSave(fromDraft(draft));
+    onSave(fromRecipeDraft(draft));
   };
 
   const materialCost = totals.materialCost;
 
   const renderPicker = () => (
-    <div className="stock-picker">
-      <div className="stock-picker__head">
-        <input
-          type="text"
-          autoFocus
-          placeholder="ค้นหาชื่อสินค้าในสต็อก / หมวดหมู่..."
-          value={pickQuery}
-          onChange={(e) => setPickQuery(e.target.value)}
-        />
-        <button className="btn-ghost btn-sm" onClick={() => setPickerFor(null)}>ปิด</button>
-      </div>
-      <div className="stock-picker__list">
-        {searchResults.map((i) => (
-          <button className="stock-picker__row" key={i.id} onClick={() => pickItem(i)}>
-            {i.img ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="stock-picker__thumb" src={i.img} alt="" />
-            ) : (
-              <span className="stock-picker__thumb stock-picker__thumb--empty">📦</span>
-            )}
-            <span className="stock-picker__name">
-              {i.name}
-              {i.variant && <small> · {i.variant}</small>}
-            </span>
-            <span className="stock-picker__meta">
-              {i.price != null ? `฿${i.price}` : "ยังไม่ใส่ราคา"}
-              {i.size ? ` · ${i.size}` : ""} · เหลือ {i.qty}
-            </span>
-          </button>
-        ))}
-        {searchResults.length === 0 && (
-          <div className="empty" style={{ padding: 14, fontSize: 12 }}>
-            {items.length === 0 ? "ยังไม่มีสินค้าในสต็อก — เพิ่มสินค้าก่อน หรือกรอกวัตถุดิบเอง" : "ไม่เจอสินค้าที่ค้นหา"}
-          </div>
-        )}
-      </div>
-    </div>
+    <StockPicker
+      items={items}
+      onPick={pickItem}
+      onClose={() => setPickerFor(null)}
+      emptyStockText="ยังไม่มีสินค้าในสต็อก — เพิ่มสินค้าก่อน หรือกรอกวัตถุดิบเอง"
+      meta={(i) => (
+        <>
+          {i.price != null ? `฿${i.price}` : "ยังไม่ใส่ราคา"}
+          {i.size ? ` · ${i.size}` : ""} · เหลือ {i.qty}
+        </>
+      )}
+    />
   );
 
   return (
-    <div className="modal-backdrop open">
-      <div className="modal modal-wide">
-        <div className="modal-header">
-          <h2>{recipe?.name ? "แก้ไขสูตรต้นทุน" : "สูตรต้นทุนใหม่"}</h2>
-          <button className="modal-close" title="ปิด" onClick={onClose}>×</button>
-        </div>
-
+    <ModalShell open={open} title={recipe?.name ? "แก้ไขสูตรต้นทุน" : "สูตรต้นทุนใหม่"} onClose={onClose} wide>
         <div className="modal-body">
           <div className="field">
             <label>ชื่อสูตร / ของที่ทำ</label>
@@ -268,7 +177,7 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
 
           <div className="cost-lines">
             {draft.lines.map((l) => {
-              const line = toLine(l);
+              const line = fromRecipeLineDraft(l);
               const cost = lineCost(line);
               const issue = lineIssue(line);
               const share = materialCost > 0 ? (cost / materialCost) * 100 : 0;
@@ -469,6 +378,62 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
             )}
           </div>
 
+          {canLogRuns && (
+            <>
+              <h3 className="cost-section-title">ทำไปแล้วกี่รอบ</h3>
+              <p className="sub sub-tight text-xs">
+                จดไว้เฉยๆ ว่าทำวันไหนกี่รอบ — <b>ไม่ตัดสต็อกวัตถุดิบให้</b> (สต็อกอัปเดตทางนำเข้า Shopee ทางเดียว)
+                ต้นทุนรวมข้างล่างคิดจากราคาวัตถุดิบ<b>ปัจจุบัน</b> ไม่ใช่ราคา ณ วันที่ทำ
+              </p>
+              <div className="run-add">
+                <label className="cost-num">
+                  <span>ทำกี่รอบ</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={runBatches}
+                    onChange={(e) => setRunBatches(e.target.value)}
+                  />
+                </label>
+                <button type="button" className="btn-ghost btn-sm" onClick={handleLogRun}>
+                  ＋ บันทึกว่าทำวันนี้
+                </button>
+              </div>
+              {production && production.times > 0 && (
+                <>
+                  <div className="cost-summary">
+                    <div className="cost-summary__row">
+                      <span>ทำไปแล้ว</span>
+                      <strong>{production.batches} รอบ · ได้ {production.units} {preview.yieldUnit}</strong>
+                    </div>
+                    <div className="cost-summary__row">
+                      <span>ต้นทุนที่ลงไป (ราคาวัตถุดิบวันนี้)</span>
+                      <strong>{baht(production.cost)}</strong>
+                    </div>
+                  </div>
+                  <ul className="run-list">
+                    {[...runs!].reverse().map((r) => (
+                      <li className="run-row" key={r.id}>
+                        <span className="run-row__date">{formatThaiShortDate(r.date) || r.date || "ไม่ทราบวันที่"}</span>
+                        <span className="run-row__batches">{r.batches} รอบ</span>
+                        {onRemoveRun && (
+                          <button
+                            type="button"
+                            className="icon-btn del"
+                            title="ลบรอบนี้ออกจากประวัติ"
+                            onClick={() => onRemoveRun(recipe!.id, r.id)}
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
+          )}
+
           <h3 className="cost-section-title">ควรขายเท่าไร</h3>
           <PriceAdvisor
             cost={totals.perUnitCost}
@@ -482,7 +447,6 @@ export default function RecipeModal({ open, recipe, items, onClose, onSave }: Pr
           <button className="btn-ghost" onClick={onClose}>ยกเลิก</button>
           <button className="btn-primary" onClick={handleSave} disabled={!draft.name.trim()}>บันทึกสูตร</button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

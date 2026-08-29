@@ -5,12 +5,16 @@ import { STATUS_OPTIONS } from "@/lib/statusOptions";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import IngredientInput from "@/components/IngredientInput";
 import IngredientPanel from "@/components/IngredientPanel";
+import ModalShell from "@/components/ModalShell";
+import { fromProductForm, toProductForm, type ProductForm } from "@/lib/productForm";
 import TextField from "@/components/TextField";
 import { baht } from "@/lib/cost";
-import { todayISO } from "@/lib/date";
+import { todayISO, formatThaiShortDate } from "@/lib/date";
+import { effectiveExpiry, expiryLabel } from "@/lib/expiry";
+import { daysUntilEmpty, usageStats } from "@/lib/usage";
 import type { SkinProfile } from "@/lib/db";
 import { priceStats, pushPricePoint } from "@/lib/price";
-import type { ItemStatus, PricePoint, StockItem } from "@/lib/types";
+import type { ItemStatus, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -25,47 +29,26 @@ interface Props {
 
 const todayStr = () => todayISO();
 
-const emptyForm = {
-  name: "", cats: [] as string[], qty: 0, min: 0, price: "", buyQty: "", size: "", note: "", img: "", link: "", status: "" as ItemStatus,
-  purchasedAt: todayStr(), ingredients: "", priceHistory: [] as PricePoint[],
-};
-
 export default function ProductModal({ open, item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup }: Props) {
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<ProductForm>(() => toProductForm(null));
 
-  useEffect(() => {
-    if (item) {
-      setForm({
-        name: item.name,
-        cats: item.cats,
-        qty: item.qty,
-        min: item.min,
-        price: item.price != null ? String(item.price) : "",
-        buyQty: item.buyQty != null ? String(item.buyQty) : "",
-        size: item.size || "",
-        note: item.note,
-        img: item.img || "",
-        link: item.link || "",
-        status: item.status || "",
-        purchasedAt: item.purchasedAt || "",
-        ingredients: item.ingredients || "",
-        priceHistory: item.priceHistory || [],
-      });
-    } else {
-      setForm({ ...emptyForm, purchasedAt: todayStr() });
-    }
-  }, [item, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
+  useEffect(() => setForm(toProductForm(item)), [item, open]);
 
   const stats = priceStats(form.priceHistory);
+  // เตือนตั้งแต่ในฟอร์มว่าวันไหนคือวันที่ "ใช้จริง" — ฉลากกับ PAO มักไม่ตรงกัน (ดู lib/expiry.ts)
+  const usage = item ? usageStats(item) : null;
+  const runoutDays = item
+    ? daysUntilEmpty({
+        qty: Number(form.qty) || 0,
+        openPct: form.openPct.trim() === "" ? undefined : Number(form.openPct) || 0,
+        usageLog: item.usageLog,
+      })
+    : null;
+  const expiryPreview = effectiveExpiry({
+    expiryAt: form.expiryAt,
+    openedAt: form.openedAt,
+    paoMonths: Number(form.paoMonths) || undefined,
+  });
 
   const removePricePoint = (idx: number) => {
     setForm((f) => ({ ...f, priceHistory: f.priceHistory.filter((_, i) => i !== idx) }));
@@ -86,39 +69,12 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
   };
 
   const handleSave = () => {
-    const name = form.name.trim();
-    if (!name) return;
-    onSave(
-      {
-        name,
-        cats: form.cats,
-        qty: Math.max(0, Number(form.qty) || 0),
-        min: Math.max(0, Number(form.min) || 0),
-        price: form.price.trim() ? Math.max(0, Number(form.price) || 0) : undefined,
-        buyQty: form.buyQty.trim() ? Math.max(0, Number(form.buyQty) || 0) : undefined,
-        priceHistory: form.priceHistory,
-        // บันทึกเอง = ผู้ใช้ตรวจราคาแล้ว ปลดธง "ยังไม่ยืนยัน" ของข้อมูลเก่าทิ้ง
-        priceUnverified: undefined,
-        size: form.size.trim(),
-        note: form.note.trim(),
-        img: form.img.trim(),
-        link: form.link.trim(),
-        status: form.status,
-        purchasedAt: form.purchasedAt || undefined,
-        ingredients: form.ingredients.trim(),
-      },
-      item ? item.id : null
-    );
+    if (!form.name.trim()) return;
+    onSave(fromProductForm(form, item), item ? item.id : null);
   };
 
   return (
-    <div className="modal-backdrop open">
-      <div className="modal">
-        <div className="modal-header">
-          <h2>{item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</h2>
-          <button className="modal-close" title="ปิด" onClick={onClose}>×</button>
-        </div>
-
+    <ModalShell open={open} title={item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"} onClose={onClose}>
         <div className="modal-body">
         <TextField
           label="ชื่อสินค้า"
@@ -142,15 +98,15 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
         <TextField
           label="จำนวน"
           type="number"
-          value={String(form.qty)}
-          onChange={(v) => setForm({ ...form, qty: Number(v) || 0 })}
+          value={form.qty}
+          onChange={(v) => setForm({ ...form, qty: v })}
         />
 
         <TextField
           label="แจ้งเตือนเมื่อต่ำกว่า"
           type="number"
-          value={String(form.min)}
-          onChange={(v) => setForm({ ...form, min: Number(v) || 0 })}
+          value={form.min}
+          onChange={(v) => setForm({ ...form, min: v })}
         />
 
         <div className="field">
@@ -188,6 +144,22 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
           value={form.buyQty}
           onChange={(v) => setForm({ ...form, buyQty: v })}
         />
+
+        <div className="field">
+          <label>การใช้งาน</label>
+          {usage ? (
+            <p className="sub text-xs">
+              ใช้ไปประมาณวันละ <strong>{usage.perDay.toFixed(2)}</strong> ชิ้น (จาก {usage.used} ชิ้นใน {usage.days} วัน)
+              {runoutDays != null && <> — ของที่เหลือพอใช้อีกราว <strong>{runoutDays} วัน</strong></>}
+              {form.openPct.trim() !== "" && <> (นับเศษของขวดที่เปิดอยู่แล้ว)</>}
+            </p>
+          ) : (
+            <p className="sub text-xs">
+              ยังคำนวณไม่ได้ — ระบบจดให้อัตโนมัติทุกครั้งที่กด ＋/− บนการ์ดสินค้า
+              พอมีข้อมูลสัก 2 ครั้งห่างกันเกิน 1 สัปดาห์ จะบอกได้ว่าของจะหมดอีกกี่วัน
+            </p>
+          )}
+        </div>
 
         <div className="field">
           <label>ประวัติราคา</label>
@@ -236,6 +208,90 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
           value={form.size}
           onChange={(v) => setForm({ ...form, size: v })}
         />
+
+        <TextField
+          label="1 แพ็ค/ขวดได้ปริมาณเท่าไร"
+          type="number"
+          placeholder="ไม่บังคับ — เช่น 1000 (ถ้าไม่กรอก /cost จะเดาจากช่องขนาด)"
+          value={form.packAmount}
+          onChange={(v) => setForm({ ...form, packAmount: v })}
+        />
+
+        <TextField
+          label="หน่วย"
+          placeholder="เช่น g, ml, ชิ้น"
+          value={form.unit}
+          onChange={(v) => setForm({ ...form, unit: v })}
+        />
+
+        <TextField
+          label="ขวด/แพ็คที่เปิดอยู่ เหลือกี่ %"
+          type="number"
+          placeholder="ไม่บังคับ — ไม่กรอก = ถือว่าเต็มทุกขวด"
+          value={form.openPct}
+          onChange={(v) => setForm({ ...form, openPct: v })}
+        />
+
+        <TextField
+          label="ปกติซื้อทีละกี่ชิ้น/แพ็ค"
+          type="number"
+          placeholder="ไม่บังคับ — ใช้เติมจำนวนให้ตอนใส่ในแผนซื้อของ"
+          value={form.reorderQty}
+          onChange={(v) => setForm({ ...form, reorderQty: v })}
+        />
+
+        <TextField
+          label="เก็บไว้ตรงไหน"
+          placeholder="เช่น ลิ้นชักบน, ตู้ห้องนอน (ค้นหาเจอด้วยช่องค้นหา)"
+          value={form.location}
+          onChange={(v) => setForm({ ...form, location: v })}
+        />
+
+        <TextField
+          label="ร้านที่ซื้อ"
+          placeholder="ไม่บังคับ — นำเข้าจาก Shopee จะเติมให้เอง"
+          value={form.shop}
+          onChange={(v) => setForm({ ...form, shop: v })}
+        />
+
+        <div className="field">
+          <label>วันหมดอายุ (ตามฉลาก)</label>
+          <input
+            type="date"
+            value={form.expiryAt}
+            onChange={(e) => setForm({ ...form, expiryAt: e.target.value })}
+          />
+        </div>
+
+        <div className="field">
+          <label>วันที่เปิดใช้</label>
+          <input
+            type="date"
+            value={form.openedAt}
+            onChange={(e) => setForm({ ...form, openedAt: e.target.value })}
+          />
+        </div>
+
+        <TextField
+          label="เปิดแล้วใช้ได้กี่เดือน (PAO)"
+          type="number"
+          placeholder="ดูสัญลักษณ์กระปุกเปิดฝาข้างขวด เช่น 12M ให้ใส่ 12"
+          value={form.paoMonths}
+          onChange={(v) => setForm({ ...form, paoMonths: v })}
+        />
+
+        {expiryPreview && (
+          <div className={`expiry-note ${expiryPreview.expired ? "is-expired" : expiryPreview.soon ? "is-soon" : "is-ok"}`}>
+            <span>{expiryPreview.expired ? "⛔" : expiryPreview.soon ? "⏰" : "✅"}</span>
+            <span>
+              หมดอายุจริง <strong>{formatThaiShortDate(expiryPreview.date) || expiryPreview.date}</strong>{" "}
+              ({expiryLabel(expiryPreview)}) —{" "}
+              {expiryPreview.source === "pao"
+                ? "นับจากวันที่เปิดใช้ ซึ่งมาถึงก่อนวันบนฉลาก"
+                : "ตามวันที่บนฉลาก"}
+            </span>
+          </div>
+        )}
 
         <TextField
           label="หมายเหตุ"
@@ -292,7 +348,6 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
           <button className="btn-ghost" onClick={onClose}>ยกเลิก</button>
           <button className="btn-primary" onClick={handleSave}>บันทึก</button>
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 }

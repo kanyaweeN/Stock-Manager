@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useStockDB } from "@/lib/StockDBProvider";
 import { useGoogleSheetsSync } from "@/lib/useGoogleSheetsSync";
-import { useGoogleDriveSync } from "@/lib/useGoogleDriveSync";
+import { useProductActions } from "@/lib/useProductActions";
 import StorageTab from "@/components/config/StorageTab";
 import DriveTab from "@/components/config/DriveTab";
 import SheetsTab from "@/components/config/SheetsTab";
@@ -22,9 +22,9 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function ConfigPage() {
-  const { db, setDb, status, linkedFileName, toggleLink } = useStockDB();
-  const driveSync = useGoogleDriveSync(db, setDb);
+  const { db, setDb, status, linkedFileName, toggleLink, driveSync } = useStockDB();
   const sheetsSync = useGoogleSheetsSync(db);
+  const productActions = useProductActions(setDb);
   const [tab, setTab] = useState<Tab>("storage");
 
   const setPresets = (updater: (prev: string[]) => string[]) => {
@@ -94,7 +94,15 @@ export default function ConfigPage() {
       {tab === "categories" && (
         <CategoriesTab presets={allCategories} onAdd={addCategory} onRemove={removeCategory} onRename={renameCategory} />
       )}
-      {tab === "backup" && <BackupTab db={db} onRestore={setDb} />}
+      {tab === "backup" && (
+        <BackupTab
+          db={db}
+          onRestore={setDb}
+          onRestoreItem={productActions.restoreFromTrash}
+          onDeleteForever={productActions.deleteForever}
+          onEmptyTrash={productActions.emptyTrash}
+        />
+      )}
     </div>
   );
 }
