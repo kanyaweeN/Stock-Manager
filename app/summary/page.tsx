@@ -21,6 +21,21 @@ import {
 
 type RangeMode = "30d" | "90d" | "year" | "all" | "custom";
 
+/** แท็บของหน้าสรุป — สามตัวใน RANGE_TABS ใช้ตัวเลือก "ช่วงวันที่" ร่วมกัน state จึงอยู่ระดับหน้า ไม่หายตอนสลับแท็บ */
+type Tab = "overview" | "category" | "shop" | "item" | "month" | "orders";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "overview", label: "ภาพรวม" },
+  { id: "category", label: "ตามหมวดหมู่" },
+  { id: "shop", label: "ตามร้านค้า" },
+  { id: "item", label: "รายชิ้น" },
+  { id: "month", label: "รายเดือน" },
+  { id: "orders", label: "ค่าส่ง/ส่วนลด" },
+];
+
+/** แท็บที่คิดยอดจากช่วงวันที่ที่เลือก จึงต้องโชว์แถบเลือกช่วง + ยอดรวมของช่วงนั้นไว้ด้านบนตาราง */
+const RANGE_TABS: Tab[] = ["category", "shop", "item"];
+
 // ชุดสีจัดหมวดหมู่ (categorical) ที่ผ่านการตรวจสอบว่าแยกแยะได้ชัดทั้งคนตาปกติและตาบอดสี — ใช้ตามลำดับคงที่
 const CAT_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
 
@@ -36,6 +51,7 @@ export default function SummaryPage() {
   const { db, setDb } = useStockDB();
   const orderActions = useOrderActions(setDb);
 
+  const [tab, setTab] = useState<Tab>("overview");
   const [rangeMode, setRangeMode] = useState<RangeMode>("30d");
   const [from, setFrom] = useState(daysAgoISO(29));
   const [to, setTo] = useState(todayISO());
@@ -142,164 +158,201 @@ export default function SummaryPage() {
   return (
     <div className="page">
       <h1>📊 สรุปยอด</h1>
-      <p className="sub sub-tight text-xs">
-        ทุกยอดคิดจาก <b>ประวัติราคาทุกครั้งที่ซื้อ</b> (ราคาต่อแพ็ค × จำนวนที่ซื้อครั้งนั้น) ของที่ใช้หมดไปแล้วก็ยังนับเป็นเงินที่จ่ายในเดือนที่ซื้อ
-        — ส่วน &quot;มูลค่าของที่เหลือ&quot; เป็นคนละยอด คิดจากของที่ยังอยู่ในสต็อกตอนนี้
-      </p>
 
-      <div className="stats">
-        <div className="stat stat--blue">
-          <div className="n">{baht(overview.thisMonth)}</div>
-          <div className="l">
-            จ่ายเดือนนี้
-            {overview.momPct != null && (
-              <span className={`summary-delta ${overview.momPct >= 0 ? "is-up" : "is-down"}`}>
-                {overview.momPct >= 0 ? "▲" : "▼"} {Math.abs(overview.momPct)}%
-              </span>
+      <div className="tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`tab-btn ${tab === t.id ? "active" : ""}`}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {RANGE_TABS.includes(tab) && (
+        <>
+          <div className="toolbar">
+            <select value={rangeMode} onChange={(e) => setRangeMode(e.target.value as RangeMode)}>
+              {RANGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {rangeMode === "custom" && (
+              <>
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+                <span>ถึง</span>
+                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              </>
             )}
           </div>
-        </div>
-        <div className="stat stat--violet">
-          <div className="n">{baht(overview.avgPerMonth)}</div>
-          <div className="l">เฉลี่ยต่อเดือน{overview.monthsCounted > 0 ? ` (${overview.monthsCounted} เดือน)` : ""}</div>
-        </div>
-        <div className="stat stat--orange">
-          <div className="n">{baht(overview.thisYear)}</div>
-          <div className="l">จ่ายไปทั้งปีนี้</div>
-        </div>
-        <div className="stat stat--green">
-          <div className="n">{baht(overview.stockValue)}</div>
-          <div className="l">มูลค่าของที่เหลือ ({overview.stockQty} ชิ้น)</div>
-        </div>
-      </div>
-      {(overview.shippingTotal > 0 || overview.discountTotal > 0) && (
-        <p className="sub sub-tight text-xs">
-          รวมค่าส่ง {baht(overview.shippingTotal)} และหักส่วนลด/โค้ด {baht(overview.discountTotal)} ไว้ในยอดข้างบนแล้ว —
-          เงินก้อนนี้ผูกกับ<b>ออเดอร์</b> ไม่ใช่สินค้าชิ้นไหน จึงไม่ปรากฏในตารางแยกตามหมวดหมู่/ร้าน/รายชิ้น
-        </p>
-      )}
-
-      {insights.length > 0 && (
-        <ul className="insight-list">
-          {insights.map((ins) => (
-            <li key={ins.key} className={`insight insight--${ins.tone}`}>
-              <span className="insight__icon">{ins.tone === "warn" ? "⚠️" : ins.tone === "good" ? "✅" : "•"}</span>
-              <span>{ins.text}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <h2 className="summary-section-title">ยอดตามช่วงเวลา</h2>
-      <div className="toolbar">
-        <select value={rangeMode} onChange={(e) => setRangeMode(e.target.value as RangeMode)}>
-          {RANGE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        {rangeMode === "custom" && (
-          <>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-            <span>ถึง</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </>
-        )}
-      </div>
-      <div className="stats">
-        <div className="stat stat--blue"><div className="n">{rangeEvents.length}</div><div className="l">ครั้งที่ซื้อ</div></div>
-        <div className="stat stat--orange"><div className="n">{rangeEvents.reduce((s, e) => s + e.qty, 0)}</div><div className="l">จำนวนที่ซื้อรวม</div></div>
-        <div className="stat stat--green">
-          <div className="n">{baht(rangeTotal + rangeExtrasTotal)}</div>
-          <div className="l">จ่ายไปในช่วงนี้{rangeExtrasTotal !== 0 ? ` (ค่าสินค้า ${baht(rangeTotal)} + ค่าส่ง/ส่วนลด ${baht(rangeExtrasTotal)})` : ""}</div>
-        </div>
-        <div className="stat stat--violet">
-          <div className="n">{baht(rangeEvents.length ? rangeTotal / rangeEvents.length : 0)}</div>
-          <div className="l">เฉลี่ยต่อครั้ง</div>
-        </div>
-      </div>
-
-      <h3 className="summary-sub-title">แยกตามหมวดหมู่</h3>
-      <p className="sub sub-tight text-xs">ของที่ติดหลายหมวดถูกนับในทุกหมวด ยอดรวมของทุกแถวจึงมากกว่ายอดจริงได้</p>
-      {renderTable(catRows, "หมวดหมู่", true, true)}
-
-      <h3 className="summary-sub-title">จ่ายให้ร้านไหนมากที่สุด</h3>
-      <p className="sub sub-tight text-xs">
-        คิดจากร้านที่บันทึกไว้ในประวัติราคาแต่ละครั้ง — ครั้งที่ซื้อก่อนมีการเก็บชื่อร้านจะกองอยู่แถว &quot;ไม่ทราบร้าน&quot;
-      </p>
-      {renderTable(shopRows, "ร้านค้า", true, true)}
-
-      <h3 className="summary-sub-title">จ่ายให้ของชิ้นไหนมากที่สุด</h3>
-      {renderTable(itemRows, "สินค้า", false, true)}
-
-      <h2 className="summary-section-title">ค่าส่ง / ส่วนลด รายออเดอร์</h2>
-      <p className="sub sub-tight text-xs">
-        บันทึกให้ตอนนำเข้าจาก Shopee — แก้ตัวเลขได้ทันที (บันทึกเองอัตโนมัติ ไม่ต้องกดอะไร)
-        ถ้าเผลอนำเข้าออเดอร์เดิมซ้ำจนค่าส่งถูกนับสองรอบ ให้ลบก้อนที่เกินทิ้งที่นี่ —
-        ลบแล้ว<b>สินค้ากับประวัติราคาไม่หาย</b> หายเฉพาะเงินก้อนนี้
-      </p>
-      {orders.length === 0 ? (
-        <div className="empty">
-          ยังไม่มีออเดอร์ที่บันทึกค่าส่ง/ส่วนลดไว้ — กรอกช่อง &quot;ค่าใช้จ่ายของออเดอร์นี้&quot; ตอนนำเข้าจาก Shopee แล้วจะขึ้นที่นี่
-        </div>
-      ) : (
-        <div className="order-list">
-          {orders.map((o) => (
-            <div className="order-row" key={o.id}>
-              <input
-                type="date"
-                value={o.date}
-                onChange={(e) => orderActions.patchOrder(o.id, { date: e.target.value })}
-              />
-              <input
-                type="text"
-                placeholder="ร้านค้า"
-                value={o.shop || ""}
-                onChange={(e) => orderActions.patchOrder(o.id, { shop: e.target.value })}
-              />
-              <label className="order-row__num">
-                ค่าส่ง
-                <input
-                  type="number"
-                  min={0}
-                  value={o.shipping}
-                  onChange={(e) => orderActions.patchOrder(o.id, { shipping: Number(e.target.value) || 0 })}
-                />
-              </label>
-              <label className="order-row__num">
-                ส่วนลด
-                <input
-                  type="number"
-                  min={0}
-                  value={o.discount}
-                  onChange={(e) => orderActions.patchOrder(o.id, { discount: Number(e.target.value) || 0 })}
-                />
-              </label>
-              <span className={`order-row__net ${orderNet(o) < 0 ? "is-saving" : ""}`}>
-                {orderNet(o) >= 0 ? "+" : "−"}{baht(Math.abs(orderNet(o)))}
-              </span>
-              <button
-                type="button"
-                className="icon-btn del"
-                title="ลบค่าส่ง/ส่วนลดของออเดอร์นี้"
-                onClick={() => orderActions.removeOrder(o)}
-              >
-                🗑️
-              </button>
+          <div className="stats">
+            <div className="stat stat--blue"><div className="n">{rangeEvents.length}</div><div className="l">ครั้งที่ซื้อ</div></div>
+            <div className="stat stat--orange"><div className="n">{rangeEvents.reduce((s, e) => s + e.qty, 0)}</div><div className="l">จำนวนที่ซื้อรวม</div></div>
+            <div className="stat stat--green">
+              <div className="n">{baht(rangeTotal + rangeExtrasTotal)}</div>
+              <div className="l">จ่ายไปในช่วงนี้{rangeExtrasTotal !== 0 ? ` (ค่าสินค้า ${baht(rangeTotal)} + ค่าส่ง/ส่วนลด ${baht(rangeExtrasTotal)})` : ""}</div>
             </div>
-          ))}
-        </div>
+            <div className="stat stat--violet">
+              <div className="n">{baht(rangeEvents.length ? rangeTotal / rangeEvents.length : 0)}</div>
+              <div className="l">เฉลี่ยต่อครั้ง</div>
+            </div>
+          </div>
+        </>
       )}
 
-      <h2 className="summary-section-title">ยอดรายเดือน</h2>
-      <div className="toolbar">
-        <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-          <option value="all">ทุกปี</option>
-          {years.map((y) => (
-            <option key={y} value={y}>ปี {Number(y) + 543}</option>
-          ))}
-        </select>
-      </div>
-      {renderTable(monthRows, "เดือน", false)}
+      {tab === "overview" && (
+        <>
+          <p className="sub sub-tight text-xs">
+            ทุกยอดคิดจาก <b>ประวัติราคาทุกครั้งที่ซื้อ</b> (ราคาต่อแพ็ค × จำนวนที่ซื้อครั้งนั้น) ของที่ใช้หมดไปแล้วก็ยังนับเป็นเงินที่จ่ายในเดือนที่ซื้อ
+            — ส่วน &quot;มูลค่าของที่เหลือ&quot; เป็นคนละยอด คิดจากของที่ยังอยู่ในสต็อกตอนนี้
+          </p>
+
+          <div className="stats">
+            <div className="stat stat--blue">
+              <div className="n">{baht(overview.thisMonth)}</div>
+              <div className="l">
+                จ่ายเดือนนี้
+                {overview.momPct != null && (
+                  <span className={`summary-delta ${overview.momPct >= 0 ? "is-up" : "is-down"}`}>
+                    {overview.momPct >= 0 ? "▲" : "▼"} {Math.abs(overview.momPct)}%
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="stat stat--violet">
+              <div className="n">{baht(overview.avgPerMonth)}</div>
+              <div className="l">เฉลี่ยต่อเดือน{overview.monthsCounted > 0 ? ` (${overview.monthsCounted} เดือน)` : ""}</div>
+            </div>
+            <div className="stat stat--orange">
+              <div className="n">{baht(overview.thisYear)}</div>
+              <div className="l">จ่ายไปทั้งปีนี้</div>
+            </div>
+            <div className="stat stat--green">
+              <div className="n">{baht(overview.stockValue)}</div>
+              <div className="l">มูลค่าของที่เหลือ ({overview.stockQty} ชิ้น)</div>
+            </div>
+          </div>
+
+          {(overview.shippingTotal > 0 || overview.discountTotal > 0) && (
+            <p className="sub sub-tight text-xs">
+              รวมค่าส่ง {baht(overview.shippingTotal)} และหักส่วนลด/โค้ด {baht(overview.discountTotal)} ไว้ในยอดข้างบนแล้ว —
+              เงินก้อนนี้ผูกกับ<b>ออเดอร์</b> ไม่ใช่สินค้าชิ้นไหน จึงไม่ปรากฏในแท็บหมวดหมู่/ร้านค้า/รายชิ้น
+            </p>
+          )}
+
+          {insights.length > 0 && (
+            <ul className="insight-list">
+              {insights.map((ins) => (
+                <li key={ins.key} className={`insight insight--${ins.tone}`}>
+                  <span className="insight__icon">{ins.tone === "warn" ? "⚠️" : ins.tone === "good" ? "✅" : "•"}</span>
+                  <span>{ins.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {tab === "category" && (
+        <>
+          <p className="sub sub-tight text-xs">ของที่ติดหลายหมวดถูกนับในทุกหมวด ยอดรวมของทุกแถวจึงมากกว่ายอดจริงได้</p>
+          {renderTable(catRows, "หมวดหมู่", true, true)}
+        </>
+      )}
+
+      {tab === "shop" && (
+        <>
+          <p className="sub sub-tight text-xs">
+            คิดจากร้านที่บันทึกไว้ในประวัติราคาแต่ละครั้ง — ครั้งที่ซื้อก่อนมีการเก็บชื่อร้านจะกองอยู่แถว &quot;ไม่ทราบร้าน&quot;
+          </p>
+          {renderTable(shopRows, "ร้านค้า", true, true)}
+        </>
+      )}
+
+      {tab === "item" && (
+        <>
+          <p className="sub sub-tight text-xs">10 อันดับแรกที่จ่ายเงินไปมากที่สุดในช่วงที่เลือก</p>
+          {renderTable(itemRows, "สินค้า", false, true)}
+        </>
+      )}
+
+      {tab === "month" && (
+        <>
+          <div className="toolbar">
+            <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+              <option value="all">ทุกปี</option>
+              {years.map((y) => (
+                <option key={y} value={y}>ปี {Number(y) + 543}</option>
+              ))}
+            </select>
+          </div>
+          {renderTable(monthRows, "เดือน", false)}
+        </>
+      )}
+
+      {tab === "orders" && (
+        <>
+          <p className="sub sub-tight text-xs">
+            บันทึกให้ตอนนำเข้าจาก Shopee — แก้ตัวเลขได้ทันที (บันทึกเองอัตโนมัติ ไม่ต้องกดอะไร)
+            ถ้าเผลอนำเข้าออเดอร์เดิมซ้ำจนค่าส่งถูกนับสองรอบ ให้ลบก้อนที่เกินทิ้งที่นี่ —
+            ลบแล้ว<b>สินค้ากับประวัติราคาไม่หาย</b> หายเฉพาะเงินก้อนนี้
+          </p>
+          {orders.length === 0 ? (
+            <div className="empty">
+              ยังไม่มีออเดอร์ที่บันทึกค่าส่ง/ส่วนลดไว้ — กรอกช่อง &quot;ค่าใช้จ่ายของออเดอร์นี้&quot; ตอนนำเข้าจาก Shopee แล้วจะขึ้นที่นี่
+            </div>
+          ) : (
+            <div className="order-list">
+              {orders.map((o) => (
+                <div className="order-row" key={o.id}>
+                  <input
+                    type="date"
+                    value={o.date}
+                    onChange={(e) => orderActions.patchOrder(o.id, { date: e.target.value })}
+                  />
+                  <input
+                    type="text"
+                    placeholder="ร้านค้า"
+                    value={o.shop || ""}
+                    onChange={(e) => orderActions.patchOrder(o.id, { shop: e.target.value })}
+                  />
+                  <label className="order-row__num">
+                    ค่าส่ง
+                    <input
+                      type="number"
+                      min={0}
+                      value={o.shipping}
+                      onChange={(e) => orderActions.patchOrder(o.id, { shipping: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+                  <label className="order-row__num">
+                    ส่วนลด
+                    <input
+                      type="number"
+                      min={0}
+                      value={o.discount}
+                      onChange={(e) => orderActions.patchOrder(o.id, { discount: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+                  <span className={`order-row__net ${orderNet(o) < 0 ? "is-saving" : ""}`}>
+                    {orderNet(o) >= 0 ? "+" : "−"}{baht(Math.abs(orderNet(o)))}
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-btn del"
+                    title="ลบค่าส่ง/ส่วนลดของออเดอร์นี้"
+                    onClick={() => orderActions.removeOrder(o)}
+                  >
+                    🗑️
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

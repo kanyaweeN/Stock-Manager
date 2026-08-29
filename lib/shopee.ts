@@ -225,9 +225,10 @@ export function extractShopeePage(html: string): ShopeePageData {
         qty = parseInt(qtyMatch[1], 10);
         continue;
       }
-      const priceMatch = t.match(/^฿\s?(\d+(?:\.\d+)?)/);
+      // ต้องรับคอมมาด้วย ไม่งั้น "฿1,980" จะแกะได้แค่ "1" แล้วของแพงทุกชิ้นกลายเป็นราคา 1 บาท
+      const priceMatch = t.match(/^฿\s?([\d,]+(?:\.\d+)?)/);
       if (priceMatch) {
-        prices.push(parseFloat(priceMatch[1]));
+        prices.push(parseFloat(priceMatch[1].replace(/,/g, "")));
         continue;
       }
       if (/^\d+(\.\d+)?$/.test(t)) continue;

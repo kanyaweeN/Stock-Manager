@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { lineFromItem, parsePackSize, productionSummary, recipeTotals } from "@/lib/cost";
+import {
+  bahtPerUnit,
+  lineFromItem,
+  parsePackSize,
+  perUnitPrice,
+  productionSummary,
+  recipeTotals,
+  totalPieces,
+} from "@/lib/cost";
 import { priceForMargin, roundPrice } from "@/lib/pricing";
 import type { PricingSettings, Recipe, StockItem } from "@/lib/types";
 
@@ -105,5 +113,79 @@ describe("pricing — คิดราคาขาย", () => {
     expect(roundPrice(101, "10")).toBe(110);
     expect(roundPrice(101, "9")).toBeGreaterThanOrEqual(101);
     expect(roundPrice(101, "none")).toBe(101);
+  });
+});
+
+describe("perUnitPrice", () => {
+  it("ของที่ขายเป็นแพ็ค หารราคาต่อแพ็คด้วยจำนวนชิ้นในแพ็ค", () => {
+    expect(perUnitPrice(item({ price: 90, packAmount: 100, unit: "ชิ้น" }))).toEqual({
+      amount: 100,
+      unit: "ชิ้น",
+      perUnit: 0.9,
+    });
+  });
+
+  it("ไม่ได้กรอก packAmount ก็เดาจากช่องขนาด — แต่ค่าที่กรอกเองมาก่อนเสมอ", () => {
+    expect(perUnitPrice(item({ price: 90, size: "1000 g" }))).toEqual({ amount: 1000, unit: "g", perUnit: 0.09 });
+    expect(perUnitPrice(item({ price: 90, size: "1000 g", packAmount: 250, unit: "ml" }))).toMatchObject({
+      amount: 250,
+      perUnit: 0.36,
+    });
+  });
+
+  it("ไม่รู้ขนาดบรรจุ = คืน null ไม่เดาว่าแพ็คละ 1", () => {
+    expect(perUnitPrice(item({ price: 90, size: "ขวดกลาง" }))).toBeNull();
+  });
+
+  it("แพ็คละ 1 หน่วย/ของนับชิ้น คืน null — ราคาต่อหน่วยเท่ากับราคาที่โชว์อยู่แล้ว", () => {
+    expect(perUnitPrice(item({ price: 90 }))).toBeNull();
+    expect(perUnitPrice(item({ price: 90, packAmount: 1, unit: "ชิ้น" }))).toBeNull();
+  });
+
+  it("ยังไม่ได้กรอกราคา = null แต่ราคา 0 (ของแถม) คิดได้ตามปกติ", () => {
+    expect(perUnitPrice(item({ packAmount: 100 }))).toBeNull();
+    expect(perUnitPrice(item({ price: 0, packAmount: 100 }))).toMatchObject({ perUnit: 0 });
+  });
+});
+
+describe("totalPieces", () => {
+  it("qty นับเป็นแพ็ค — คูณขนาดบรรจุออกมาเป็นจำนวนชิ้นจริง", () => {
+    expect(totalPieces(item({ qty: 2, packAmount: 50, unit: "ชิ้น" }))).toMatchObject({
+      pieces: 100,
+      packs: 2,
+      amount: 50,
+      unit: "ชิ้น",
+    });
+  });
+
+  it("เดาขนาดบรรจุจากช่องขนาดได้เหมือน perUnitPrice", () => {
+    expect(totalPieces(item({ qty: 3, size: "10 ชิ้น" }))).toMatchObject({ pieces: 30, unit: "ชิ้น" });
+  });
+
+  it("นับเศษของแพ็คที่เปิดอยู่ด้วย", () => {
+    expect(totalPieces(item({ qty: 2, openPct: 50, packAmount: 10, unit: "ชิ้น" }))).toMatchObject({ pieces: 15 });
+  });
+
+  it("หน่วยเป็นน้ำหนัก/ปริมาตร = null — 'รวม 2,000 g' ไม่ใช่คำตอบของ 'มีกี่ชิ้น'", () => {
+    expect(totalPieces(item({ qty: 2, packAmount: 1000, unit: "g" }))).toBeNull();
+    expect(totalPieces(item({ qty: 2, size: "500ml" }))).toBeNull();
+  });
+
+  it("ไม่รู้ขนาดบรรจุ/แพ็คละ 1 = null ไม่โชว์ตัวเลขซ้ำกับจำนวนแพ็ค", () => {
+    expect(totalPieces(item({ qty: 2 }))).toBeNull();
+    expect(totalPieces(item({ qty: 2, size: "ขวดกลาง" }))).toBeNull();
+    expect(totalPieces(item({ qty: 2, packAmount: 1, unit: "ชิ้น" }))).toBeNull();
+  });
+
+  it("ของหมดแล้ว = null", () => {
+    expect(totalPieces(item({ qty: 0, packAmount: 50, unit: "ชิ้น" }))).toBeNull();
+  });
+});
+
+describe("bahtPerUnit", () => {
+  it("ต่ำกว่าสตางค์ต้องไม่กลายเป็น ฿0 (อ่านแล้วนึกว่าฟรี)", () => {
+    expect(bahtPerUnit(90 / 30000)).toContain("0.003");
+    expect(bahtPerUnit(0.9)).toBe("฿0.9");
+    expect(bahtPerUnit(0)).toBe("฿0");
   });
 });

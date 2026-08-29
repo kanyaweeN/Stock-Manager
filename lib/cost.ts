@@ -1,5 +1,6 @@
 import type { PricingSettings, Recipe, RecipeLine, StockItem } from "./types";
 import { priceOutcome } from "./pricing";
+import { remainingUnits } from "./stock";
 import { uid } from "./uid";
 
 /**
@@ -115,6 +116,15 @@ export function baht(n: number): string {
   return `฿${rounded.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
 }
 
+/**
+ * เงินต่อ 1 หน่วยย่อย — ปัดแค่ 2 ตำแหน่งไม่พอ เพราะของที่บรรจุเยอะจะได้ "฿0"
+ * ที่อ่านแล้วเข้าใจผิดว่าฟรี (฿90 ÷ 30,000 g = ฿0.003) ต่ำกว่าสตางค์เมื่อไรจึงโชว์เป็นเลขนัยสำคัญแทน
+ */
+export function bahtPerUnit(n: number): string {
+  if (n > 0 && n < 0.01) return `฿${n.toLocaleString("th-TH", { maximumSignificantDigits: 2 })}`;
+  return baht(n);
+}
+
 // ─────────────────────────────────────────────────────────────
 // แกะขนาดบรรจุจากข้อความ `item.size`
 // ─────────────────────────────────────────────────────────────
@@ -181,6 +191,74 @@ export function parsePackSize(size?: string): { amount: number; unit: string } |
   return found;
 }
 
+export interface PackSize {
+  /** 1 แพ็คได้กี่หน่วยย่อย */
+  amount: number;
+  /** หน่วยย่อย เช่น g, ml, ชิ้น */
+  unit: string;
+}
+
+type PackSource = Pick<StockItem, "packAmount" | "unit" | "size">;
+
+/**
+ * ขนาดบรรจุของสินค้า 1 แพ็ค — ค่าที่กรอกเอง (`packAmount`/`unit`) มาก่อนการเดาจากข้อความ `size` เสมอ
+ * คืน null = **ยังไม่รู้** ไม่ใช่ "แพ็คละ 1" — ตัวหารที่เดาผิดทำให้ต้นทุน/ราคาต่อหน่วยเพี้ยนแบบเงียบๆ
+ */
+export function packOf(item: PackSource): PackSize | null {
+  if (item.packAmount && item.packAmount > 0) {
+    return { amount: item.packAmount, unit: item.unit?.trim() || "ชิ้น" };
+  }
+  return parsePackSize(item.size);
+}
+
+export interface PerUnitPrice extends PackSize {
+  /** ราคาต่อ 1 หน่วยย่อย (ถุงซิปแพ็ค 100 ชิ้น ราคา ฿90 ⇒ ฿0.9 ต่อชิ้น) */
+  perUnit: number;
+}
+
+/**
+ * ราคาต่อ "ชิ้นย่อย" ของสินค้าในสต็อก
+ *
+ * `item.price` เป็นราคา **ต่อ 1 แพ็ค** เสมอ (เหมือนที่ `qty` นับเป็นแพ็ค) ของที่ 1 แพ็คมีหลายชิ้น
+ * จึงเอาราคาบนการ์ดไปเทียบร้านที่ขายแยกชิ้นไม่ได้ ต้องหารด้วยขนาดบรรจุก่อน
+ *
+ * คืน null เมื่อไม่รู้ขนาดบรรจุ หรือแพ็คละ 1 หน่วย (ราคาต่อหน่วย = ราคาที่โชว์อยู่แล้ว ไม่ต้องโชว์ซ้ำ)
+ */
+export function perUnitPrice(item: PackSource & Pick<StockItem, "price">): PerUnitPrice | null {
+  if (item.price == null || !Number.isFinite(item.price)) return null;
+  const pack = packOf(item);
+  if (!pack || pack.amount <= 1) return null;
+  return { ...pack, perUnit: item.price / pack.amount };
+}
+
+export interface PieceCount extends PackSize {
+  /** เหลือกี่ชิ้นย่อยจริงๆ — รวมเศษของแพ็คที่เปิดอยู่แล้ว (`amount` คือชิ้นย่อยต่อ 1 แพ็ค) */
+  pieces: number;
+  /** เหลือกี่แพ็ค (= `remainingUnits`) — เก็บไว้ให้ UI อธิบายที่มาของตัวเลขได้โดยไม่ต้องคิดซ้ำ */
+  packs: number;
+}
+
+/**
+ * "ของชิ้นนี้เหลือกี่ชิ้น" — `qty` นับเป็น**แพ็ค** กล่องละ 50 ชิ้นเหลือ 2 กล่องคือ 100 ชิ้น
+ * ซึ่งเป็นตัวเลขที่ผู้ใช้อยากรู้จริงๆ เวลาถามว่า "ของเหลือพอไหม"
+ *
+ * คืน null = **ตอบไม่ได้/ไม่ต้องตอบ** ห้ามเดาเป็น `qty`:
+ * - ไม่รู้ขนาดบรรจุ (ไม่ได้กรอก `packAmount` และเดาจาก `size` ไม่ออก)
+ * - แพ็คละ 1 หน่วย — จำนวนชิ้น = จำนวนแพ็คอยู่แล้ว โชว์ซ้ำเปล่าๆ
+ * - หน่วยย่อยเป็นน้ำหนัก/ปริมาตร (g, ml) — "รวม 2,000 g" ไม่ใช่คำตอบของ "มีกี่ชิ้น"
+ * - ของหมด (เหลือ 0 แพ็ค) — 0 ชิ้นก็คือ 0 ที่โชว์อยู่แล้ว
+ */
+export function totalPieces(
+  item: PackSource & Pick<StockItem, "qty" | "openPct">,
+): PieceCount | null {
+  const pack = packOf(item);
+  if (!pack || pack.amount <= 1) return null;
+  if (!COUNT_UNITS.has(unitKey(pack.unit))) return null;
+  const packs = remainingUnits(item);
+  if (packs <= 0) return null;
+  return { ...pack, packs, pieces: packs * pack.amount };
+}
+
 /**
  * สร้างบรรทัดวัตถุดิบจากสินค้าในสต็อก — ดึงราคา/ขนาดบรรจุมาให้อัตโนมัติ
  *
@@ -192,9 +270,7 @@ export function parsePackSize(size?: string): { amount: number; unit: string } |
  * ไม่ตั้งเป็น 1 เงียบๆ เพราะจะกลายเป็น "ใช้ 50 g = จ่ายราคาเต็ม 50 แพ็ค"
  */
 export function lineFromItem(item: StockItem): RecipeLine {
-  const pack = item.packAmount && item.packAmount > 0
-    ? { amount: item.packAmount, unit: item.unit?.trim() || "ชิ้น" }
-    : parsePackSize(item.size);
+  const pack = packOf(item);
   const countable = !item.packAmount && !item.size?.trim(); // ไม่ได้ระบุขนาดไว้เลย = ของนับเป็นชิ้น
   return {
     id: uid(),

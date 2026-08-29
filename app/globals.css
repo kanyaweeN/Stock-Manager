@@ -1,4 +1,7 @@
 :root {
+  /* บอกเบราว์เซอร์ว่าธีมไหน — ช่องติ๊ก/สกรอลล์บาร์ที่เบราว์เซอร์วาดเองจะได้เข้าชุดกัน
+     (ไม่ใส่แล้วช่องติ๊กในโหมดมืดเป็นสี่เหลี่ยมขาวโพลนกลางพื้นดำ) */
+  color-scheme: light;
   --bg: #f4f5f7;
   --panel: #ffffff;
   --card: #ffffff;
@@ -27,6 +30,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --bg: #0f1216;
     --panel: #171b21;
     --card: #1b1f26;
@@ -146,6 +150,16 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
 .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
 
 /* ── แถบบนหน้าสินค้า — components/Toolbar.tsx ── */
+/* ตรึงแถบบน+ตัวกรองไว้บนสุด — ช่องค้นหากับเมนู ⋯ (เลือกหลายรายการ/ส่งออก)
+   ต้องกดได้จากทุกจุดของหน้า ไม่ใช่เลื่อนกลับขึ้นไปบนสุดก่อ· margin ลบบนคือกิน padding ของ
+   .shell__main กลับมาเป็น padding ของตัวเอง พื้นหลังจะได้ทึบถึงขอบบนจริง ไม่งั้นการ์ดจะไหลผ่านช่องว่างให้เห็น */
+.toolbar-sticky {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--bg);
+  margin: -22px 0 16px; padding-top: 22px;
+}
+.toolbar-sticky .filterbar { margin-bottom: 0; }
+
 .topbar {
   display: flex; align-items: center; gap: 10px;
   margin-bottom: 14px; flex-wrap: wrap;
@@ -248,6 +262,16 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
 .fab { display: none; }
 @media (max-width: 860px) {
   .topbar__title { font-size: 18px; }
+  /* จอเล็ก — ตรึงแค่แถบบน (ค้นหา+เมนู ⋯) ปล่อยแถวตัวกรองเลื่อนหายไป ไม่งั้นกินจอเกินครึ่ง */
+  /* `display: contents` ละกล่องครอบทิ้ง — จำเป็น เพราะ sticky ติดอยู่ในกรอบของพ่อได้เท่านั้น
+     ถ้าครอบยังอยู่ .topbar จะเลื่อนหายไปพร้อมตัวกรอง ไม่ตรึงจริง */
+  .toolbar-sticky { display: contents; }
+  .toolbar-sticky .filterbar { margin-bottom: 16px; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg);
+    margin: -14px 0 14px; padding: 14px 0 8px;
+  }
   .topbar__add, .topbar__import { display: none; }
   .fab {
     position: fixed; right: 16px; z-index: 25;
@@ -295,10 +319,11 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
   list-style: none;
   display: flex;
   align-items: center;
+  gap: 6px;
   background: var(--card);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 9px 12px;
   font-size: 14px;
   cursor: pointer;
@@ -311,6 +336,21 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.cat-multiselect__label.is-empty { color: var(--muted); }
+/* ในฟอร์ม (โมดัล) ให้กว้างเต็มช่องเหมือน input ตัวอื่น — ไม่ใช่กล่องแคบๆ ลอยอยู่กลางแถว
+   ส่วนบนแถบตัวกรองยังคุมความกว้างด้วย max-width เหมือนเดิม */
+.field .cat-multiselect { width: 100%; }
+.field .cat-multiselect > summary { width: 100%; max-width: none; }
+/* เลือกหลายอันแล้วโชว์ชื่อแรก + ป้ายนับที่เหลือ — ต่อชื่อยาวๆ แล้วโดนตัดกลางคำอ่านไม่รู้เรื่อง */
+.cat-multiselect__count {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
 }
 .cat-multiselect > summary::-webkit-details-marker { display: none; }
 .cat-multiselect > summary::after {
@@ -341,92 +381,208 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-left: 6px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   color: var(--muted);
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
 }
-.cat-multiselect__x:hover { background: var(--bg); color: var(--text); }
+.cat-multiselect__x:hover { background: var(--danger-soft); color: var(--danger); }
 .cat-multiselect__panel {
   position: fixed;
   z-index: 1000;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px;
-  min-width: 200px;
-  max-height: 260px;
-  overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  max-height: 55vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+  animation: cat-multiselect-pop .12s ease-out;
 }
-.cat-multiselect__option {
+/* รายการกินพื้นที่ที่เหลือทั้งหมดแล้วสกรอลล์ในตัว — แถบท้าย (เพิ่ม/ล้าง) ค้างอยู่กับที่ */
+.cat-multiselect__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* กันหน้าข้างหลังเลื่อนตามตอนสกรอลล์จนสุดในแผง */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  padding: 6px;
+}
+@keyframes cat-multiselect-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+.cat-multiselect__list::-webkit-scrollbar { width: 10px; }
+.cat-multiselect__list::-webkit-scrollbar-track { background: transparent; }
+.cat-multiselect__list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid var(--card);
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+.cat-multiselect__panel .cat-multiselect__option {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border-radius: 6px;
+  gap: 11px;
+  /* ตั้งทับ `.field label` ที่บังคับ block/ตัวเล็ก/สีจาง ให้แถวในแผงเหมือนกันทุกที่ */
+  color: var(--text);
+  margin-bottom: 0;
+  padding: 9px 10px;
+  border-radius: 9px;
   font-size: 14px;
+  line-height: 1.35;
   cursor: pointer;
+  transition: background .12s, color .12s;
 }
-.cat-multiselect__option:hover { background: var(--bg); }
-.cat-multiselect__option--top {
-  cursor: default;
+/* ช่องติ๊กวาดเอง — ของเดิมเป็นช่องติ๊กของเบราว์เซอร์ที่หน้าตาต่างกันทุกเครื่อง
+   และไม่มีสถานะ "ติ๊กบางส่วน" (indeterminate) ที่หมวดหลักต้องใช้บอกว่ามีซับหมวดถูกเลือกอยู่ */
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  margin: 0; padding: 0;
+  border: 2px solid var(--border-strong);
+  border-radius: 4px;
+  background: transparent no-repeat center / 13px;
+  cursor: pointer;
+  transition: background-color .13s, border-color .13s, box-shadow .13s;
 }
-.cat-multiselect__option--top label {
-  display: flex; align-items: center; gap: 8px;
+.cat-multiselect__panel .cat-multiselect__option:hover input[type="checkbox"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:checked,
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:indeterminate {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+}
+/* ติ๊กบางส่วน = ขีดกลาง (ลูกบางตัวถูกเลือก แต่ยังไม่ครบ) */
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round'%3E%3Cline x1='6' y1='12' x2='18' y2='12'/%3E%3C/svg%3E");
+}
+.cat-multiselect__panel .cat-multiselect__option:hover { background: var(--bg); }
+/* ติ๊กแล้วให้เห็นทั้งแถบ ไม่ใช่เห็นแค่ช่องติ๊กเล็กๆ */
+.cat-multiselect__panel .cat-multiselect__option:has(input:checked) {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+/* คอลัมน์ลูกศรกาง/พับชิดกับช่องติ๊ก — เว้นห่างแล้วมันดูเป็นสองคอลัมน์ที่ไม่เกี่ยวกัน */
+.cat-multiselect__panel .cat-multiselect__option--top { cursor: default; gap: 6px; padding-left: 6px; }
+.cat-multiselect__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cat-multiselect__panel .cat-multiselect__option--top label {
+  display: flex; align-items: center; gap: 11px;
   cursor: pointer; flex: 1; min-width: 0;
 }
-.cat-multiselect__option--sub { padding-left: 56px; }
-.cat-multiselect__group { margin-bottom: 2px; }
+/* ซับหมวดหมู่ใช้เส้นแนวตั้งบอกว่าอยู่ใต้หมวดไหน แทนการเว้นวรรคลึกๆ ที่ดูลอย */
+.cat-multiselect__group {
+  margin: 2px 0 4px 19px;
+  padding-left: 9px;
+  border-left: 1.5px solid var(--border);
+}
+.cat-multiselect__panel .cat-multiselect__option--sub { padding-left: 10px; font-size: 13.5px; }
 .cat-multiselect__expand {
   flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; padding: 0;
+  width: 18px; height: 18px; padding: 0;
   background: none; border: none; cursor: pointer;
-  color: var(--muted); font-size: 12px;
+  color: var(--muted); font-size: 11px;
   border-radius: 999px;
+  transition: background .12s, color .12s;
 }
 .cat-multiselect__expand:hover { background: var(--bg); color: var(--text); }
-.cat-multiselect__expand-spacer { display: inline-block; width: 20px; flex-shrink: 0; }
-.cat-multiselect__new {
+.cat-multiselect__expand-spacer { display: inline-block; width: 18px; flex-shrink: 0; }
+/* แถบท้ายแผง — เดิมฟอร์มเพิ่มหมวดหมู่กางค้างอยู่บนสุดตลอด กินที่ไปเกือบครึ่งแผง
+   ทั้งที่นานๆ ใช้ที ตอนนี้พับไว้ท้ายแผง กดแล้วค่อยกาง */
+.cat-multiselect__foot {
+  flex-shrink: 0;
   padding: 6px;
-  margin-bottom: 4px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+.cat-multiselect__foot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cat-multiselect__create-toggle {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+}
+.cat-multiselect__create-toggle:hover { background: var(--accent-soft); }
+.cat-multiselect__new {
+  padding: 2px 2px 8px;
+  margin-bottom: 6px;
   border-bottom: 1px solid var(--border);
 }
 .cat-multiselect__new-row {
   display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 .cat-multiselect__new-row input {
   flex: 1;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 7px 10px;
   font-size: 13px;
+  background: var(--bg);
+  border-radius: 8px;
 }
 .cat-multiselect__add-btn {
   width: 100%;
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
   background: var(--accent);
   color: #fff;
+  cursor: pointer;
+  transition: background .12s;
 }
+.cat-multiselect__add-btn:hover { background: var(--accent-dark); }
 .cat-multiselect__clear {
-  display: block;
-  width: 100%;
-  text-align: left;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--accent);
-  font-size: 13px;
   padding: 6px 8px;
-  margin-bottom: 4px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
   cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cat-multiselect__clear:hover { background: var(--danger-soft); color: var(--danger); }
+.cat-multiselect__empty {
+  padding: 14px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
 }
 input, select, textarea {
   background: var(--card);
@@ -571,7 +727,7 @@ td.actions { text-align: right; white-space: nowrap; width: 160px; }
 
 .modal-backdrop {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
-  align-items: center; justify-content: center; z-index: 10;
+  align-items: center; justify-content: center; z-index: 50;
 }
 .modal-backdrop.open { display: flex; }
 .modal {
@@ -653,6 +809,39 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .price-history__price { color: var(--text); font-weight: 600; }
 .price-history__total { color: var(--muted); white-space: nowrap; }
 .field { margin-bottom: 12px; }
+
+/* สองช่องต่อแถวสำหรับช่องสั้นๆ ที่เป็นคู่กัน (จำนวน/ขั้นต่ำ, ราคา/วันที่ซื้อ) — ฟอร์มสินค้าจะได้ไม่ยาวเป็นหางว่าว */
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.field-row > .field { min-width: 0; }
+/* ช่องคู่มีที่แคบ — เหลือแค่ปุ่มล้าง (คัดลอก/วางแทบไม่ได้ใช้กับตัวเลขและวันที่) ไม่งั้นเลขที่พิมพ์จะโดนปุ่มเบียดจนอ่านไม่ออก */
+.field-row .field-actions__btn:nth-child(-n+2) { display: none; }
+.field-row .field-with-actions__input { padding-right: 34px !important; }
+
+.form-hint { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
+
+/* กลุ่มช่องกรอกแบบพับได้ใน ProductModal */
+.form-section { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; background: var(--bg); }
+.form-section > summary {
+  display: flex; align-items: center; gap: 8px; justify-content: space-between;
+  padding: 10px 12px; cursor: pointer; list-style: none;
+  font-size: 13px; font-weight: 600; border-radius: 10px;
+}
+.form-section > summary::-webkit-details-marker { display: none; }
+.form-section > summary::after {
+  content: "⌄"; flex-shrink: 0; color: var(--muted); font-size: 14px; line-height: 1;
+  transition: transform .15s;
+}
+.form-section[open] > summary::after { transform: rotate(180deg); }
+.form-section:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.form-section[open] { background: var(--card); }
+.form-section[open] > summary { border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0; }
+.form-section__title { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.form-section__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+.form-section__hint {
+  flex: 1; min-width: 0; text-align: right; font-weight: 400; font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.form-section__body { padding: 12px 12px 2px; }
 .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .field input, .field select, .field textarea { width: 100%; }
 .tab-panel .toolbar input { width: auto; flex: 1; min-width: 0; }
@@ -907,27 +1096,13 @@ td.thumb-cell { width: 46px; }
 .product-group .product-card { box-shadow: none; }
 .product-group .product-card:hover { box-shadow: none; transform: none; }
 
-/* collapsed "deck of cards" peek — same footprint as a regular card, extra cards peek out behind */
+/* กลุ่มที่ยุบอยู่ = การ์ดตัวแทนใบเดียว ขนาดเท่าการ์ดปกติเป๊ะ (เดิมซ้อนใบที่สองเหลื่อมออกมา
+   ด้วย position:absolute + translate ซึ่งล้นออกนอกช่องกริดไปทับการ์ดข้างๆ) — จำนวนรายการบอกที่ป้ายพอ */
 .product-group__peek {
   position: relative;
   cursor: pointer;
 }
-.product-group__peek-card {
-  position: relative;
-}
-.product-group__peek-card:not(:first-child) {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 100%;
-  pointer-events: none;
-  z-index: -1;
-}
-.product-group__peek-card:nth-child(2) {
-  transform: translate(10px, 12px);
-  filter: brightness(0.95);
-}
-.product-group__peek-card .product-card { box-shadow: 0 6px 16px rgba(0, 0, 0, .12); }
-.product-group__peek--selected .product-group__peek-card:first-child .product-card {
+.product-group__peek--selected .product-card {
   border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent);
 }
 
@@ -1067,6 +1242,10 @@ td.thumb-cell { width: 46px; }
   border: 1px solid color-mix(in srgb, var(--violet) 35%, transparent);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* กดได้ = กรองเฉพาะร้านนั้น (ดู ProductGrid.onFilterShop) — หน้าตาเหมือน .shop-tag ทุกอย่าง ต่างแค่รับคลิก */
+.shop-tag--btn { cursor: pointer; font-family: inherit; line-height: inherit; }
+.shop-tag--btn:hover { background: var(--violet); color: #fff; }
+.shop-tag--btn.is-active { background: var(--violet); color: #fff; border-color: var(--violet); }
 .group-tag {
   display: inline-block; padding: 1px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 600; background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -1085,9 +1264,13 @@ td.thumb-cell { width: 46px; }
 .product-card__avg { font-size: 12px; color: var(--violet); font-weight: 600; }
 .product-card__price-warn { font-size: 12px; cursor: help; }
 .product-card__size { font-size: 12px; color: var(--muted); }
+/* ราคาต่อชิ้นย่อยของของที่ขายเป็นแพ็ค — สีอ่อนกว่าราคาจริงที่จ่ายต่อแพ็ค */
+.product-card__per-unit { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .product-card__bought { font-size: 12px; color: var(--muted); margin-top: 2px; }
 /* เศษของขวดที่เปิดอยู่ — อยู่แถวล่างคู่กับ "ขั้นต่ำ" ไม่ใช่ป้ายเตือน จึงไม่ใช้สีเตือน */
 .product-card__open { font-size: 11px; font-weight: 600; color: var(--violet); }
+/* "รวมกี่ชิ้น" ของของที่ขายยกแพ็ค — อยู่ติดปุ่ม −/+ เพราะขยายความตัวเลขจำนวนแพ็คที่อยู่ข้างๆ */
+.product-card__pieces { font-size: 11px; font-weight: 600; color: var(--accent); white-space: nowrap; }
 .product-card__location {
   font-size: 12px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1135,7 +1318,6 @@ td.thumb-cell { width: 46px; }
   /* เว้นที่ให้ดาวที่มุมขวาบน ไม่งั้นชื่อ/ป้ายสถานะแถวบนสุดจะไหลไปอยู่ใต้ปุ่ม
      (ใช้ max-width ไม่ใช่ padding เพราะ padding ไปดัน min-content ของการ์ดให้ล้นคอลัมน์กริด) */
   .product-card__title, .product-card__flags { max-width: calc(100% - 30px); }
-  .product-group__peek-card:nth-child(2) { transform: translate(6px, 8px); }
 }
 
 /* ── วิเคราะห์ส่วนผสม (INCI) ─────────────────────────────── */

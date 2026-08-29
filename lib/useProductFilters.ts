@@ -6,6 +6,7 @@ import { itemTags, TAG_PRIORITY, type IngredientTag } from "./ingredients";
 import { buyTimes, isFrequent } from "./price";
 import { effectiveExpiry, needsAttention } from "./expiry";
 import { isLow, isOutOfStock } from "./stock";
+import { normalizeShopName, shopKey } from "./orders";
 
 export type SortKey =
   | "bought-desc" | "bought-asc"
@@ -58,6 +59,8 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
   const [filterTag, setFilterTag] = useState<IngredientTag | "">("");
   /** true = เอาเฉพาะตัวที่ "ไม่มี" แท็กนั้น (เช่น อยากได้ตัวที่ไม่มีน้ำหอม) */
   const [excludeTag, setExcludeTag] = useState(false);
+  /** ร้านที่เลือกกรองอยู่ — เก็บเป็น `shopKey` ไม่ใช่ชื่อที่โชว์ (ดู lib/orders.ts) */
+  const [filterShop, setFilterShop] = useState("");
 
   // แท็กส่วนผสมของแต่ละสินค้า — แยก memo ไว้เพราะ parse ลิสต์ INCI หนักกว่าการกรองอย่างอื่นมาก
   const tagsByItem = useMemo(() => {
@@ -75,6 +78,31 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
   );
 
   const withIngredientsCount = useMemo(() => tagsByItem.size, [tagsByItem]);
+
+  /**
+   * ร้านที่เคยซื้อทั้งหมด (นับจำนวน "สินค้า" ที่เคยซื้อจากร้านนั้น ไม่ใช่จำนวนครั้ง)
+   *
+   * รวมทั้ง `item.shop` (ร้านครั้งล่าสุด) และทุกจุดใน `priceHistory` — ของที่เคยซื้อจากร้านนี้
+   * เมื่อปีที่แล้วแล้วรอบล่าสุดไปซื้อร้านอื่น ก็ยังต้องหาเจอด้วยตัวกรองนี้
+   * จัดกลุ่มด้วย `shopKey` (ตัดช่องว่างทิ้งหมด) ไม่ใช่ชื่อที่โชว์ ไม่งั้น "ร้านเอ" กับ "ร้าน เอ" แตกเป็นสองตัวเลือก
+   */
+  const availableShops = useMemo(() => {
+    const found = new Map<string, { key: string; label: string; count: number }>();
+    for (const i of items) {
+      // นับสินค้าชิ้นหนึ่งให้ร้านหนึ่งได้แค่ครั้งเดียว แม้จะซื้อจากร้านนั้นมาหลายรอบ
+      const labelByKey = new Map<string, string>();
+      for (const raw of [i.shop, ...(i.priceHistory ?? []).map((p) => p.shop)]) {
+        const key = shopKey(raw);
+        if (key && !labelByKey.has(key)) labelByKey.set(key, normalizeShopName(raw));
+      }
+      for (const [key, label] of labelByKey) {
+        const cur = found.get(key);
+        if (cur) cur.count += 1;
+        else found.set(key, { key, label, count: 1 });
+      }
+    }
+    return [...found.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "th"));
+  }, [items]);
 
   /**
    * ตัวเรียงลำดับที่ต้องใช้ตำแหน่งใน `db.items` มา tie-break
@@ -139,6 +167,11 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
       const has = tagsByItem.get(i.id)?.includes(filterTag) ?? false;
       return excludeTag ? !has : has;
     };
+    const matchShop = (i: StockItem) => {
+      if (!filterShop) return true;
+      if (shopKey(i.shop) === filterShop) return true;
+      return (i.priceHistory ?? []).some((p) => shopKey(p.shop) === filterShop);
+    };
     const matchStock = (i: StockItem) => {
       switch (stockTab) {
         case "in-stock": return !isOutOfStock(i);
@@ -162,10 +195,11 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
           (i.shop || "").toLowerCase().includes(q)) &&
         (uncategorizedOnly ? i.cats.length === 0 : filterCats.length === 0 || i.cats.some((c) => filterCats.includes(c))) &&
         matchStock(i) &&
-        matchTag(i)
+        matchTag(i) &&
+        matchShop(i)
       )
       .sort(sorters[sortKey]);
-  }, [items, search, filterCats, uncategorizedOnly, stockTab, sortKey, filterTag, excludeTag, tagsByItem, sorters]);
+  }, [items, search, filterCats, uncategorizedOnly, stockTab, sortKey, filterTag, excludeTag, filterShop, tagsByItem, sorters]);
 
   const outOfStockCount = useMemo(() => items.filter(isOutOfStock).length, [items]);
   const lowCount = useMemo(() => items.filter(isLow).length, [items]);
@@ -178,6 +212,19 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
     () => new Set(items.filter((i) => i.groupId).map((i) => i.groupId)).size,
     [items]
   );
+
+  /** ชื่อร้านที่กำลังกรองอยู่ (ไว้โชว์บนแถบตัวกรอง) — key ที่เก็บไว้เป็น shopKey ที่อ่านไม่รู้เรื่อง */
+  const filterShopLabel = useMemo(
+    () => availableShops.find((s) => s.key === filterShop)?.label ?? "",
+    [availableShops, filterShop]
+  );
+
+  /** กดแท็กร้านบนการ์ด — ร้านเดิมที่กรองอยู่แล้วให้กดซ้ำเพื่อเลิกกรอง */
+  const toggleShopFilter = (shop: string | undefined) => {
+    const key = shopKey(shop);
+    if (!key) return;
+    setFilterShop((prev) => (prev === key ? "" : key));
+  };
 
   const setFilterCatsExclusive = (cats: string[]) => {
     if (cats.length > 0) setUncategorizedOnly(false);
@@ -199,6 +246,7 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
     stockTab, setStockTab,
     filterTag, setFilterTag,
     excludeTag, setExcludeTag,
+    filterShop, setFilterShop, filterShopLabel, toggleShopFilter,
     availableTags, withIngredientsCount,
     categorySuggestions, filtered,
     outOfStockCount, lowCount, totalUnits, uncategorizedCount, groupedCount, favCount, frequentCount, expiringCount,

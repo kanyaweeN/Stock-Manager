@@ -38,6 +38,10 @@ interface Props {
   onFilterTag: (v: IngredientTag | "") => void;
   excludeTag: boolean;
   onExcludeTag: (v: boolean) => void;
+  /** ร้านที่กรองอยู่ — ตั้งค่าด้วยการกดแท็ก 🏪 บนการ์ดสินค้า ที่นี่แค่โชว์ให้เห็นว่ากรองค้างอยู่ + กดปิด */
+  filterShop: string;
+  filterShopLabel: string;
+  onClearShop: () => void;
   onClearFilters: () => void;
   onAdd: () => void;
   onNewRecipe: () => void;
@@ -66,94 +70,109 @@ export default function Toolbar(p: Props) {
 
   const run = (fn: () => void) => () => { setMenuOpen(false); fn(); };
 
-  const activeFilters = p.filterCats.length + (p.filterTag ? 1 : 0) + (p.search.trim() ? 1 : 0);
+  const activeFilters =
+    p.filterCats.length + (p.filterTag ? 1 : 0) + (p.filterShop ? 1 : 0) + (p.search.trim() ? 1 : 0);
 
   return (
     <>
-      <div className="topbar">
-        <h1 className="topbar__title">{p.title}</h1>
+      {/* ตรึงแถบบน+ตัวกรองไว้บนสุดตอนเลื่อน — ช่องค้นหากับเมนู ⋯ (เลือกหลายรายการ/ส่งออก)
+          จะได้กดได้จากทุกจุดของหน้า ไม่ต้องเลื่อนกลับขึ้นไปบนสุดก่อน */}
+      <div className="toolbar-sticky">
+        <div className="topbar">
+          <h1 className="topbar__title">{p.title}</h1>
 
-        <div className="topbar__search">
-          <span className="topbar__search-icon" aria-hidden>🔍</span>
-          <input
-            id="search"
-            type="text"
-            placeholder="ค้นหาชื่อสินค้า / ส่วนผสม..."
-            value={p.search}
-            onChange={(e) => p.onSearch(e.target.value)}
-          />
-          {p.search && (
-            <button className="topbar__search-clear" title="ล้างคำค้น" onClick={() => p.onSearch("")}>×</button>
-          )}
+          <div className="topbar__search">
+            <span className="topbar__search-icon" aria-hidden>🔍</span>
+            <input
+              id="search"
+              type="text"
+              placeholder="ค้นหาชื่อสินค้า / ส่วนผสม..."
+              value={p.search}
+              onChange={(e) => p.onSearch(e.target.value)}
+            />
+            {p.search && (
+              <button className="topbar__search-clear" title="ล้างคำค้น" onClick={() => p.onSearch("")}>×</button>
+            )}
+          </div>
+
+          {/* นำเข้าจาก Shopee เป็นทางหลักที่ของเข้าสต็อก เลยเป็นปุ่มหลัก ส่วนกรอกเองเป็นปุ่มรอง */}
+          <button className="btn-primary topbar__import" onClick={p.onImport}>📥 นำเข้า Shopee</button>
+          <button className="btn-ghost topbar__add" onClick={p.onAdd}>＋ เพิ่มเอง</button>
+
+          <div className="menu" ref={menuRef}>
+            <button
+              className={`btn-ghost menu__btn ${menuOpen ? "is-open" : ""}`}
+              title="เพิ่มเติม"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="menu__panel">
+                <button className="menu__item" onClick={run(p.onExport)}><i>📤</i> ส่งออก CSV</button>
+                <button className="menu__item" onClick={run(p.onNewRecipe)}><i>🧮</i> สร้างสูตรต้นทุนใหม่</button>
+                <div className="menu__sep" />
+                <button className="menu__item" onClick={run(p.onToggleSelectMode)}>
+                  <i>☑️</i> {p.selectMode ? "ออกจากโหมดเลือก" : "เลือกหลายรายการ"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* นำเข้าจาก Shopee เป็นทางหลักที่ของเข้าสต็อก เลยเป็นปุ่มหลัก ส่วนกรอกเองเป็นปุ่มรอง */}
-        <button className="btn-primary topbar__import" onClick={p.onImport}>📥 นำเข้า Shopee</button>
-        <button className="btn-ghost topbar__add" onClick={p.onAdd}>＋ เพิ่มเอง</button>
+        <div className="filterbar">
+          <CategoryMultiSelect categories={p.categories} selected={p.filterCats} onChange={p.onFilterCats} />
 
-        <div className="menu" ref={menuRef}>
-          <button
-            className={`btn-ghost menu__btn ${menuOpen ? "is-open" : ""}`}
-            title="เพิ่มเติม"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            ⋯
-          </button>
-          {menuOpen && (
-            <div className="menu__panel">
-              <button className="menu__item" onClick={run(p.onExport)}><i>📤</i> ส่งออก CSV</button>
-              <button className="menu__item" onClick={run(p.onNewRecipe)}><i>🧮</i> สร้างสูตรต้นทุนใหม่</button>
-              <div className="menu__sep" />
-              <button className="menu__item" onClick={run(p.onToggleSelectMode)}>
-                <i>☑️</i> {p.selectMode ? "ออกจากโหมดเลือก" : "เลือกหลายรายการ"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="filterbar">
-        <CategoryMultiSelect categories={p.categories} selected={p.filterCats} onChange={p.onFilterCats} />
-
-        <select
-          className="filterbar__sort"
-          value={p.sortKey}
-          onChange={(e) => p.onSortKey(e.target.value as SortKey)}
-          title="เรียงลำดับ"
-        >
-          {(Object.entries(SORT_LABELS) as [SortKey, string][]).map(([k, v]) => (
-            <option key={k} value={k}>↓↑ {v}</option>
-          ))}
-        </select>
-
-        {p.availableTags.length > 0 && (
           <select
-            className={p.filterTag ? "is-active" : ""}
-            value={p.filterTag}
-            onChange={(e) => p.onFilterTag(e.target.value as IngredientTag | "")}
-            title={`กรองด้วยส่วนผสม — มีข้อมูล ${p.withIngredientsCount} รายการ`}
+            className="filterbar__sort"
+            value={p.sortKey}
+            onChange={(e) => p.onSortKey(e.target.value as SortKey)}
+            title="เรียงลำดับ"
           >
-            <option value="">🧪 ส่วนผสมทั้งหมด</option>
-            {p.availableTags.map((t) => (
-              <option key={t} value={t}>{TAG_META[t].emoji} {TAG_META[t].label}</option>
+            {(Object.entries(SORT_LABELS) as [SortKey, string][]).map(([k, v]) => (
+              <option key={k} value={k}>↓↑ {v}</option>
             ))}
           </select>
-        )}
 
-        {p.filterTag && (
-          <button
-            className={`chip-toggle ${p.excludeTag ? "is-active" : ""}`}
-            onClick={() => p.onExcludeTag(!p.excludeTag)}
-            title="เอาเฉพาะรายการที่ไม่มีส่วนผสมกลุ่มนี้"
-          >
-            {p.excludeTag ? "✓ " : ""}กลับด้าน
-          </button>
-        )}
+          {p.availableTags.length > 0 && (
+            <select
+              className={p.filterTag ? "is-active" : ""}
+              value={p.filterTag}
+              onChange={(e) => p.onFilterTag(e.target.value as IngredientTag | "")}
+              title={`กรองด้วยส่วนผสม — มีข้อมูล ${p.withIngredientsCount} รายการ`}
+            >
+              <option value="">🧪 ส่วนผสมทั้งหมด</option>
+              {p.availableTags.map((t) => (
+                <option key={t} value={t}>{TAG_META[t].emoji} {TAG_META[t].label}</option>
+              ))}
+            </select>
+          )}
 
-        {activeFilters > 0 && (
-          <button className="filterbar__clear" onClick={p.onClearFilters}>ล้างตัวกรอง ({activeFilters})</button>
-        )}
+          {p.filterTag && (
+            <button
+              className={`chip-toggle ${p.excludeTag ? "is-active" : ""}`}
+              onClick={() => p.onExcludeTag(!p.excludeTag)}
+              title="เอาเฉพาะรายการที่ไม่มีส่วนผสมกลุ่มนี้"
+            >
+              {p.excludeTag ? "✓ " : ""}กลับด้าน
+            </button>
+          )}
+
+          {p.filterShop && (
+            <button
+              className="chip-toggle is-active"
+              onClick={p.onClearShop}
+              title="เลิกกรองร้านนี้ (หรือกดแท็ก 🏪 บนการ์ดซ้ำก็ได้)"
+            >
+              🏪 {p.filterShopLabel || "ร้านที่เลือก"} ×
+            </button>
+          )}
+
+          {activeFilters > 0 && (
+            <button className="filterbar__clear" onClick={p.onClearFilters}>ล้างตัวกรอง ({activeFilters})</button>
+          )}
+        </div>
       </div>
 
       {/* มือถือ: ปุ่มลอยสองชั้น — ตัวล่างเด่นคือนำเข้า Shopee ตัวเล็กด้านบนคือกรอกเอง */}

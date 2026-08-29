@@ -33,6 +33,7 @@ export default function Home() {
     stockTab, setStockTab,
     filterTag, setFilterTag,
     excludeTag, setExcludeTag,
+    filterShop, setFilterShop, filterShopLabel, toggleShopFilter,
     availableTags, withIngredientsCount,
     categorySuggestions, filtered,
     outOfStockCount, lowCount, totalUnits, uncategorizedCount, groupedCount, favCount, frequentCount, expiringCount,
@@ -165,6 +166,7 @@ export default function Home() {
     setFilterCats([]);
     setFilterTag("");
     setExcludeTag(false);
+    setFilterShop("");
   };
 
   return (
@@ -184,6 +186,9 @@ export default function Home() {
         onFilterTag={setFilterTag}
         excludeTag={excludeTag}
         onExcludeTag={setExcludeTag}
+        filterShop={filterShop}
+        filterShopLabel={filterShopLabel}
+        onClearShop={() => setFilterShop("")}
         onClearFilters={clearFilters}
         onAdd={openAdd}
         onNewRecipe={() => setRecipeDraft(emptyRecipe())}
@@ -241,6 +246,8 @@ export default function Home() {
         onToggleFav={actions.toggleFav}
         onAddToRecipe={(item) => openAddToRecipe([item])}
         onAddToPlan={(item) => openAddToPlan([item])}
+        onFilterShop={toggleShopFilter}
+        activeShopKey={filterShop}
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}

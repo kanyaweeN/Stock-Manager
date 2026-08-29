@@ -10,6 +10,8 @@ import { effectiveExpiry, expiryLabel, type ExpiryInfo } from "@/lib/expiry";
 import { isLow, isOutOfStock } from "@/lib/stock";
 import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/usage";
 import { buyTimes, priceStats, FREQUENT_MIN_TIMES } from "@/lib/price";
+import { shopKey } from "@/lib/orders";
+import { amountText, bahtPerUnit, perUnitPrice, totalPieces, type PerUnitPrice, type PieceCount } from "@/lib/cost";
 import type { SkinProfile } from "@/lib/db";
 
 /** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
@@ -29,6 +31,10 @@ interface Props {
   onAddToRecipe?: (item: StockItem) => void;
   /** จดสินค้าชิ้นนี้ไว้ในแผนซื้อของ (ดู lib/plan.ts) */
   onAddToPlan?: (item: StockItem) => void;
+  /** กดแท็ก 🏪 บนการ์ดแล้วกรองเฉพาะร้านนั้น (ไม่ส่งมา = แท็กเป็นข้อความเฉยๆ เหมือนเดิม) */
+  onFilterShop?: (shop: string) => void;
+  /** `shopKey` ของร้านที่กรองอยู่ — ไว้ไฮไลต์แท็กที่กำลังกรอง */
+  activeShopKey?: string;
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
@@ -55,7 +61,7 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   /** id ของการ์ดที่เปิดเมนู ⋯ อยู่ (เปิดได้ทีละใบ) */
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -115,6 +121,32 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
   }, [items]);
 
   /**
+   * ราคาต่อชิ้นย่อยของของที่ขายเป็นแพ็ค — ราคาตัวใหญ่บนการ์ดเป็นราคาต่อ 1 แพ็ค (ดู lib/cost.ts)
+   * คิดล่วงหน้าเหมือนกัน เพราะ `perUnitPrice` ต้องแกะข้อความ `size` ด้วย regex เมื่อไม่ได้กรอกขนาดแพ็คไว้
+   */
+  const perUnitById = useMemo(() => {
+    const map = new Map<string, PerUnitPrice>();
+    for (const i of items) {
+      const pu = perUnitPrice(i);
+      if (pu) map.set(i.id, pu);
+    }
+    return map;
+  }, [items]);
+
+  /**
+   * "เหลือกี่ชิ้น" ของของที่ขายยกแพ็ค — ตัวเลขข้างปุ่ม −/+ นับเป็นแพ็ค (ดู lib/stock.ts)
+   * คิดล่วงหน้าด้วยเหตุผลเดียวกับ `perUnitById`: ต้องแกะข้อความ `size` เมื่อไม่ได้กรอกขนาดแพ็คไว้
+   */
+  const piecesById = useMemo(() => {
+    const map = new Map<string, PieceCount>();
+    for (const i of items) {
+      const pc = totalPieces(i);
+      if (pc) map.set(i.id, pc);
+    }
+    return map;
+  }, [items]);
+
+  /**
    * วันหมดอายุที่ใช้จริงของแต่ละใบ — เก็บเฉพาะตัวที่ต้องเตือน (หมดแล้ว/ใกล้หมด)
    * ของที่ยังอีกนานไม่ต้องมีป้าย ไม่งั้นการ์ดเต็มไปด้วยป้ายที่ไม่ต้องทำอะไร
    */
@@ -153,6 +185,8 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
     const avg = buy?.avg;
     const frequent = (buy?.times ?? 0) >= FREQUENT_MIN_TIMES;
     const boughtLabel = formatThaiShortDate(i.purchasedAt);
+    const perUnit = perUnitById.get(i.id);
+    const pieces = piecesById.get(i.id);
     const exp = expiryById.get(i.id);
     const runout = runoutById.get(i.id);
     return (
@@ -227,7 +261,18 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
           {(i.source === "shopee" || i.variant || i.shop) && (
             <div className="product-card__tags">
               {i.source === "shopee" && <span className="source-tag">Shopee</span>}
-              {i.shop && <span className="shop-tag" title="ร้านที่ซื้อครั้งล่าสุด">🏪 {i.shop}</span>}
+              {i.shop && (onFilterShop ? (
+                <button
+                  type="button"
+                  className={`shop-tag shop-tag--btn ${activeShopKey && shopKey(i.shop) === activeShopKey ? "is-active" : ""}`}
+                  title={`ดูเฉพาะของจากร้าน ${i.shop} (กดซ้ำเพื่อเลิกกรอง)`}
+                  onClick={(e) => { e.stopPropagation(); onFilterShop(i.shop!); }}
+                >
+                  🏪 {i.shop}
+                </button>
+              ) : (
+                <span className="shop-tag" title="ร้านที่ซื้อครั้งล่าสุด">🏪 {i.shop}</span>
+              ))}
               {i.variant && <span className="variant-tag">{i.variant}</span>}
             </div>
           )}
@@ -258,6 +303,14 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
             {i.priceUnverified && (
               <span className="product-card__price-warn" title="ราคานี้อาจเป็นยอดรวมทั้งแถวจากการนำเข้าเวอร์ชันเก่า — เปิดแก้ไขเพื่อตรวจสอบ">⚠️</span>
             )}
+            {perUnit && (
+              <span
+                className="product-card__per-unit"
+                title={`฿${i.price?.toLocaleString("th-TH")} ÷ ${amountText(perUnit.amount)} ${perUnit.unit} ต่อ 1 แพ็ค`}
+              >
+                = {bahtPerUnit(perUnit.perUnit)}/{perUnit.unit}
+              </span>
+            )}
             {avg && <span className="product-card__avg" title={avg.title}>{avg.text}</span>}
             {i.size && <span className="product-card__size">ขนาด {i.size}</span>}
           </div>
@@ -282,6 +335,15 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               <span> {i.qty} </span>
               <button className="qty-btn" onClick={() => onInc(i.id)}>+</button>
             </div>
+            {/* ตัวเลขข้างปุ่ม −/+ นับเป็นแพ็ค — ของที่แพ็คละหลายชิ้นจึงบอก "รวมกี่ชิ้น" ต่อท้ายให้ */}
+            {pieces && (
+              <span
+                className="product-card__pieces"
+                title={`${amountText(pieces.packs)} แพ็ค × ${amountText(pieces.amount)} ${pieces.unit} ต่อแพ็ค`}
+              >
+                = {amountText(pieces.pieces)} {pieces.unit}
+              </span>
+            )}
             {/* ตอนใกล้หมดมีป้าย "ใกล้หมด · ขั้นต่ำ n" อยู่แล้ว ไม่ต้องบอกซ้ำ */}
             {i.openPct != null && i.qty > 0 && (
               <span className="product-card__open" title="ขวด/แพ็คที่เปิดอยู่เหลืออยู่เท่าไร">
@@ -383,11 +445,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
                   onClick={(e) => e.stopPropagation()}
                 />
               )}
-              {cluster.slice(0, 2).map((i, idx) => (
-                <div className="product-group__peek-card" key={i.id} style={{ zIndex: 2 - idx }}>
-                  {renderCard(i, true)}
-                </div>
-              ))}
+              {renderCard(cluster[0], true)}
             </div>
           </div>
         );
