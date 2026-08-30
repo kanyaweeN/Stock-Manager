@@ -1,0 +1,156 @@
+/* นำเข้าออเดอร์ · แถบคำสั่งโหมดเลือกหลายรายการ · ถังขยะ · ประวัติการผลิต · ออเดอร์ · แถบเตือนซิงก์ */
+
+.modal-wide { max-width: 760px; }
+/* เลือกร้านที่จะนำเข้า — โครงหน้าเว็บกับป้ายยอดเงินของแต่ละร้านคนละแบบ ต้องบอกก่อนแกะ */
+.import-sites { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.import-site {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  font-size: 13px; font-weight: 600;
+}
+.import-site:hover { border-color: var(--accent); color: var(--text); }
+.import-site.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.import-textarea {
+  width: 100%; min-height: 120px; resize: vertical; font-family: monospace; font-size: 12px;
+}
+.modal-actions-inline { margin-top: 0; margin-bottom: 12px; justify-content: flex-start; }
+.select-action-bar {
+  position: fixed;
+  left: calc(50% + var(--side-w) / 2);
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: calc(100% - var(--side-w) - 52px);
+  max-width: 1080px;
+  z-index: 26;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: var(--shadow-2);
+  font-size: 14px; font-weight: 600;
+}
+@media (max-width: 860px) {
+  .select-action-bar {
+    left: 50%;
+    width: calc(100% - 24px);
+    bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom, 0px));
+    font-size: 13px;
+  }
+  .select-action-bar button { padding: 8px 12px; font-size: 13px; }
+}
+.import-bulk-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; margin-bottom: 12px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; color: var(--muted);
+}
+.dup-backdated {
+  margin: 6px 0 2px; padding: 6px 8px; border-radius: 6px;
+  background: var(--low-bg); color: var(--low); line-height: 1.45;
+}
+
+/* เทียบยอดที่แกะได้กับ "รวมค่าสินค้า" บนหน้าออเดอร์ — จับเคสแถวหล่นหาย */
+.import-total-check {
+  padding: 8px 12px; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; line-height: 1.5;
+}
+.import-total-check.is-ok { background: var(--ok-soft); color: var(--ok); }
+.import-total-check.is-warn { background: var(--low-bg); color: var(--low); }
+.import-total-check .sub { color: inherit; opacity: .85; }
+.import-order-date {
+  padding: 0 2px; margin-bottom: 10px; color: var(--muted);
+}
+
+/* กล่องสรุปวันหมดอายุ "ที่ใช้จริง" ใต้ช่องกรอกในหน้าแก้ไขสินค้า */
+.expiry-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  font-size: 12.5px; line-height: 1.45;
+}
+.expiry-note.is-ok { background: var(--ok-soft); color: var(--ok); }
+.expiry-note.is-soon { background: var(--low-bg); color: var(--low); }
+.expiry-note.is-expired { background: var(--danger-soft); color: var(--danger); }
+
+/* ถังขยะในหน้าตั้งค่า */
+.trash-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.trash-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+}
+.trash-row__name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-row__meta { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* ประวัติการผลิตในหน้าสูตรต้นทุน */
+.run-add { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 10px; }
+.run-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.run-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 10px; background: var(--bg); border-radius: 8px; font-size: 12.5px;
+}
+.run-row__date { color: var(--muted); }
+.run-row__batches { font-weight: 600; }
+.run-row .icon-btn { margin-left: auto; }
+
+/* ความสำคัญของบรรทัดในแผน — แถบซ้ายบางๆ พอให้กวาดตาเห็นว่าตัดอะไรออกได้ */
+.plan-line--must { border-left: 3px solid var(--danger); }
+.plan-line--maybe { border-left: 3px solid var(--border-strong); opacity: .85; }
+
+/* รายการออเดอร์ (ค่าส่ง/ส่วนลด) ที่แก้/ลบได้ในหน้าสรุปยอด */
+.order-list { display: flex; flex-direction: column; gap: 8px; }
+.order-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+}
+.order-row input[type="text"] { flex: 1 1 140px; min-width: 0; }
+.order-row__num {
+  display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.order-row__num input { width: 84px; }
+.order-row__net { margin-left: auto; font-weight: 700; color: var(--low); white-space: nowrap; }
+.order-row__net.is-saving { color: var(--ok); }
+
+@media (max-width: 640px) {
+  .order-row__net { margin-left: 0; }
+}
+
+/* ค่าส่ง/ส่วนลดของออเดอร์ในหน้านำเข้า */
+.import-extras {
+  padding: 10px 12px; margin-bottom: 12px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+}
+.import-extras__title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.import-extras__row { display: flex; flex-wrap: wrap; gap: 12px; }
+.import-extras__row label {
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted);
+}
+.import-extras__row input { width: 110px; }
+.import-extras__check {
+  margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12.5px; line-height: 1.45;
+}
+.import-extras__check.is-ok { background: var(--ok-soft); color: var(--ok); }
+.import-extras__check.is-warn { background: var(--low-bg); color: var(--low); }
+.import-price-mode {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; margin-bottom: 12px;
+  background: var(--accent-soft); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; line-height: 1.45; cursor: pointer;
+}
+.import-price-mode input { margin-top: 3px; flex-shrink: 0; }
+.import-price-total { color: var(--muted); white-space: nowrap; }
+
+/* แถวติ๊กถูกพร้อมคำอธิบาย (เช่น เปิด/ปิดซิงก์อัตโนมัติในหน้าตั้งค่า) */
+.check-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 13px; line-height: 1.45; cursor: pointer;
+}
+.check-row input { margin-top: 3px; flex-shrink: 0; }
+
+/* แถบเตือนบนสุดของทุกหน้า — ใช้ตอนซิงก์ขึ้น Drive หยุดเอง ข้อมูลใหม่จึงยังไม่มีสำเนาบนคลาวด์ */
+.sync-alert {
+  display: block; margin-bottom: 14px; padding: 9px 13px;
+  background: var(--low-bg); border: 1px solid var(--low); border-radius: 10px;
+  color: var(--low); font-size: 13px; font-weight: 600; text-decoration: none;
+}
+.sync-alert:hover { filter: brightness(1.05); }
+.import-list-wrap { max-height: 340px; overflow: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.img-preview { max-width: 100%; max-height: 120px; border-radius: 8px; border: 1px solid var(--border); }

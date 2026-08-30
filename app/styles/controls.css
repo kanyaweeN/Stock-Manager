@@ -1,0 +1,336 @@
+/* ตัวควบคุมฟอร์มที่ใช้ทั้งแอป: CategoryMultiSelect · input/select/textarea · ปุ่ม */
+
+.cat-multiselect { position: relative; }
+.cat-multiselect > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 140px;
+  max-width: 260px;
+  user-select: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+.cat-multiselect__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cat-multiselect__label.is-empty { color: var(--muted); }
+/* ในฟอร์ม (โมดัล) ให้กว้างเต็มช่องเหมือน input ตัวอื่น — ไม่ใช่กล่องแคบๆ ลอยอยู่กลางแถว
+   ส่วนบนแถบตัวกรองยังคุมความกว้างด้วย max-width เหมือนเดิม */
+.field .cat-multiselect { width: 100%; }
+.field .cat-multiselect > summary { width: 100%; max-width: none; }
+/* เลือกหลายอันแล้วโชว์ชื่อแรก + ป้ายนับที่เหลือ — ต่อชื่อยาวๆ แล้วโดนตัดกลางคำอ่านไม่รู้เรื่อง */
+.cat-multiselect__count {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.cat-multiselect > summary::-webkit-details-marker { display: none; }
+.cat-multiselect > summary::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px;
+  transition: transform .15s;
+}
+.cat-multiselect:hover > summary { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.cat-multiselect[open] > summary {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.cat-multiselect[open] > summary::after { transform: rotate(180deg); }
+@media (prefers-color-scheme: dark) {
+  .cat-multiselect > summary::after {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  }
+}
+.cat-multiselect__x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cat-multiselect__x:hover { background: var(--danger-soft); color: var(--danger); }
+.cat-multiselect__panel {
+  position: fixed;
+  z-index: 1000;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  max-height: 55vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+  animation: cat-multiselect-pop .12s ease-out;
+}
+/* รายการกินพื้นที่ที่เหลือทั้งหมดแล้วสกรอลล์ในตัว — แถบท้าย (เพิ่ม/ล้าง) ค้างอยู่กับที่ */
+.cat-multiselect__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* กันหน้าข้างหลังเลื่อนตามตอนสกรอลล์จนสุดในแผง */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  padding: 6px;
+}
+@keyframes cat-multiselect-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+.cat-multiselect__list::-webkit-scrollbar { width: 10px; }
+.cat-multiselect__list::-webkit-scrollbar-track { background: transparent; }
+.cat-multiselect__list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid var(--card);
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+.cat-multiselect__panel .cat-multiselect__option {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  /* ตั้งทับ `.field label` ที่บังคับ block/ตัวเล็ก/สีจาง ให้แถวในแผงเหมือนกันทุกที่ */
+  color: var(--text);
+  margin-bottom: 0;
+  padding: 9px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+/* ช่องติ๊กวาดเอง — ของเดิมเป็นช่องติ๊กของเบราว์เซอร์ที่หน้าตาต่างกันทุกเครื่อง
+   และไม่มีสถานะ "ติ๊กบางส่วน" (indeterminate) ที่หมวดหลักต้องใช้บอกว่ามีซับหมวดถูกเลือกอยู่ */
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  margin: 0; padding: 0;
+  border: 2px solid var(--border-strong);
+  border-radius: 4px;
+  background: transparent no-repeat center / 13px;
+  cursor: pointer;
+  transition: background-color .13s, border-color .13s, box-shadow .13s;
+}
+.cat-multiselect__panel .cat-multiselect__option:hover input[type="checkbox"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:checked,
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:indeterminate {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+}
+/* ติ๊กบางส่วน = ขีดกลาง (ลูกบางตัวถูกเลือก แต่ยังไม่ครบ) */
+.cat-multiselect__panel .cat-multiselect__option input[type="checkbox"]:indeterminate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round'%3E%3Cline x1='6' y1='12' x2='18' y2='12'/%3E%3C/svg%3E");
+}
+.cat-multiselect__panel .cat-multiselect__option:hover { background: var(--bg); }
+/* ติ๊กแล้วให้เห็นทั้งแถบ ไม่ใช่เห็นแค่ช่องติ๊กเล็กๆ */
+.cat-multiselect__panel .cat-multiselect__option:has(input:checked) {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+/* คอลัมน์ลูกศรกาง/พับชิดกับช่องติ๊ก — เว้นห่างแล้วมันดูเป็นสองคอลัมน์ที่ไม่เกี่ยวกัน */
+.cat-multiselect__panel .cat-multiselect__option--top { cursor: default; gap: 6px; padding-left: 6px; }
+.cat-multiselect__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cat-multiselect__panel .cat-multiselect__option--top label {
+  display: flex; align-items: center; gap: 11px;
+  cursor: pointer; flex: 1; min-width: 0;
+}
+/* ซับหมวดหมู่ใช้เส้นแนวตั้งบอกว่าอยู่ใต้หมวดไหน แทนการเว้นวรรคลึกๆ ที่ดูลอย */
+.cat-multiselect__group {
+  margin: 2px 0 4px 19px;
+  padding-left: 9px;
+  border-left: 1.5px solid var(--border);
+}
+.cat-multiselect__panel .cat-multiselect__option--sub { padding-left: 10px; font-size: 13.5px; }
+.cat-multiselect__expand {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0;
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: 11px;
+  border-radius: 999px;
+  transition: background .12s, color .12s;
+}
+.cat-multiselect__expand:hover { background: var(--bg); color: var(--text); }
+.cat-multiselect__expand-spacer { display: inline-block; width: 18px; flex-shrink: 0; }
+/* แถบท้ายแผง — เดิมฟอร์มเพิ่มหมวดหมู่กางค้างอยู่บนสุดตลอด กินที่ไปเกือบครึ่งแผง
+   ทั้งที่นานๆ ใช้ที ตอนนี้พับไว้ท้ายแผง กดแล้วค่อยกาง */
+.cat-multiselect__foot {
+  flex-shrink: 0;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+.cat-multiselect__foot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cat-multiselect__create-toggle {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+}
+.cat-multiselect__create-toggle:hover { background: var(--accent-soft); }
+.cat-multiselect__new {
+  padding: 2px 2px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.cat-multiselect__new-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.cat-multiselect__new-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--bg);
+  border-radius: 8px;
+}
+.cat-multiselect__add-btn {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition: background .12s;
+}
+.cat-multiselect__add-btn:hover { background: var(--accent-dark); }
+.cat-multiselect__clear {
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cat-multiselect__clear:hover { background: var(--danger-soft); color: var(--danger); }
+.cat-multiselect__empty {
+  padding: 14px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+input, select, textarea {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 34px;
+  cursor: pointer;
+}
+select:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+/* Safari บน iOS ซูมทั้งหน้าเข้าไปเองเมื่อโฟกัสช่องที่ตัวอักษรเล็กกว่า 16px
+   แล้วไม่ซูมกลับ ผู้ใช้ต้องถ่างนิ้วออกเองทุกครั้งที่กรอกของ */
+@media (max-width: 860px) {
+  input, select, textarea { font-size: 16px; }
+}
+@media (prefers-color-scheme: dark) {
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0a8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  }
+}
+#search { flex: 1; min-width: 180px; }
+button, a.btn-primary, a.btn-ghost {
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+button { border: none; }
+a.btn-primary, a.btn-ghost {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-primary { background: var(--accent); color: white; border: none; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-ghost:hover { background: var(--border); }
+.btn-icon-label { display: inline-flex; align-items: center; gap: 6px; }
+.btn-danger { background: transparent; border: 1px solid var(--danger); color: var(--danger); }
+.btn-danger:hover { background: var(--danger); color: #fff; }
+.danger-zone {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+

@@ -1,0 +1,56 @@
+/* วางแผนซื้อของ — app/plan/page.tsx + components/plan/PlanModal.tsx */
+
+/* ── วางแผนซื้อของ — app/plan/page.tsx + components/plan/PlanModal.tsx ── */
+.plan-card { border-top-color: var(--violet); }
+.plan-card--done { border-top-color: var(--ok); opacity: .8; }
+.plan-due { font-weight: 600; }
+.plan-due--normal { color: var(--muted); }
+.plan-due--soon { color: var(--low); }
+.plan-due--late { color: var(--danger); }
+.plan-due--done { color: var(--ok); }
+
+.plan-progress {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: var(--border); margin: 0 0 12px;
+}
+.plan-progress__fill { display: block; height: 100%; background: var(--ok); transition: width .18s; }
+
+.plan-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.plan-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.plan-item:last-child { border-bottom: none; }
+.plan-item__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.plan-item__name { font-weight: 600; font-size: 13px; }
+.plan-item__meta { font-size: 11px; color: var(--muted); }
+.plan-item__hint { color: var(--low); }
+.plan-item__total { font-weight: 700; font-size: 13px; white-space: nowrap; }
+.plan-item.is-bought .plan-item__name { text-decoration: line-through; color: var(--muted); }
+.plan-item.is-bought .plan-item__total { color: var(--ok); }
+
+.plan-check { display: flex; align-items: center; flex-shrink: 0; cursor: pointer; }
+.plan-check input { width: 17px; height: 17px; margin: 0; accent-color: var(--ok); cursor: pointer; }
+
+.plan-lines { display: flex; flex-direction: column; gap: 10px; }
+.plan-line {
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px; background: var(--bg);
+}
+.plan-line.is-bought { border-color: var(--ok); background: var(--ok-soft); }
+.plan-line.is-bought .plan-line__name { text-decoration: line-through; color: var(--muted); }
+.plan-line__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.plan-line__name { flex: 1; min-width: 0; font-weight: 600; }
+.plan-line__total { font-weight: 700; white-space: nowrap; }
+.plan-line__grid { display: grid; grid-template-columns: 90px 130px minmax(0, 1fr); gap: 8px; }
+.plan-line__grid--bought { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 8px; }
+.plan-num-wide { min-width: 0; }
+.plan-picker__hint { color: var(--muted); margin: 6px 0 0; text-align: center; }
+
+@media (max-width: 620px) {
+  .cost-line__head { flex-wrap: wrap; }
+  .cost-line__pick { max-width: none; flex: 1; }
+  .cost-line__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-line__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-num-wide { grid-column: 1 / -1; }
+}

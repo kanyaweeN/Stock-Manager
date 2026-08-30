@@ -1,0 +1,183 @@
+/* แถบบนหน้าสินค้า + ชิปตัวเลขที่กดกรองได้ + ปุ่มลอยบนมือถือ — Toolbar / FilterChips */
+
+/* ── แถบบนหน้าสินค้า — components/product/Toolbar.tsx ── */
+/* ตรึงแถบบน+ตัวกรองไว้บนสุด — ช่องค้นหากับเมนู ⋯ (เลือกหลายรายการ/ส่งออก)
+   ต้องกดได้จากทุกจุดของหน้า ไม่ใช่เลื่อนกลับขึ้นไปบนสุดก่อ· margin ลบบนคือกิน padding ของ
+   .shell__main กลับมาเป็น padding ของตัวเอง พื้นหลังจะได้ทึบถึงขอบบนจริง ไม่งั้นการ์ดจะไหลผ่านช่องว่างให้เห็น */
+.toolbar-sticky {
+  position: sticky; top: 0; z-index: 20;
+  background: var(--bg);
+  margin: -22px 0 16px; padding-top: 22px;
+}
+.toolbar-sticky .filterbar { margin-bottom: 0; }
+
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.topbar__title { font-size: 20px; margin: 0; flex-shrink: 0; }
+.topbar__search {
+  flex: 1; min-width: 200px; position: relative;
+  display: flex; align-items: center;
+}
+.topbar__search input {
+  width: 100%; padding-left: 34px; padding-right: 32px;
+}
+.topbar__search-icon {
+  position: absolute; left: 11px; font-size: 13px; opacity: .6; pointer-events: none;
+}
+.topbar__search-clear {
+  position: absolute; right: 6px;
+  width: 22px; height: 22px; padding: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); font-size: 16px; line-height: 1;
+}
+.topbar__search-clear:hover { background: var(--border); color: var(--text); }
+
+.menu { position: relative; }
+.menu__btn { font-size: 18px; line-height: 1; padding: 8px 13px; }
+.menu__btn.is-open { border-color: var(--accent); color: var(--accent); }
+.menu__panel {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 40;
+  min-width: 208px; padding: 5px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-2);
+}
+.menu__item {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; padding: 9px 10px; border-radius: 8px;
+  background: none; border: none; text-align: left;
+  color: var(--text); font-size: 13.5px; font-weight: 500; text-decoration: none;
+  cursor: pointer;
+}
+.menu__item i { font-style: normal; font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+.menu__item:hover { background: var(--bg); }
+.menu__item--danger { color: var(--danger); }
+.menu__sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
+.filterbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border);
+}
+.filterbar select { font-size: 13px; padding: 7px 30px 7px 11px; }
+.filterbar select.is-active { border-color: var(--accent); color: var(--accent); }
+.filterbar__clear {
+  margin-left: auto; background: none; border: none; padding: 6px 2px;
+  color: var(--accent); font-size: 13px;
+}
+/* ปุ่มเข้า/ออกโหมดเลือกหลายรายการ — ท้ายแถวตัวกรอง อยู่ขวาสุดเสมอเพื่อให้ตำแหน่งไม่ขยับ */
+.select-mode-toggle {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  font-size: 13px; font-weight: 600;
+}
+.select-mode-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.select-mode-toggle.is-active {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink);
+}
+@media (max-width: 640px) {
+  .select-mode-toggle { padding: 9px 14px; }
+}
+
+.chip-toggle {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  border-radius: 999px; padding: 6px 13px; font-size: 12.5px;
+}
+.chip-toggle.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+/* ── ชิปตัวเลขที่กดกรองได้ — components/product/FilterChips.tsx ── */
+.fchips {
+  display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.fchip {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  min-width: 104px; padding: 9px 13px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  text-align: left; font-family: inherit; cursor: pointer;
+  transition: border-color .12s, background .12s, transform .12s;
+}
+.fchip::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--border-strong);
+}
+.fchip:hover { border-color: var(--border-strong); }
+.fchip__n { font-size: 19px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.fchip__l { font-size: 11.5px; color: var(--muted); }
+.fchip--warn::before { background: var(--low); }
+.fchip--warn .fchip__n { color: var(--low); }
+.fchip--danger::before { background: var(--danger); }
+.fchip--danger .fchip__n { color: var(--danger); }
+.fchip--violet::before { background: var(--violet); }
+.fchip--fav::before { background: var(--fav); }
+.fchip--fav .fchip__n { color: var(--fav); }
+.fchip--repeat::before { background: var(--ok); }
+.fchip--repeat .fchip__n { color: var(--ok); }
+/* ใกล้หมดอายุ — ใช้โทนเดียวกับ "ใกล้หมด" เพราะเป็นคำเตือนระดับเดียวกัน (ยังไม่ถึงขั้นแดง) */
+.fchip--expiry::before { background: var(--low); }
+.fchip--expiry .fchip__n { color: var(--low); }
+.fchip--static { cursor: default; opacity: .85; }
+.fchip--static:hover { border-color: var(--border); }
+.fchip.is-active { background: var(--accent-soft); border-color: var(--accent); }
+.fchip.is-active::before { background: var(--accent); }
+.fchip.is-active .fchip__l { color: var(--accent-ink); }
+
+.topbar__import, .topbar__add { flex-shrink: 0; }
+
+/* ปุ่มลอย — โผล่เฉพาะจอมือถือแทนปุ่มในแถบบน ตัวล่าง = นำเข้า Shopee (ทางหลัก), ตัวบน = เพิ่มเอง */
+.fab { display: none; }
+@media (max-width: 860px) {
+  .topbar__title { font-size: 18px; }
+  /* จอเล็ก — ตรึงแค่แถบบน (ค้นหา+เมนู ⋯) ปล่อยแถวตัวกรองเลื่อนหายไป ไม่งั้นกินจอเกินครึ่ง */
+  /* `display: contents` ละกล่องครอบทิ้ง — จำเป็น เพราะ sticky ติดอยู่ในกรอบของพ่อได้เท่านั้น
+     ถ้าครอบยังอยู่ .topbar จะเลื่อนหายไปพร้อมตัวกรอง ไม่ตรึงจริง */
+  .toolbar-sticky { display: contents; }
+  .toolbar-sticky .filterbar { margin-bottom: 16px; }
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--bg);
+    margin: -14px 0 14px; padding: 14px 0 8px;
+  }
+  .topbar__add, .topbar__import { display: none; }
+  .fab {
+    position: fixed; right: 16px; z-index: 25;
+    bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom, 0px));
+    display: grid; place-items: center;
+    width: 54px; height: 54px; padding: 0; border-radius: 18px;
+    background: var(--accent); color: #fff; font-size: 26px; line-height: 1;
+    box-shadow: 0 12px 26px -10px var(--accent);
+  }
+  /* ปุ่มรองวางซ้อนขึ้นไปด้านบน เล็กกว่าและสีอ่อนกว่า ให้ตัวนำเข้าเด่นกว่าชัดเจน */
+  .fab--add {
+    bottom: calc(var(--tabbar-h) + 16px + 54px + 10px + env(safe-area-inset-bottom, 0px));
+    width: 44px; height: 44px; border-radius: 15px; font-size: 21px;
+    background: var(--panel); color: var(--accent);
+    border: 1px solid var(--border-strong); box-shadow: var(--shadow-2);
+  }
+  /* มือถือ: ชิปเป็นแถบเลื่อนแนวนอนแถวเดียว ไม่ให้ตัวเลขดันเนื้อหาจริงลงไปไกล */
+  .fchips {
+    gap: 7px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -14px 14px; padding: 0 14px 2px;
+  }
+  .fchips::-webkit-scrollbar { display: none; }
+  .fchip { min-width: 0; flex: 0 0 auto; padding: 8px 12px; }
+  .fchip__n { font-size: 17px; }
+  .fchip--static { display: none; }
+  .filterbar {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -14px 14px; padding: 0 14px 12px;
+  }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .filterbar > * { flex: 0 0 auto; }
+  .filterbar__clear { margin-left: 0; }
+}
+
+.toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  align-items: center;
+}
+

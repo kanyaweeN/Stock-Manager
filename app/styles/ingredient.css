@@ -1,0 +1,106 @@
+/* วิเคราะห์ส่วนผสม (INCI) · Skin compatibility · ช่องกรอกส่วนผสม */
+
+/* ── วิเคราะห์ส่วนผสม (INCI) ─────────────────────────────── */
+.ingredients-textarea, .import-ingredients {
+  width: 100%; min-height: 80px; resize: vertical; font-family: inherit; font-size: 13px; line-height: 1.5;
+}
+.ing-panel {
+  margin-top: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+}
+.ing-summary { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.ing-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.ing-tag {
+  display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; white-space: nowrap;
+  background: var(--card); color: var(--muted); border: 1px solid var(--border);
+}
+.ing-tag--good {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.ing-tag--caution {
+  background: var(--low-bg); color: var(--low); border-color: color-mix(in srgb, var(--low) 45%, transparent);
+}
+.ing-tag__count { opacity: 0.7; font-weight: 500; }
+.ing-warnings { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.ing-warn { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); }
+.ing-warn--warn { border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.ing-warn--info { border-color: color-mix(in srgb, var(--accent) 35%, transparent); background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.ing-warn__title { font-size: 13px; font-weight: 700; }
+.ing-warn__detail { font-size: 12px; margin-top: 2px; }
+.ing-warn__culprits { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.ing-list { margin: 6px 0 0; padding-left: 22px; display: flex; flex-direction: column; gap: 4px; }
+.ing-item { font-size: 12px; }
+.ing-item--unknown { color: var(--muted); }
+.ing-item__name { font-weight: 600; }
+.ing-item__pct { color: var(--accent); }
+.ing-item__th { font-size: 11px; color: var(--muted); margin-left: 6px; }
+.ing-item__tags { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.ing-item__note { display: block; font-size: 11px; color: var(--muted); font-style: italic; }
+.ing-picker {
+  display: flex; flex-direction: column; gap: 4px; max-height: 320px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px; background: var(--card);
+}
+.ing-picker__row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer;
+}
+.ing-picker__row:hover { background: var(--bg); }
+.ing-picker__row--on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ing-picker__name { flex: 1; font-size: 13px; font-weight: 600; }
+.ing-picker .ing-tags { margin-bottom: 0; }
+.ing-row--shared { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* ── Skin compatibility ────────────────────────────────────── */
+.skin-score {
+  display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.skin-score--great { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.skin-score--good { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+.skin-score--neutral { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+.skin-score--caution { background: var(--low-bg); color: #92400e; border: 1px solid color-mix(in srgb, var(--low) 45%, transparent); }
+.skin-score--avoid { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+@media (prefers-color-scheme: dark) {
+  .skin-score--great { background: #052e16; color: #86efac; border-color: #166534; }
+  .skin-score--good { background: #172554; color: #93c5fd; border-color: #1e40af; }
+  .skin-score--caution { background: #451a03; color: #fbbf24; border-color: #92400e; }
+  .skin-score--avoid { background: #450a0a; color: #fca5a5; border-color: #991b1b; }
+}
+.skin-compat-bar {
+  margin: 8px 0; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);
+}
+.skin-compat-bar__score { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.skin-compat-bar__label { font-size: 13px; font-weight: 600; }
+.skin-compat-bar__list { display: flex; flex-direction: column; gap: 3px; }
+.skin-compat { font-size: 12px; padding: 2px 0; }
+.skin-compat--good { color: #166534; }
+.skin-compat--bad { color: #991b1b; }
+@media (prefers-color-scheme: dark) {
+  .skin-compat--good { color: #86efac; }
+  .skin-compat--bad { color: #fca5a5; }
+}
+.skin-comparison { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 12px 0; }
+.skin-card {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);
+}
+.skin-card__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.skin-card__label { font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
+.skin-card__list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+
+/* ── Ingredient input (search / OCR / paste) ──────────────── */
+.ing-input-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.btn-sm { font-size: 12px; padding: 3px 8px; }
+.ing-search-box { margin-bottom: 8px; }
+.ing-search-box input { width: 100%; }
+.ing-search-results {
+  max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;
+  margin-top: 4px; background: var(--card);
+}
+.ing-search-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px;
+  border: none; background: none; cursor: pointer; text-align: left; font-size: 13px;
+  color: var(--text); border-bottom: 1px solid var(--border);
+}
+.ing-search-row:last-child { border-bottom: none; }
+.ing-search-row:hover { background: var(--bg); }
+

@@ -1,0 +1,163 @@
+/* คำนวณต้นทุน (/cost) + คิดราคาขาย — components/recipe/PriceAdvisor.tsx */
+
+/* ===== คำนวณต้นทุน (/cost) ===== */
+.cost-section-title { font-size: 14px; margin: 18px 0 6px; }
+.cost-inline-fields { display: flex; gap: 10px; flex-wrap: wrap; }
+.cost-inline-fields > .field { flex: 1; min-width: 130px; }
+
+.cost-lines { display: flex; flex-direction: column; gap: 10px; }
+.cost-line {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cost-line__head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.cost-line__name { flex: 1; min-width: 120px; }
+.cost-line__link { color: var(--muted); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.cost-line__link strong { color: var(--text); }
+.cost-line__link--missing { color: var(--danger); }
+
+/* รูป/ชื่อวัตถุดิบที่ผูกกับสินค้าในสต็อก */
+.mat-thumb {
+  width: 34px; height: 34px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.mat-thumb--empty, .mat-thumb--missing {
+  display: inline-flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.mat-thumb--missing { border-color: var(--danger); }
+.mat-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mat-label__text { display: flex; flex-direction: column; min-width: 0; }
+.mat-label__name { font-weight: 600; }
+.mat-label__meta { font-size: 11px; color: var(--muted); }
+
+.stock-picker {
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--card);
+  padding: 8px;
+  margin: 6px 0;
+}
+.stock-picker__head { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.stock-picker__head input { flex: 1; min-width: 0; }
+.stock-picker__list { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; }
+.stock-picker__row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px;
+  border: none; background: none; cursor: pointer; text-align: left; font-size: 13px;
+  color: var(--text); border-bottom: 1px solid var(--border); border-radius: 6px;
+}
+.stock-picker__row:last-child { border-bottom: none; }
+.stock-picker__row:hover { background: var(--bg); }
+.stock-picker__thumb {
+  width: 34px; height: 34px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.stock-picker__thumb--empty { display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.stock-picker__name { flex: 1; min-width: 0; font-weight: 600; }
+.stock-picker__name small { font-weight: 400; color: var(--muted); }
+.stock-picker__meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.cost-line__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cost-num { display: flex; flex-direction: column; gap: 2px; }
+.cost-num > span { font-size: 11px; color: var(--muted); }
+.cost-num input { width: 100%; }
+.cost-line__warn { color: var(--low); margin-top: 6px; line-height: 1.4; }
+/* ค่าในสูตรไม่ตรงกับสินค้าในสต็อกแล้ว (ดู stockDrift ใน lib/domain/cost.ts) */
+.cost-line__drift {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 6px; line-height: 1.4; color: var(--muted);
+}
+.cost-line__drift--fill { color: var(--accent); }
+/* วัตถุดิบชิ้นเดิมถูกใส่ซ้ำในสูตรเดียว (ดู duplicateLineIds ใน lib/domain/cost.ts) */
+.cost-line__drift--dup { color: var(--low); }
+.cost-line__foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cost-line__rate { color: var(--muted); }
+.cost-line__cost { font-weight: 700; white-space: nowrap; }
+.cost-line__cost small { font-weight: 500; color: var(--muted); }
+
+.cost-summary {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  overflow: hidden;
+}
+.cost-summary__row {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 8px 12px; font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.cost-summary__row:last-child { border-bottom: none; }
+.cost-summary__row--main { font-size: 16px; background: var(--low-bg); }
+.cost-summary__row--main strong { color: var(--accent); }
+.cost-summary__row--profit strong { color: var(--ok); }
+.cost-summary__row--loss strong { color: var(--danger); }
+
+/* ── คิดราคาขาย "ควรขายเท่าไร" — components/recipe/PriceAdvisor.tsx ── */
+.price-advisor {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--violet);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.price-advisor__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.price-advisor__label { font-size: 11.5px; color: var(--muted); }
+.price-advisor__price { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; color: var(--violet); }
+.price-advisor__price--none { color: var(--muted); }
+.price-advisor__meta { color: var(--muted); }
+.price-advisor__controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.price-advisor__controls input, .price-advisor__controls select { width: 100%; }
+.price-table th, .price-table td { padding: 6px 8px; font-size: 13px; white-space: nowrap; }
+.price-table th { text-transform: none; letter-spacing: 0; }
+.price-table td small { color: var(--muted); font-weight: 500; }
+.price-table__row--active { background: var(--accent-soft); }
+.price-table__row--current { background: var(--low-bg); }
+.price-table__profit { color: var(--ok); font-weight: 600; }
+.price-table__loss { color: var(--danger); font-weight: 600; }
+.price-notes { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.6; }
+.price-notes li + li { margin-top: 3px; }
+@media (max-width: 640px) {
+  .price-advisor__controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .price-advisor__price { font-size: 24px; }
+  .price-table th, .price-table td { padding: 6px 5px; font-size: 12px; }
+}
+
+.recipe-list { display: flex; flex-direction: column; gap: 14px; }
+.recipe-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 14px;
+  border-top: 3px solid var(--accent);
+}
+.recipe-card__head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+.recipe-card__title { margin: 0; font-size: 16px; }
+.recipe-card__meta { color: var(--muted); margin: 2px 0 0; }
+.recipe-card__actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.recipe-card__figures { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.recipe-figure {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: var(--bg);
+  min-width: 110px;
+}
+.recipe-figure__n { font-size: 20px; font-weight: 700; color: var(--accent); }
+.recipe-figure__n small { font-size: 12px; font-weight: 500; }
+.recipe-figure__l { font-size: 11px; color: var(--muted); }
+.recipe-figure--profit .recipe-figure__n { color: var(--ok); }
+.recipe-figure--loss .recipe-figure__n { color: var(--danger); }
+.recipe-figure--suggest { border-style: dashed; }
+.recipe-figure--suggest .recipe-figure__n { color: var(--violet); }
+.recipe-card__hint { color: var(--muted); margin: 0 0 10px; }
+.recipe-table { margin-top: 4px; }
+.recipe-card__note { color: var(--muted); margin: 10px 0 0; white-space: pre-wrap; }
+

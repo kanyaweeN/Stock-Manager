@@ -1,0 +1,84 @@
+/* ตาราง + การ์ดสถิติ + แถบสัดส่วน + ประโยคสรุป — ใช้ที่ /summary และ /cost */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 12px 15px;
+}
+.stat .n { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+.stat .l { font-size: 11.5px; color: var(--muted); }
+.stat--blue { border-left-color: var(--accent); }
+.stat--orange { border-left-color: var(--orange); }
+.stat--green { border-left-color: var(--ok); }
+.stat--warning { border-left-color: var(--low); }
+.stat--violet { border-left-color: var(--violet); }
+
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+th, td { padding: 10px 12px; text-align: left; font-size: 14px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+tr:last-child td { border-bottom: none; }
+.summary-section-title {
+  display: inline-block;
+  font-size: 14px; font-weight: 700; color: #fff;
+  padding: 5px 14px; border-radius: 999px;
+  margin: 24px 0 10px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+}
+.summary-section-title:first-of-type { margin-top: 8px; }
+.summary-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 8px; flex-shrink: 0;
+}
+.summary-bar-cell { display: flex; align-items: center; gap: 8px; min-width: 160px; }
+.summary-bar-track {
+  position: relative; flex: 1; height: 8px; border-radius: 999px;
+  background: var(--bg); overflow: hidden;
+}
+.summary-bar-fill {
+  position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+  transition: width .2s ease;
+}
+.summary-bar-label { font-weight: 600; white-space: nowrap; }
+.summary-share { color: var(--muted); font-weight: 500; font-size: 11px; }
+.summary-sub-title { font-size: 13.5px; font-weight: 700; margin: 18px 0 8px; }
+/* ตัวเลขเทียบเดือนก่อนบนการ์ดสถิติ — ขึ้น = ส้ม (จ่ายเยอะขึ้น) ลง = เขียว */
+.summary-delta { margin-left: 6px; font-weight: 700; }
+.summary-delta.is-up { color: var(--low); }
+.summary-delta.is-down { color: var(--ok); }
+
+/* ประโยคสรุป: ตัวเลขที่แปลเป็นภาษาคนแล้วว่าต้องสนใจอะไร */
+.insight-list { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 6px; }
+.insight {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 13px; line-height: 1.5;
+  padding: 9px 12px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+}
+.insight__icon { flex-shrink: 0; }
+.insight--info { border-left-color: var(--accent); }
+.insight--good { border-left-color: var(--ok); background: var(--ok-soft); }
+.insight--warn { border-left-color: var(--low); background: var(--low-bg); }
+tr.low-row { background: var(--low-bg); }
+td.qty { font-weight: 600; text-align: center; width: 90px; }
+td.actions { text-align: right; white-space: nowrap; width: 160px; }
+.qty-btn {
+  width: 26px; height: 26px; border-radius: 999px; padding: 0;
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  font-size: 15px; line-height: 1;
+}
+.qty-btn:hover { background: var(--border); }
+.badge-low { color: var(--low); font-size: 11px; font-weight: 600; margin-left: 6px; }
+.icon-btn { background: transparent; border: none; cursor: pointer; padding: 4px 6px; font-size: 15px; }
+.icon-btn.del:hover { color: var(--danger); }
+.empty { text-align: center; padding: 40px; color: var(--muted); }
+

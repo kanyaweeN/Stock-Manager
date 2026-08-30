@@ -61,7 +61,8 @@ app/
   summary/page.tsx     สรุปยอดที่จ่ายจริง (รายเดือน / หมวด / รายชิ้น + ประโยคสรุป)
   config/page.tsx      หน้าตั้งค่า (แท็บ: ที่เก็บข้อมูล / Google Drive / ส่งออก Sheet / หมวดหมู่ / สำรอง-กู้คืน)
   layout.tsx           mount AppShell ให้ทุกหน้า
-  globals.css          สไตล์รวมทั้งแอป
+  globals.css          รายการ @import เรียงลำดับ (สไตล์จริงอยู่ใน styles/)
+  styles/*.css         สไตล์ทั้งแอป แยกตามส่วน — ลำดับใน globals.css ห้ามสลับ
 components/
   AppShell.tsx           แถบนำทาง (sidebar บนจอใหญ่ / แถบล่างบนมือถือ) + สถานะซิงก์
   Toolbar.tsx            แถบค้นหา/กรอง/เรียง ของหน้าหลัก (ตรึงไว้บนสุด)

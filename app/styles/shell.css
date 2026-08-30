@@ -1,0 +1,85 @@
+/* โครงแอป: แถบข้าง (จอกว้าง) / แถบล่าง (มือถือ) — components/AppShell.tsx */
+
+/* ── โครงแอป: แถบข้าง (จอกว้าง) / แถบล่าง (มือถือ) — components/AppShell.tsx ── */
+.shell { min-height: 100vh; min-height: 100dvh; }
+.shell__side {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--side-w);
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 16px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 30;
+}
+.shell__brand {
+  display: flex; align-items: center; gap: 9px;
+  padding: 4px 8px 16px;
+  font-weight: 700; font-size: 15px;
+  color: var(--text); text-decoration: none;
+}
+.shell__brand-mark {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  display: grid; place-items: center; font-size: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--violet));
+}
+.shell__nav { display: flex; flex-direction: column; gap: 2px; }
+.shell__nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 9px;
+  color: var(--muted); font-size: 14px; text-decoration: none;
+  transition: background .12s, color .12s;
+}
+.shell__nav-item:hover { background: var(--bg); color: var(--text); }
+.shell__nav-item.is-active { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.shell__nav-icon { font-size: 15px; line-height: 1; }
+.shell__nav-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.shell__nav-count {
+  margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+}
+.shell__nav-item.is-active .shell__nav-count { background: var(--panel); border-color: transparent; }
+.shell__side-foot {
+  margin-top: auto; padding: 10px 10px 0; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+}
+.shell__sync { display: inline-flex; align-items: flex-start; gap: 6px; }
+.shell__sync i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; margin-top: 5px; }
+/* ข้อความสถานะยาวได้เรื่อยๆ — ตัดที่ 3 บรรทัด ที่เหลือดูได้จาก title */
+.shell__sync-msg {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; word-break: break-word;
+}
+.shell__sync--ok i { background: var(--ok); }
+.shell__sync--err i { background: var(--danger); }
+.shell__sync--loading i { background: var(--low); }
+.shell__main { margin-left: var(--side-w); padding: 22px 26px 40px; }
+.shell__tabbar { display: none; }
+
+@media (max-width: 860px) {
+  .shell__side { display: none; }
+  .shell__main { margin-left: 0; padding: 14px 14px calc(var(--tabbar-h) + 24px); }
+  .shell__tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: grid; grid-template-columns: repeat(6, 1fr);
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    padding: 7px 2px calc(7px + env(safe-area-inset-bottom, 0px));
+  }
+  .shell__tab {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 10px; color: var(--muted); text-decoration: none; padding: 2px 0;
+  }
+  .shell__tab-icon { font-size: 18px; line-height: 1; }
+  .shell__tab.is-active { color: var(--accent); font-weight: 700; }
+}
+
+.page, .wrap { max-width: 1080px; margin: 0 auto; }
+.page--with-select-bar, .wrap--with-select-bar { padding-bottom: 84px; }
+h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
+.sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
+
