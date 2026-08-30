@@ -1,5 +1,6 @@
 import type { PlanLine, PlanPriority, PricePoint, PricingSettings, ProductionRun, PurchaseOrder, PurchasePlan, Recipe, RecipeLine, StockItem, UsagePoint } from "./types";
 import { normalizeShopName } from "./orders";
+import { dropRedundantParentCats } from "./cats";
 import { DEFAULT_PRICING, ROUNDING_VALUES } from "./pricing";
 
 export type SkinType = "" | "oily" | "dry" | "combination" | "normal" | "sensitive";
@@ -215,11 +216,6 @@ const numLoose = (v: unknown, fallback = 0) => {
 };
 const str = (v: unknown, fallback = "") => (typeof v === "string" ? v : fallback);
 const isISODate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
-
-/** เอาหมวดแม่เปล่าๆ ทิ้ง ถ้ามีซับหมวดของหมวดนั้นเลือกไว้อยู่แล้ว (เช่น มีทั้ง "เครื่องใช้" และ "เครื่องใช้ > ของแต่งห้อง") */
-function dropRedundantParentCats(cats: string[]): string[] {
-  return cats.filter((c) => !cats.some((other) => other !== c && other.startsWith(`${c} > `)));
-}
 
 /** ทิ้งจุดที่ delta ไม่ใช่ตัวเลข/เป็น 0 (ไม่มีความหมาย) แล้วเรียงตามวันที่ */
 function normalizeUsageLog(raw: unknown): UsagePoint[] {

@@ -11,7 +11,7 @@ import {
   type RecipeDraft,
   type RecipeLineDraft,
 } from "@/lib/recipeDraft";
-import { amountText, baht, emptyLine, lineCost, lineFromItem, lineIssue, productionSummary, recipeTotals, unitCost } from "@/lib/cost";
+import { amountText, baht, driftNote, duplicateLineIds, emptyLine, lineCost, lineFromItem, lineIssue, productionSummary, recipeTotals, stockDrift, unitCost, type StockDrift } from "@/lib/cost";
 import { formatThaiShortDate, todayISO } from "@/lib/date";
 import { MaterialThumb } from "@/components/MaterialLabel";
 import PriceAdvisor from "@/components/PriceAdvisor";
@@ -77,6 +77,9 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
 
   if (!open || !draft || !preview || !totals) return null;
 
+  /** บรรทัดที่ใส่สินค้าชิ้นเดิมซ้ำ — เตือนอย่างเดียว ไม่กันไว้ (ดู duplicateLineIds ใน lib/cost.ts) */
+  const dupLineIds = duplicateLineIds(draft.lines);
+
   const patchLine = (id: string, patch: Partial<RecipeLineDraft>) =>
     setDraft({ ...draft, lines: draft.lines.map((l) => (l.id === id ? { ...l, ...patch } : l)) });
 
@@ -102,6 +105,15 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
 
   const unlinkItem = (id: string) => patchLine(id, { itemId: undefined });
 
+  /** ดึงราคา/ขนาดแพ็คล่าสุดของสินค้าที่ผูกไว้มาทับ — ไม่แตะ "ใช้ไป" กับชื่อที่ผู้ใช้ตั้งเอง */
+  const applyDrift = (id: string, drift: StockDrift) => {
+    const patch: Partial<RecipeLineDraft> = {};
+    if (drift.buyPrice !== undefined) patch.buyPrice = String(drift.buyPrice);
+    if (drift.packAmount !== undefined) patch.packAmount = String(drift.packAmount);
+    if (drift.unit !== undefined) patch.unit = drift.unit;
+    patchLine(id, patch);
+  };
+
   const addLine = () => setDraft({ ...draft, lines: [...draft.lines, toRecipeLineDraft(emptyLine())] });
   const removeLine = (id: string) => setDraft({ ...draft, lines: draft.lines.filter((l) => l.id !== id) });
 
@@ -112,20 +124,27 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
 
   const materialCost = totals.materialCost;
 
-  const renderPicker = () => (
-    <StockPicker
-      items={items}
-      onPick={pickItem}
-      onClose={() => setPickerFor(null)}
-      emptyStockText="ยังไม่มีสินค้าในสต็อก — เพิ่มสินค้าก่อน หรือกรอกวัตถุดิบเอง"
-      meta={(i) => (
-        <>
-          {i.price != null ? `฿${i.price}` : "ยังไม่ใส่ราคา"}
-          {i.size ? ` · ${i.size}` : ""} · เหลือ {i.qty}
-        </>
-      )}
-    />
-  );
+  const renderPicker = () => {
+    // ของที่อยู่ในสูตรนี้แล้วติด ✓ ไว้ให้เห็นก่อนกด — ไม่นับบรรทัดที่กำลังเปลี่ยนสินค้าอยู่ (ตัวมันเองไม่ใช่ตัวซ้ำ)
+    const otherItemIds = new Set(
+      draft.lines.filter((l) => l.id !== pickerFor).map((l) => l.itemId).filter(Boolean)
+    );
+    return (
+      <StockPicker
+        items={items}
+        onPick={pickItem}
+        onClose={() => setPickerFor(null)}
+        emptyStockText="ยังไม่มีสินค้าในสต็อก — เพิ่มสินค้าก่อน หรือกรอกวัตถุดิบเอง"
+        namePrefix={(i) => (otherItemIds.has(i.id) ? "✓ " : null)}
+        meta={(i) => (
+          <>
+            {i.price != null ? `฿${i.price}` : "ยังไม่ใส่ราคา"}
+            {i.size ? ` · ${i.size}` : ""} · เหลือ {i.qty}
+          </>
+        )}
+      />
+    );
+  };
 
   return (
     <ModalShell open={open} title={recipe?.name ? "แก้ไขสูตรต้นทุน" : "สูตรต้นทุนใหม่"} onClose={onClose} wide>
@@ -182,6 +201,8 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
               const issue = lineIssue(line);
               const share = materialCost > 0 ? (cost / materialCost) * 100 : 0;
               const linked = l.itemId ? itemById.get(l.itemId) : undefined;
+              // ค่าในสูตรเป็นสแนปช็อตตอนกดเลือกสินค้า แก้ที่หน้าสินค้าทีหลังแล้วมันไม่ตามมาเอง
+              const drift = stockDrift(line, linked);
               return (
                 <div className="cost-line" key={l.id}>
                   <div className="cost-line__head">
@@ -223,6 +244,22 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
                       ) : (
                         <span className="cost-line__link--missing">⚠️ ไม่พบสินค้านี้ในสต็อกแล้ว — ใช้ราคาที่บันทึกไว้ในสูตร</span>
                       )}
+                    </div>
+                  )}
+
+                  {dupLineIds.has(l.id) && (
+                    <div className="cost-line__drift cost-line__drift--dup text-xs">
+                      <span>⚠️ ใส่ซ้ำกับบรรทัดก่อนหน้า — ค่าวัตถุดิบจะถูกบวกสองรอบ</span>
+                      <button className="btn-ghost btn-sm" onClick={() => removeLine(l.id)}>ลบบรรทัดนี้</button>
+                    </div>
+                  )}
+
+                  {drift && (
+                    <div className={`cost-line__drift text-xs${drift.fillsUnknownPack ? " cost-line__drift--fill" : ""}`}>
+                      <span>{drift.fillsUnknownPack ? "📦" : "🔄"} {driftNote(drift, line)}</span>
+                      <button className="btn-ghost btn-sm" onClick={() => applyDrift(l.id, drift)}>
+                        {drift.fillsUnknownPack ? "เติมจากสต็อก" : "ใช้ค่าล่าสุด"}
+                      </button>
                     </div>
                   )}
 

@@ -4,22 +4,25 @@ import { useState } from "react";
 import {
   MERGE_FIELD_LABELS,
   applyPriceMode,
+  detectPricePerUnit,
   isBackdated,
   linkToExisting,
   mergeWithinBatch,
   newFieldValue,
   oldFieldValue,
   orderMetaFrom,
+  rowLineTotal,
   type MergeField,
 } from "@/lib/importMerge";
 import { roundBaht } from "@/lib/price";
 import { findDuplicateOrder } from "@/lib/orders";
-import { extractShopeePage } from "@/lib/shopee";
+import { DEFAULT_IMPORT_SOURCE, IMPORT_SITES, importSite } from "@/lib/importSites";
+import { extractOrderPage } from "@/lib/orderPage";
 import { STATUS_OPTIONS } from "@/lib/statusOptions";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import ModalShell from "@/components/ModalShell";
 import { ClearIcon, PasteIcon } from "@/components/icons";
-import type { ImportCandidate, ItemStatus, PurchaseOrder, StockItem } from "@/lib/types";
+import type { ImportCandidate, ImportSource, ItemStatus, PurchaseOrder, StockItem } from "@/lib/types";
 
 interface Props {
   open: boolean;
@@ -35,11 +38,12 @@ interface Props {
 }
 
 export default function ImportModal({ open, categories, items, orders, onClose, onImport }: Props) {
+  const [source, setSource] = useState<ImportSource>(DEFAULT_IMPORT_SOURCE);
   const [html, setHtml] = useState("");
   const [candidates, setCandidates] = useState<ImportCandidate[]>([]);
   const [step, setStep] = useState<"input" | "review">("input");
   const [bulkCats, setBulkCats] = useState<string[]>([]);
-  const [pricePerUnit, setPricePerUnit] = useState(true);
+  const [pricePerUnit, setPricePerUnit] = useState(importSite(DEFAULT_IMPORT_SOURCE).priceIsLineTotal);
   /** ยอด "รวมค่าสินค้า" ที่หน้าออเดอร์บอกไว้ — ใช้เทียบว่าแกะรายการมาครบไหม */
   const [goodsSubtotal, setGoodsSubtotal] = useState<number | undefined>(undefined);
   /*
@@ -51,14 +55,35 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
   /** ยอดชำระทั้งหมดที่หน้าออเดอร์บอก — ใช้เทียบว่าค่าส่ง/ส่วนลดที่กรอกครบหรือยัง */
   const [grandTotal, setGrandTotal] = useState<number | undefined>(undefined);
 
+  const site = importSite(source);
+
   const handleParse = () => {
-    const page = extractShopeePage(html);
+    const page = extractOrderPage(html, source);
+    const merged = mergeWithinBatch(page.items);
+    const perUnit = detectPricePerUnit(merged, page.goodsSubtotal, site.priceIsLineTotal);
     setGoodsSubtotal(page.goodsSubtotal);
     setShipping(page.shipping != null ? String(page.shipping) : "");
     setDiscount(page.discount != null ? String(page.discount) : "");
     setGrandTotal(page.grandTotal);
-    setCandidates(linkToExisting(applyPriceMode(mergeWithinBatch(page.items), pricePerUnit), items));
+    setPricePerUnit(perUnit);
+    setCandidates(linkToExisting(applyPriceMode(merged, perUnit), items));
     setStep("review");
+  };
+
+  /** ล้างทุกอย่างที่ได้มาจากการแกะหน้า แล้วตั้งค่าเริ่มต้นของร้านที่เลือกไว้ใหม่ */
+  const clearParsed = (next: ImportSource) => {
+    setCandidates([]);
+    setPricePerUnit(importSite(next).priceIsLineTotal);
+    setGoodsSubtotal(undefined);
+    setShipping("");
+    setDiscount("");
+    setGrandTotal(undefined);
+  };
+
+  /** เปลี่ยนร้าน = ต้องแกะใหม่ทั้งหมด (คนละโครงหน้า คนละป้ายยอดเงิน) — ล้างของที่แกะไว้ทิ้ง */
+  const changeSource = (next: ImportSource) => {
+    setSource(next);
+    clearParsed(next);
   };
 
   const updateCandidate = (idx: number, patch: Partial<ImportCandidate>) => {
@@ -97,13 +122,10 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
     setCandidates((prev) => applyPriceMode(prev, perUnit));
   };
 
-  /**
-   * เทียบผลรวมที่แกะได้กับ "รวมค่าสินค้า" บนหน้าออเดอร์ — จับเคสที่มีแถวหล่นหายแบบเงียบๆ
-   * ใช้ `lineTotal` (ยอดดิบจากหน้าเว็บ) ไม่ใช่ `price` ที่ผู้ใช้แก้ได้ จะได้วัดเฉพาะว่า "แกะครบไหม"
-   */
+  /** เทียบผลรวมที่แกะได้กับ "รวมค่าสินค้า" บนหน้าออเดอร์ — จับเคสที่มีแถวหล่นหายแบบเงียบๆ */
   const subtotalCheck = (() => {
     if (goodsSubtotal == null || candidates.length === 0) return null;
-    const parsed = candidates.reduce((s, c) => s + (c.lineTotal ?? (c.price ?? 0) * c.qty), 0);
+    const parsed = candidates.reduce((s, c) => s + rowLineTotal(c, pricePerUnit), 0);
     return { parsed, expected: goodsSubtotal, ok: Math.abs(parsed - goodsSubtotal) < 0.5 };
   })();
 
@@ -134,14 +156,10 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
 
   const handleClose = () => {
     setHtml("");
-    setCandidates([]);
     setStep("input");
     setBulkCats([]);
-    setPricePerUnit(true);
-    setGoodsSubtotal(undefined);
-    setShipping("");
-    setDiscount("");
-    setGrandTotal(undefined);
+    setSource(DEFAULT_IMPORT_SOURCE);
+    clearParsed(DEFAULT_IMPORT_SOURCE);
     onClose();
   };
 
@@ -165,19 +183,31 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
   };
 
   return (
-    <ModalShell open={open} title="นำเข้ารายการจาก Shopee" onClose={handleClose} wide>
+    <ModalShell open={open} title={`นำเข้ารายการจาก ${site.label}`} onClose={handleClose} wide>
         <div className="modal-body">
         {step === "input" ? (
           <>
-            <p className="sub" style={{ marginTop: -8 }}>
-              เปิดหน้า &quot;คำสั่งซื้อของฉัน&quot; ใน Shopee กด Ctrl+U หรือคลิกขวา &gt; &quot;ดูซอร์สหน้าเว็บ&quot; (View Page Source)
-              แล้วคัดลอกโค้ด HTML ทั้งหมดมาวางในกล่องด้านล่าง ระบบจะพยายามดึงชื่อสินค้า จำนวน และรูปภาพให้อัตโนมัติ —
-              กรุณาตรวจสอบและแก้ไขรายการก่อนนำเข้าจริง เพราะโครงสร้างหน้าเว็บของ Shopee อาจไม่แน่นอน
+            <div className="import-sites" role="group" aria-label="เลือกร้านที่จะนำเข้า">
+              {IMPORT_SITES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`import-site ${s.id === source ? "is-active" : ""}`}
+                  aria-pressed={s.id === source}
+                  onClick={() => changeSource(s.id)}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <p className="sub" style={{ marginTop: 0 }}>
+              {site.hint} ระบบจะพยายามดึงชื่อสินค้า จำนวน ราคา และรูปภาพให้อัตโนมัติ —
+              กรุณาตรวจสอบและแก้ไขรายการก่อนนำเข้าจริง เพราะโครงสร้างหน้าเว็บของแต่ละร้านอาจไม่แน่นอน
             </p>
             <div className="field">
               <textarea
                 className="import-textarea"
-                placeholder="วางโค้ด HTML ของหน้าออเดอร์ Shopee ที่นี่..."
+                placeholder={`วางโค้ด HTML ของหน้าออเดอร์ ${site.label} ที่นี่...`}
                 value={html}
                 onChange={(e) => setHtml(e.target.value)}
               />
@@ -287,7 +317,7 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
                   onChange={(e) => changePriceMode(e.target.checked)}
                 />
                 <span>
-                  ราคาที่ Shopee โชว์เป็น<strong>ยอดรวมทั้งแถว</strong> — หารด้วยจำนวนให้เป็นราคาต่อชิ้น
+                  ราคาที่ {site.label} โชว์เป็น<strong>ยอดรวมทั้งแถว</strong> — หารด้วยจำนวนให้เป็นราคาต่อชิ้น
                   <span className="sub text-xs"> (ติ๊กออกถ้าหน้าที่วางมาโชว์ราคาต่อชิ้นอยู่แล้ว)</span>
                 </span>
               </label>
@@ -451,7 +481,10 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
               })}
             </div>
             {candidates.length === 0 && (
-              <div className="empty" style={{ padding: 16 }}>ไม่พบรายการสินค้าจาก HTML ที่วาง — กด &quot;ย้อนกลับ&quot; เพื่อลองใหม่</div>
+              <div className="empty" style={{ padding: 16 }}>
+                ไม่พบรายการสินค้าจาก HTML ที่วาง — กด &quot;ย้อนกลับ&quot; เพื่อลองใหม่
+                (เช็คด้วยว่าเลือกร้านตรงกับหน้าที่คัดลอกมาไหม ตอนนี้เลือก <strong>{site.label}</strong> อยู่)
+              </div>
             )}
           </>
         )}

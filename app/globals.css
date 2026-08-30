@@ -243,6 +243,22 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
   margin-left: auto; background: none; border: none; padding: 6px 2px;
   color: var(--accent); font-size: 13px;
 }
+/* ปุ่มเข้า/ออกโหมดเลือกหลายรายการ — ท้ายแถวตัวกรอง อยู่ขวาสุดเสมอเพื่อให้ตำแหน่งไม่ขยับ */
+.select-mode-toggle {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  font-size: 13px; font-weight: 600;
+}
+.select-mode-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.select-mode-toggle.is-active {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink);
+}
+@media (max-width: 640px) {
+  .select-mode-toggle { padding: 9px 14px; }
+}
+
 .chip-toggle {
   background: var(--card); border: 1px solid var(--border); color: var(--muted);
   border-radius: 999px; padding: 6px 13px; font-size: 12.5px;
@@ -962,7 +978,36 @@ td.thumb-cell { width: 46px; }
 .category-row__actions { display: flex; gap: 2px; flex-shrink: 0; }
 .category-row__title { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .category-row__edit-input { flex: 1; min-width: 0; padding: 6px 8px; font-size: 14px; margin-right: 8px; }
+/* ── กล่องจัดหมวดหมู่ทีละหลายรายการ — app/page.tsx ── */
+.cat-modes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.cat-preview__head { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+.cat-preview { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+.cat-preview__row {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+  font-size: 13px;
+}
+.cat-preview__row.is-changed { border-color: var(--accent); background: var(--accent-soft); }
+.cat-preview__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-preview__cats { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; max-width: 60%; }
+.cat-preview__none { color: var(--muted); font-size: 12px; }
+.cat-preview__chip {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 999px;
+  padding: 2px 8px; font-size: 11.5px; color: var(--muted);
+}
+.cat-preview__chip--add { border-color: var(--ok); color: var(--ok); font-weight: 600; }
+.cat-preview__chip--del { border-color: var(--danger); color: var(--danger); text-decoration: line-through; }
+
 .modal-wide { max-width: 760px; }
+/* เลือกร้านที่จะนำเข้า — โครงหน้าเว็บกับป้ายยอดเงินของแต่ละร้านคนละแบบ ต้องบอกก่อนแกะ */
+.import-sites { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.import-site {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  font-size: 13px; font-weight: 600;
+}
+.import-site:hover { border-color: var(--accent); color: var(--text); }
+.import-site.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .import-textarea {
   width: 100%; min-height: 120px; resize: vertical; font-family: monospace; font-size: 12px;
 }
@@ -1526,6 +1571,14 @@ td.thumb-cell { width: 46px; }
 .cost-num > span { font-size: 11px; color: var(--muted); }
 .cost-num input { width: 100%; }
 .cost-line__warn { color: var(--low); margin-top: 6px; line-height: 1.4; }
+/* ค่าในสูตรไม่ตรงกับสินค้าในสต็อกแล้ว (ดู stockDrift ใน lib/cost.ts) */
+.cost-line__drift {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 6px; line-height: 1.4; color: var(--muted);
+}
+.cost-line__drift--fill { color: var(--accent); }
+/* วัตถุดิบชิ้นเดิมถูกใส่ซ้ำในสูตรเดียว (ดู duplicateLineIds ใน lib/cost.ts) */
+.cost-line__drift--dup { color: var(--low); }
 .cost-line__foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .cost-line__rate { color: var(--muted); }
 .cost-line__cost { font-weight: 700; white-space: nowrap; }

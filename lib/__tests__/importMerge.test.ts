@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyPriceMode,
   computeMergeFields,
+  detectPricePerUnit,
   findExisting,
   isBackdated,
   linkToExisting,
@@ -9,11 +10,12 @@ import {
   newFieldValue,
   oldFieldValue,
   orderMetaFrom,
+  rowLineTotal,
 } from "@/lib/importMerge";
 import type { ImportCandidate, StockItem } from "@/lib/types";
 
 const cand = (over: Partial<ImportCandidate> = {}): ImportCandidate => ({
-  name: "สบู่", qty: 1, img: "", link: "", cats: [], status: "", include: true, ...over,
+  name: "สบู่", qty: 1, img: "", link: "", cats: [], status: "", include: true, source: "shopee", ...over,
 });
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({
@@ -189,5 +191,40 @@ describe("orderMetaFrom — วันที่/ร้านของออเด
   it("ไม่มีใครมีวันที่/ร้านเลย = undefined ทั้งคู่ (ไม่เดาให้)", () => {
     const all = [cand()];
     expect(orderMetaFrom(all, all)).toEqual({ date: undefined, shop: undefined });
+  });
+});
+
+describe("rowLineTotal", () => {
+  it("โหมดยอดรวมทั้งแถว = ใช้ยอดดิบตรงๆ, โหมดราคาต่อชิ้น = คูณจำนวนกลับ", () => {
+    const c = cand({ qty: 3, lineTotal: 54, price: 18 });
+    expect(rowLineTotal(c, true)).toBe(54);
+    expect(rowLineTotal(c, false)).toBe(162);
+  });
+
+  it("แถวที่ไม่มียอดดิบ ค่อยถอยไปคิดจากราคาที่กรอกไว้ × จำนวน", () => {
+    expect(rowLineTotal(cand({ qty: 2, price: 25, lineTotal: undefined }), true)).toBe(50);
+    expect(rowLineTotal(cand({ qty: 2, price: undefined, lineTotal: undefined }), true)).toBe(0);
+  });
+});
+
+describe("detectPricePerUnit", () => {
+  const rows = [cand({ qty: 3, lineTotal: 54 }), cand({ qty: 2, lineTotal: 30 })];
+
+  it("ยอดดิบรวมกันเท่ากับ 'รวมค่าสินค้า' = หน้านั้นโชว์ยอดรวมทั้งแถว", () => {
+    expect(detectPricePerUnit(rows, 84, false)).toBe(true);
+  });
+
+  it("ต้องคูณจำนวนถึงจะเท่ากับ 'รวมค่าสินค้า' = หน้านั้นโชว์ราคาต่อชิ้น", () => {
+    expect(detectPricePerUnit(rows, 222, true)).toBe(false);
+  });
+
+  it("ไม่มียอดให้เทียบ/ไม่มีแถวที่มียอดดิบ = ใช้ค่าเริ่มต้นของร้านนั้น ไม่เดาเอง", () => {
+    expect(detectPricePerUnit(rows, undefined, true)).toBe(true);
+    expect(detectPricePerUnit([cand({ lineTotal: undefined })], 84, false)).toBe(false);
+  });
+
+  it("เทียบแล้วไม่ตรงสักทาง (แกะมาไม่ครบ) = ใช้ค่าเริ่มต้น ไม่ดันไปทางใดทางหนึ่ง", () => {
+    expect(detectPricePerUnit(rows, 999, true)).toBe(true);
+    expect(detectPricePerUnit(rows, 999, false)).toBe(false);
   });
 });

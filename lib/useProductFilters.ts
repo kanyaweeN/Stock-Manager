@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { StockItem } from "./types";
+import { matchesCatFilter } from "./cats";
 import { itemTags, TAG_PRIORITY, type IngredientTag } from "./ingredients";
 import { buyTimes, isFrequent } from "./price";
 import { effectiveExpiry, needsAttention } from "./expiry";
@@ -114,7 +115,7 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
    * - `times-*` เรียงตามจำนวนครั้งที่ซื้อ (`buyTimes`) = ตัวเดียวกับที่ชิป "ซื้อบ่อย" ใช้
    *
    * ของที่ไม่รู้วันที่ (ค่าว่าง) ถือว่าเก่าสุดเสมอ แล้วจัดเรียงกันเองตามลำดับใน `db.items`
-   * (ของใหม่ถูก append ต่อท้ายเสมอ ดู useProductActions.save/importFromShopee)
+   * (ของใหม่ถูก append ต่อท้ายเสมอ ดู useProductActions.save/importOrder)
    */
   const sorters = useMemo(() => {
     const order = new Map(items.map((i, idx) => [i.id, idx]));
@@ -193,7 +194,7 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
           (i.ingredients || "").toLowerCase().includes(q) ||
           (i.location || "").toLowerCase().includes(q) ||
           (i.shop || "").toLowerCase().includes(q)) &&
-        (uncategorizedOnly ? i.cats.length === 0 : filterCats.length === 0 || i.cats.some((c) => filterCats.includes(c))) &&
+        (uncategorizedOnly ? i.cats.length === 0 : matchesCatFilter(i.cats, filterCats)) &&
         matchStock(i) &&
         matchTag(i) &&
         matchShop(i)

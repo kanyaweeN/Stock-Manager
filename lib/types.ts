@@ -56,7 +56,7 @@ export interface StockItem {
   link?: string;
   status?: ItemStatus;
   /** ที่มาของรายการ เช่น นำเข้าจาก Shopee — ใช้แสดงเป็น tag แยกจากหมวดหมู่จริง */
-  source?: "shopee" | "";
+  source?: ImportSource | "";
   /** ราคา **ต่อ 1 แพ็ค/ชิ้น** (ไม่ใช่ยอดรวมที่จ่าย) — ยอดจ่ายจริง = price × buyQty */
   price?: number;
   /** ซื้อมากี่แพ็คในครั้งล่าสุด — ใช้โชว์ยอดที่จ่ายจริงเฉยๆ ไม่มีผลกับต้นทุนต่อหน่วยใน /cost */
@@ -231,6 +231,12 @@ export interface PurchasePlan {
   updatedAt?: string;
 }
 
+/**
+ * ร้านออนไลน์ที่นำเข้าออเดอร์ได้ — รายละเอียดของแต่ละร้าน (ป้ายยอดเงิน/รูปแบบวันที่/วิธีหาชื่อร้าน)
+ * อยู่ที่ `lib/importSites.ts` ที่เดียว **เพิ่มร้านใหม่ต้องเติมทั้งสองที่**
+ */
+export type ImportSource = "shopee" | "lazada" | "watsons" | "konvy";
+
 export interface ImportCandidate {
   name: string;
   qty: number;
@@ -239,6 +245,8 @@ export interface ImportCandidate {
   cats: string[];
   status: ItemStatus;
   include: boolean;
+  /** ร้านออนไลน์ที่แถวนี้ถูกแกะมา — ติดเป็น `StockItem.source` ให้ของที่นำเข้าใหม่ */
+  source: ImportSource;
   /** ราคา **ต่อ 1 แพ็ค/ชิ้น** (= lineTotal ÷ qty) — เป็นค่าที่เอาไปลงสต็อกจริง */
   price?: number;
   /** ยอดรวมทั้งแถวที่ Shopee โชว์ (ราคาต่อชิ้น × จำนวน) — เก็บไว้ให้ผู้ใช้ตรวจทานและสลับโหมดราคาได้ */

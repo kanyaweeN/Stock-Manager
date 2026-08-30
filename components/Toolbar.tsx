@@ -53,7 +53,9 @@ interface Props {
 
 /**
  * แถบบนของหน้าสินค้า — เหลือแค่ ค้นหา / ปุ่มหลัก / เมนู ⋯ แล้วผลักคำสั่งที่ใช้นานๆ ครั้ง
- * (นำเข้า, ส่งออก, สร้างสูตร, เลือกหลายอัน) เข้าไปในเมนู ส่วนตัวกรองอยู่แถวล่างและโชว์เฉพาะที่เปิดใช้อยู่
+ * (ส่งออก, สร้างสูตร) เข้าไปในเมนู ส่วนตัวกรองอยู่แถวล่างและโชว์เฉพาะที่เปิดใช้อยู่
+ * ยกเว้น "เลือกหลายรายการ" ที่เป็นปุ่มโชว์ตลอดท้ายแถวตัวกรอง — ใช้บ่อยเกินกว่าจะซ่อนในเมนู
+ * และเป็นปุ่มเดียวที่ต้องกดก่อนเสมอเวลาจะจัดกลุ่ม/ย้ายหมวด/ลบทีละหลายชิ้น
  */
 export default function Toolbar(p: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -95,8 +97,8 @@ export default function Toolbar(p: Props) {
             )}
           </div>
 
-          {/* นำเข้าจาก Shopee เป็นทางหลักที่ของเข้าสต็อก เลยเป็นปุ่มหลัก ส่วนกรอกเองเป็นปุ่มรอง */}
-          <button className="btn-primary topbar__import" onClick={p.onImport}>📥 นำเข้า Shopee</button>
+          {/* นำเข้าออเดอร์จากร้านออนไลน์เป็นทางหลักที่ของเข้าสต็อก เลยเป็นปุ่มหลัก ส่วนกรอกเองเป็นปุ่มรอง */}
+          <button className="btn-primary topbar__import" onClick={p.onImport}>📥 นำเข้าออเดอร์</button>
           <button className="btn-ghost topbar__add" onClick={p.onAdd}>＋ เพิ่มเอง</button>
 
           <div className="menu" ref={menuRef}>
@@ -112,10 +114,6 @@ export default function Toolbar(p: Props) {
               <div className="menu__panel">
                 <button className="menu__item" onClick={run(p.onExport)}><i>📤</i> ส่งออก CSV</button>
                 <button className="menu__item" onClick={run(p.onNewRecipe)}><i>🧮</i> สร้างสูตรต้นทุนใหม่</button>
-                <div className="menu__sep" />
-                <button className="menu__item" onClick={run(p.onToggleSelectMode)}>
-                  <i>☑️</i> {p.selectMode ? "ออกจากโหมดเลือก" : "เลือกหลายรายการ"}
-                </button>
               </div>
             )}
           </div>
@@ -172,12 +170,23 @@ export default function Toolbar(p: Props) {
           {activeFilters > 0 && (
             <button className="filterbar__clear" onClick={p.onClearFilters}>ล้างตัวกรอง ({activeFilters})</button>
           )}
+
+          {/* "เลือกหลายรายการ" เคยอยู่ในเมนู ⋯ — เอาออกมาไว้ท้ายแถวตัวกรองที่ตรึงไว้ จะได้กดทีเดียวติด */}
+          <button
+            className={`select-mode-toggle ${p.selectMode ? "is-active" : ""}`}
+            onClick={p.onToggleSelectMode}
+            aria-pressed={p.selectMode}
+            title={p.selectMode ? "ออกจากโหมดเลือกหลายรายการ" : "เลือกหลายรายการพร้อมกัน"}
+          >
+            <span aria-hidden>{p.selectMode ? "✕" : "☑️"}</span>
+            {p.selectMode ? "ออกจากโหมดเลือก" : "เลือกหลายรายการ"}
+          </button>
         </div>
       </div>
 
-      {/* มือถือ: ปุ่มลอยสองชั้น — ตัวล่างเด่นคือนำเข้า Shopee ตัวเล็กด้านบนคือกรอกเอง */}
+      {/* มือถือ: ปุ่มลอยสองชั้น — ตัวล่างเด่นคือนำเข้าออเดอร์ ตัวเล็กด้านบนคือกรอกเอง */}
       <button className="fab fab--add" onClick={p.onAdd} title="เพิ่มสินค้าเอง" aria-label="เพิ่มสินค้าเอง">＋</button>
-      <button className="fab" onClick={p.onImport} title="นำเข้าจาก Shopee" aria-label="นำเข้าจาก Shopee">📥</button>
+      <button className="fab" onClick={p.onImport} title="นำเข้าออเดอร์จากร้านออนไลน์" aria-label="นำเข้าออเดอร์จากร้านออนไลน์">📥</button>
     </>
   );
 }

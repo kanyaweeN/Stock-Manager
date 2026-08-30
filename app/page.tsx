@@ -13,6 +13,7 @@ import ModalShell from "@/components/ModalShell";
 import AddToTargetModal from "@/components/AddToTargetModal";
 import SelectActionBar from "@/components/SelectActionBar";
 import { useStockDB } from "@/lib/StockDBProvider";
+import { catsInUse, commonCats, previewCatEdit, type CatEditMode } from "@/lib/cats";
 import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/cost";
 import { formatThaiShortDate } from "@/lib/date";
 import { defaultDueDate, emptyPlan, isPlanDone, planLineFromItem, planTotals, sortPlans } from "@/lib/plan";
@@ -22,6 +23,13 @@ import { useSelection } from "@/lib/useSelection";
 import { useRecipeActions } from "@/lib/useRecipeActions";
 import { usePlanActions } from "@/lib/usePlanActions";
 import type { PurchasePlan, Recipe, StockItem } from "@/lib/types";
+
+/** 3 ทางเลือกของกล่องจัดหมวดหมู่ — คำอธิบายอยู่ในตารางนี้ที่เดียว ทั้งข้อความช่วย ชื่อช่อง และคำบนปุ่มยืนยัน */
+const CAT_EDIT_MODES: { key: CatEditMode; label: string; hint: string; field: string; confirm: string }[] = [
+  { key: "add", label: "➕ เพิ่ม", hint: "ติดหมวดหมู่ที่เลือกเพิ่มให้ทุกรายการ — หมวดหมู่เดิมของแต่ละชิ้นยังอยู่ครบ", field: "หมวดหมู่ที่จะเพิ่ม", confirm: "เพิ่มหมวดหมู่" },
+  { key: "remove", label: "➖ เอาออก", hint: "เอาเฉพาะหมวดหมู่ที่เลือกออก — หมวดหมู่อื่นของแต่ละชิ้นไม่ถูกแตะ", field: "หมวดหมู่ที่จะเอาออก", confirm: "เอาหมวดหมู่ออก" },
+  { key: "replace", label: "🔁 แทนที่ทั้งหมด", hint: "ล้างหมวดหมู่เดิมของทุกรายการทิ้ง แล้วใช้ที่เลือกไว้แทน (ไม่เลือกอะไรเลย = ล้างหมวดหมู่ทิ้งทั้งหมด)", field: "หมวดหมู่ใหม่", confirm: "แทนที่หมวดหมู่" },
+];
 
 export default function Home() {
   const { db, setDb } = useStockDB();
@@ -55,6 +63,8 @@ export default function Home() {
   const [groupNameInput, setGroupNameInput] = useState("");
   const [moveCatOpen, setMoveCatOpen] = useState(false);
   const [moveCatValue, setMoveCatValue] = useState<string[]>([]);
+  /** เพิ่ม/เอาออก/แทนที่ — ตั้งต้นที่ "เพิ่ม" เพราะเป็นงานที่ทำบ่อยสุดและเป็นทางเดียวที่ไม่ลบหมวดเดิมของใครทิ้ง */
+  const [moveCatMode, setMoveCatMode] = useState<CatEditMode>("add");
   const [recipeDraft, setRecipeDraft] = useState<Recipe | null>(null);
   /** สินค้าที่กำลังจะใส่เข้าสูตร — เปิดกล่องให้เลือกว่าจะใส่สูตรไหน (null = ไม่ได้เปิด) */
   const [recipeTargetItems, setRecipeTargetItems] = useState<StockItem[] | null>(null);
@@ -85,12 +95,30 @@ export default function Home() {
   };
 
   const openMoveCatPrompt = () => {
+    setMoveCatMode("add");
     setMoveCatValue([]);
     setMoveCatOpen(true);
   };
 
+  /** สลับโหมดแล้วล้างที่เลือกไว้ทิ้ง เพราะหมวดที่เลือกไว้เพื่อ "เพิ่ม" กลายเป็นหมวดที่จะ "ลบ" ทันทีถ้าเก็บไว้ */
+  const changeMoveCatMode = (mode: CatEditMode) => {
+    setMoveCatMode(mode);
+    // โหมดแทนที่เริ่มจากหมวดที่ทุกชิ้นมีเหมือนกัน จะได้แก้ต่อจากของเดิมแทนที่จะเริ่มจากว่าง
+    setMoveCatValue(mode === "replace" ? commonCats(selectedItems.map((i) => i.cats)) : []);
+  };
+
+  /** ตัวอย่างผลลัพธ์ของทุกชิ้นที่เลือก — ดู previewCatEdit ใน lib/cats.ts */
+  const moveCatPreview = useMemo(
+    () => selectedItems.map((item) => ({ item, ...previewCatEdit(item.cats, moveCatValue, moveCatMode) })),
+    [selectedItems, moveCatValue, moveCatMode],
+  );
+  const moveCatChangedCount = moveCatPreview.filter((p) => p.changed).length;
+  const moveCatMeta = CAT_EDIT_MODES.find((m) => m.key === moveCatMode) ?? CAT_EDIT_MODES[0];
+  // โหมด "เอาออก" ให้เลือกได้เฉพาะหมวดที่ของกลุ่มนี้ใช้อยู่จริง จะได้ไม่ต้องงมในลิสต์ยาวๆ ที่กดแล้วไม่มีอะไรเกิดขึ้น
+  const moveCatOptions = moveCatMode === "remove" ? catsInUse(selectedItems.map((i) => i.cats)) : categorySuggestions;
+
   const confirmMoveCat = () => {
-    actions.setCatsForItems([...selectedIds], moveCatValue);
+    actions.setCatsForItems([...selectedIds], moveCatValue, moveCatMode);
     setMoveCatOpen(false);
     exitSelectMode();
   };
@@ -107,8 +135,13 @@ export default function Home() {
     else setRecipeTargetItems(chosen);
   };
 
+  /**
+   * ของที่อยู่ในสูตรนั้นแล้วจะไม่ถูกใส่ซ้ำ — สองบรรทัดที่ผูกสินค้าชิ้นเดียวกันคือต้นทุนก้อนเดียวที่ถูกบวกสองรอบ
+   * (ยังไม่บันทึกให้ตรงนี้ เปิด RecipeModal ให้กรอก "ใช้ไป" ก่อนแล้วค่อยกดบันทึกเอง)
+   */
   const addToExistingRecipe = (recipe: Recipe) => {
-    const chosen = recipeTargetItems ?? [];
+    const inRecipe = new Set(recipe.lines.map((l) => l.itemId).filter(Boolean));
+    const chosen = (recipeTargetItems ?? []).filter((i) => !inRecipe.has(i.id));
     setRecipeTargetItems(null);
     setRecipeDraft({ ...recipe, lines: [...recipe.lines, ...chosen.map(lineFromItem)] });
   };
@@ -318,7 +351,15 @@ export default function Home() {
           pickLabel="เลือกสูตรที่มีอยู่"
           targets={recipes}
           targetKey={(r) => r.id}
-          targetName={(r) => r.name || "(ไม่มีชื่อ)"}
+          targetName={(r) => {
+            const already = recipeTargetItems.filter((i) => r.lines.some((l) => l.itemId === i.id)).length;
+            return (
+              <>
+                {r.name || "(ไม่มีชื่อ)"}
+                {already > 0 && <small> · มีอยู่แล้ว {already}</small>}
+              </>
+            );
+          }}
           targetMeta={(r) => `วัตถุดิบ ${r.lines.length} · ${baht(recipeTotals(r).perUnitCost)}/${r.yieldUnit}`}
           onPick={addToExistingRecipe}
           newLabel="+ สูตรใหม่"
@@ -333,7 +374,7 @@ export default function Home() {
         items={db.items}
         orders={db.orders}
         onClose={() => setImportOpen(false)}
-        onImport={actions.importFromShopee}
+        onImport={actions.importOrder}
       />
 
       {groupNameOpen && (
@@ -366,30 +407,55 @@ export default function Home() {
       )}
 
       {moveCatOpen && (
-        <ModalShell open title={`ย้ายหมวดหมู่ ${selectedItems.length} รายการ`} onClose={() => setMoveCatOpen(false)}>
+        <ModalShell open title={`จัดหมวดหมู่ ${selectedItems.length} รายการ`} onClose={() => setMoveCatOpen(false)}>
           <div className="modal-body">
-            <p className="sub sub-tight text-xs">
-              หมวดหมู่ใหม่ที่เลือกจะไปแทนที่หมวดหมู่เดิมของทุกรายการที่เลือกไว้ (เลือกว่างไว้เพื่อลบหมวดหมู่ออกทั้งหมด)
-            </p>
-            <div className="category-list" style={{ marginBottom: 12 }}>
-              {selectedItems.map((i) => (
-                <div className="category-row" key={i.id}><span>{i.name}</span></div>
+            <div className="cat-modes">
+              {CAT_EDIT_MODES.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  className={`chip-toggle${moveCatMode === m.key ? " is-active" : ""}`}
+                  aria-pressed={moveCatMode === m.key}
+                  onClick={() => changeMoveCatMode(m.key)}
+                >
+                  {m.label}
+                </button>
               ))}
             </div>
+            <p className="sub sub-tight text-xs">{moveCatMeta.hint}</p>
             <div className="field">
-              <label>หมวดหมู่ใหม่</label>
+              <label>{moveCatMeta.field}</label>
               <CategoryMultiSelect
-                categories={categorySuggestions}
+                categories={moveCatOptions}
                 selected={moveCatValue}
                 onChange={setMoveCatValue}
-                allowCreate
-                emptyLabel="ไม่มีหมวดหมู่"
+                allowCreate={moveCatMode !== "remove"}
+                emptyLabel={moveCatMode === "replace" ? "ไม่มีหมวดหมู่" : "ยังไม่ได้เลือก"}
               />
+            </div>
+            <div className="cat-preview__head">
+              ผลลัพธ์ · เปลี่ยน {moveCatChangedCount} จาก {selectedItems.length} รายการ
+            </div>
+            <div className="cat-preview">
+              {moveCatPreview.map(({ item, after, added, removed, changed }) => (
+                <div className={`cat-preview__row${changed ? " is-changed" : ""}`} key={item.id}>
+                  <span className="cat-preview__name">{item.name}</span>
+                  <span className="cat-preview__cats">
+                    {after.length === 0 && removed.length === 0 && <span className="cat-preview__none">ไม่มีหมวดหมู่</span>}
+                    {after.map((c) => (
+                      <span key={c} className={`cat-preview__chip${added.includes(c) ? " cat-preview__chip--add" : ""}`}>{c}</span>
+                    ))}
+                    {removed.map((c) => (
+                      <span key={`-${c}`} className="cat-preview__chip cat-preview__chip--del">{c}</span>
+                    ))}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
           <div className="modal-actions">
             <button className="btn-ghost" onClick={() => setMoveCatOpen(false)}>ยกเลิก</button>
-            <button className="btn-primary" onClick={confirmMoveCat}>ย้ายหมวดหมู่</button>
+            <button className="btn-primary" onClick={confirmMoveCat} disabled={moveCatChangedCount === 0}>{moveCatMeta.confirm}</button>
           </div>
         </ModalShell>
       )}

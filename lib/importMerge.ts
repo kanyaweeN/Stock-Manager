@@ -1,5 +1,5 @@
 /**
- * ตรรกะจับคู่/รวมรายการตอนนำเข้าจาก Shopee — คำนวณล้วนๆ ไม่มี state ไม่มี DOM
+ * ตรรกะจับคู่/รวมรายการตอนนำเข้าออเดอร์ (ทุกร้าน) — คำนวณล้วนๆ ไม่มี state ไม่มี DOM
  *
  * แยกออกมาจาก `components/ImportModal.tsx` เพราะเป็นตรรกะที่**พลาดแล้วยอดเงินเพี้ยนเงียบๆ**
  * (จับคู่ผิด = จำนวนไปบวกใส่ของผิดชิ้น, หารราคาผิด = ต้นทุนกับยอดสรุปเพี้ยนตามทั้งหมด)
@@ -114,6 +114,41 @@ export function applyPriceMode(list: ImportCandidate[], perUnit: boolean): Impor
   return list.map((c) =>
     c.lineTotal == null ? c : { ...c, price: perUnit && c.qty > 0 ? roundBaht(c.lineTotal / c.qty) : c.lineTotal }
   );
+}
+
+/**
+ * ยอดรวมของแถวหนึ่งตามโหมดราคาที่เลือกอยู่ — คิดจาก `lineTotal` (ยอดดิบจากหน้าเว็บ)
+ * ไม่ใช่ `price` ที่ผู้ใช้แก้ได้ จะได้วัดเฉพาะว่า "แกะครบไหม" ไม่ใช่ "ผู้ใช้พิมพ์อะไรไว้"
+ *
+ * `perUnit` = หน้านั้นโชว์ยอดรวมทั้งแถว (ต้องหารเป็นราคาต่อชิ้น) ⇒ ยอดดิบคือยอดของทั้งแถวอยู่แล้ว
+ * ส่วนหน้าที่โชว์ราคาต่อชิ้น (Lazada/Watsons) ต้องคูณจำนวนกลับก่อนเอาไปเทียบกับยอดบนหน้า
+ */
+export function rowLineTotal(c: ImportCandidate, perUnit: boolean): number {
+  if (c.lineTotal == null) return (c.price ?? 0) * c.qty;
+  return perUnit ? c.lineTotal : c.lineTotal * c.qty;
+}
+
+/** ผลรวมที่แกะได้กับยอดบนหน้าถือว่าตรงกันเมื่อต่างกันไม่ถึงสตางค์เดียว */
+const MONEY_EPS = 0.5;
+
+/**
+ * เดาว่าราคาที่หน้านั้นโชว์เป็น "ยอดรวมทั้งแถว" หรือ "ราคาต่อชิ้น" โดยเทียบกับยอด "รวมค่าสินค้า" บนหน้า
+ *
+ * เดาผิดแล้วราคาต่อชิ้นเพี้ยนเป็นเท่าตัวแบบเงียบๆ (แล้วลามไปทั้งต้นทุนและยอดสรุป) แต่ละร้านโชว์ไม่เหมือนกัน
+ * และบางร้านก็เปลี่ยนไปมาระหว่างหน้ารวม/หน้ารายละเอียด — ถ้าหน้านั้นมียอดให้เทียบก็ไม่ต้องเดา
+ * ไม่มียอดให้เทียบค่อยใช้ค่าเริ่มต้นของร้านนั้น (ผู้ใช้สลับเองได้อยู่แล้ว)
+ */
+export function detectPricePerUnit(
+  list: ImportCandidate[],
+  goodsSubtotal: number | undefined,
+  fallback: boolean
+): boolean {
+  const rows = list.filter((c) => c.lineTotal != null);
+  if (goodsSubtotal == null || rows.length === 0) return fallback;
+  const sum = (perUnit: boolean) => rows.reduce((s, c) => s + rowLineTotal(c, perUnit), 0);
+  if (Math.abs(sum(true) - goodsSubtotal) < MONEY_EPS) return true;
+  if (Math.abs(sum(false) - goodsSubtotal) < MONEY_EPS) return false;
+  return fallback;
 }
 
 /** ออเดอร์ที่กำลังนำเข้าเก่ากว่าครั้งล่าสุดที่บันทึกไว้ = กำลังลงข้อมูลย้อนหลัง */

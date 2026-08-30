@@ -5,7 +5,7 @@ import RecipeModal from "@/components/RecipeModal";
 import MaterialLabel from "@/components/MaterialLabel";
 import { useStockDB } from "@/lib/StockDBProvider";
 import { useRecipeActions } from "@/lib/useRecipeActions";
-import { baht, emptyRecipe, lineCost, lineIssue, recipeTotals } from "@/lib/cost";
+import { baht, driftNote, emptyRecipe, lineCost, lineIssue, recipeTotals, stockDrift } from "@/lib/cost";
 import { DEFAULT_PRICING, pct, suggestPrice } from "@/lib/pricing";
 import type { Recipe } from "@/lib/types";
 
@@ -132,11 +132,18 @@ export default function CostPage() {
                       {r.lines.map((l) => {
                         const cost = lineCost(l);
                         const issue = lineIssue(l);
+                        // ราคา/ขนาดแพ็คในสูตรเป็นสแนปช็อต — แก้ที่หน้าสินค้าแล้วต้องมาเปิดสูตรกด "ใช้ค่าล่าสุด" เอง
+                        const drift = stockDrift(l, l.itemId ? itemById.get(l.itemId) : undefined);
                         return (
                           <tr key={l.id}>
                             <td>
                               <MaterialLabel line={l} item={l.itemId ? itemById.get(l.itemId) : undefined} />
                               {issue && <div className="cost-line__warn text-xs">⚠️ {issue}</div>}
+                              {drift && (
+                                <div className="cost-line__drift text-xs">
+                                  <span>{drift.fillsUnknownPack ? "📦" : "🔄"} {driftNote(drift, l)} — กดแก้ไขสูตรเพื่ออัปเดต</span>
+                                </div>
+                              )}
                             </td>
                             <td>{l.usedAmount} {l.unit}</td>
                             <td>

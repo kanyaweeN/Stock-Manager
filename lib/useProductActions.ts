@@ -1,5 +1,6 @@
 "use client";
 
+import { applyCatEdit, type CatEditMode } from "./cats";
 import { todayISO } from "./date";
 import type { StockDB } from "./db";
 import { csvRows, downloadFile } from "./download";
@@ -28,7 +29,7 @@ function exportCsv(items: StockItem[]) {
   downloadFile(`stock-${todayISO()}.csv`, header + rows);
 }
 
-/** รวม CRUD ทั้งหมดของรายการสินค้า (เพิ่ม/แก้ไข/ลบ/ปรับจำนวน/นำเข้าจาก Shopee/ส่งออก CSV) */
+/** รวม CRUD ทั้งหมดของรายการสินค้า (เพิ่ม/แก้ไข/ลบ/ปรับจำนวน/นำเข้าออเดอร์จากร้านออนไลน์/ส่งออก CSV) */
 export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) => void) {
   const setItems = (updater: (prev: StockItem[]) => StockItem[]) => {
     setDb((prev) => ({ ...prev, items: updater(prev.items) }));
@@ -109,9 +110,16 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, groupId: undefined, groupName: undefined } : i)));
   };
 
-  /** ตั้งหมวดหมู่ให้สินค้าหลายชิ้นพร้อมกัน (ทับของเดิมทั้งหมด) ใช้ตอนเลือกหลายอันแล้วอยากย้ายหมวดหมู่รวด */
-  const setCatsForItems = (ids: string[], cats: string[]) => {
-    setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, cats } : i)));
+  /**
+   * แก้หมวดหมู่ให้สินค้าหลายชิ้นพร้อมกัน ใช้ตอนเลือกหลายอันแล้วอยากจัดหมวดรวดเดียว
+   *
+   * `mode` ตัดสินว่าหมวดเดิมของแต่ละชิ้นจะเป็นยังไง — `add` ติดเพิ่ม, `remove` เอาเฉพาะที่เลือกออก,
+   * `replace` ทับทั้งหมด (พฤติกรรมเดิม) ตรรกะจริงอยู่ที่ `applyCatEdit` ใน lib/cats.ts
+   * ซึ่งกล่องยืนยันเรียกตัวเดียวกันไปแสดงตัวอย่างผลลัพธ์ ที่เห็นกับที่ได้จริงจึงตรงกันเสมอ
+   */
+  const setCatsForItems = (ids: string[], cats: string[], mode: CatEditMode = "replace") => {
+    const target = new Set(ids);
+    setItems((prev) => prev.map((i) => (target.has(i.id) ? { ...i, cats: applyCatEdit(i.cats, cats, mode) } : i)));
   };
 
   /** ปัก/เอาดาวออก — เก็บเฉพาะตอนเป็นของโปรดจริงๆ (ดู normalizeItem ใน lib/db.ts) */
@@ -147,13 +155,13 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
   const dec = (id: string) => changeQty(id, -1);
 
   /**
-   * นำเข้ารายการจากออเดอร์ Shopee
+   * นำเข้ารายการจากออเดอร์ร้านออนไลน์ (Shopee / Lazada / Watsons / Konvy — ดู lib/importSites.ts)
    *
    * `extras` คือค่าส่ง/ส่วนลดระดับออเดอร์ที่ไม่ได้อยู่ในราคาสินค้า — ถ้ามีจริง (ไม่ใช่ 0 ทั้งคู่)
    * จะบันทึกเป็น `PurchaseOrder` 1 ก้อนใน `db.orders` แล้วปั๊ม `orderId` ลงจุดราคาทุกจุดของรอบนี้
    * หน้าสรุปยอดจะได้บวกเงินก้อนนี้ **ครั้งเดียวต่อออเดอร์** ไม่ใช่ซ้ำตามจำนวนชิ้นในออเดอร์
    */
-  const importFromShopee = (
+  const importOrder = (
     chosen: ImportCandidate[],
     extras?: { shipping: number; discount: number; date?: string; shop?: string; note?: string }
   ) => {
@@ -224,7 +232,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
         img: c.img,
         link: c.link,
         status: c.status,
-        source: "shopee" as const,
+        source: c.source,
         price: c.price,
         buyQty: c.qty,
         priceHistory: c.price != null
@@ -270,6 +278,6 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
 
   return {
     save, remove, removeMany, restoreFromTrash, deleteForever, emptyTrash,
-    groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, importFromShopee, exportCsv,
+    groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, importOrder, exportCsv,
   };
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   bahtPerUnit,
+  driftNote,
+  duplicateLineIds,
+  stockDrift,
   lineFromItem,
   parsePackSize,
   perUnitPrice,
@@ -9,7 +12,7 @@ import {
   totalPieces,
 } from "@/lib/cost";
 import { priceForMargin, roundPrice } from "@/lib/pricing";
-import type { PricingSettings, Recipe, StockItem } from "@/lib/types";
+import type { PricingSettings, Recipe, RecipeLine, StockItem } from "@/lib/types";
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({
   id: "i", name: "x", cats: [], qty: 1, min: 0, note: "", ...over,
@@ -187,5 +190,70 @@ describe("bahtPerUnit", () => {
     expect(bahtPerUnit(90 / 30000)).toContain("0.003");
     expect(bahtPerUnit(0.9)).toBe("฿0.9");
     expect(bahtPerUnit(0)).toBe("฿0");
+  });
+});
+
+describe("stockDrift", () => {
+  const line = (over: Partial<RecipeLine> = {}): RecipeLine => ({
+    id: "l", itemId: "i", name: "x", buyPrice: 30, packAmount: 1000, unit: "g", usedAmount: 50, ...over,
+  });
+
+  it("ตรงกับสต็อก = null", () => {
+    expect(stockDrift(line(), item({ price: 30, packAmount: 1000, unit: "g" }))).toBeNull();
+    expect(stockDrift(line(), item({ price: 30, size: "1 kg" }))).toBeNull();
+  });
+
+  it("ไม่ได้ผูกกับสต็อก / หาสินค้าไม่เจอ = null", () => {
+    expect(stockDrift(line({ itemId: undefined }), item({ price: 999 }))).toBeNull();
+    expect(stockDrift(line(), undefined)).toBeNull();
+  });
+
+  it("กรอกขนาดแพ็คที่หน้าสินค้าทีหลัง — สูตรที่ยังไม่รู้ต้องเสนอเติมให้", () => {
+    const d = stockDrift(line({ packAmount: 0, unit: "ชิ้น" }), item({ price: 30, packAmount: 1000, unit: "g" }));
+    expect(d).toMatchObject({ packAmount: 1000, unit: "g", fillsUnknownPack: true });
+    expect(driftNote(d!, line({ packAmount: 0, unit: "ชิ้น" }))).toContain("1,000 g");
+  });
+
+  it("ราคาเปลี่ยนหลังซื้อรอบใหม่", () => {
+    const d = stockDrift(line(), item({ price: 45, packAmount: 1000, unit: "g" }));
+    expect(d).toMatchObject({ buyPrice: 45, fillsUnknownPack: false });
+    expect(d!.packAmount).toBeUndefined();
+    expect(driftNote(d!, line())).toContain("฿45");
+  });
+
+  it("สต็อกยังไม่กรอกราคา = ไม่รู้ ห้ามลากราคาในสูตรลง 0", () => {
+    expect(stockDrift(line(), item({ packAmount: 1000, unit: "g" }))).toBeNull();
+  });
+
+  it("สต็อกเดาขนาดแพ็คไม่ออก = ไม่นับว่าต่าง", () => {
+    expect(stockDrift(line(), item({ price: 30, size: "ขวดกลาง" }))).toBeNull();
+  });
+});
+
+describe("duplicateLineIds", () => {
+  const dl = (id: string, over: Partial<RecipeLine> = {}) => ({ id, name: "", ...over });
+
+  it("ผูกสินค้าชิ้นเดียวกัน = ตัวที่มาทีหลังคือตัวซ้ำ (ตัวแรกไม่ใช่)", () => {
+    const dups = duplicateLineIds([dl("a", { itemId: "i1" }), dl("b", { itemId: "i2" }), dl("c", { itemId: "i1" })]);
+    expect([...dups]).toEqual(["c"]);
+  });
+
+  it("ซ้ำสามบรรทัดก็เตือนทุกตัวที่เกินตัวแรก", () => {
+    const dups = duplicateLineIds([dl("a", { itemId: "i1" }), dl("b", { itemId: "i1" }), dl("c", { itemId: "i1" })]);
+    expect([...dups]).toEqual(["b", "c"]);
+  });
+
+  it("บรรทัดที่กรอกเองเทียบด้วยชื่อ ไม่สนช่องว่างหัวท้าย/ตัวพิมพ์", () => {
+    const dups = duplicateLineIds([dl("a", { name: "ผงมุก" }), dl("b", { name: " ผงมุก " }), dl("c", { name: "Mica" }), dl("d", { name: "mica" })]);
+    expect([...dups]).toEqual(["b", "d"]);
+  });
+
+  it("บรรทัดเปล่าหลายบรรทัด = กำลังกรอกอยู่ ไม่ใช่ซ้ำ", () => {
+    expect(duplicateLineIds([dl("a"), dl("b"), dl("c")]).size).toBe(0);
+  });
+
+  it("ชื่อเดียวกันแต่ผูกคนละชิ้น = คนละของ (คนละร้าน/คนละสูตรผสม)", () => {
+    const dups = duplicateLineIds([dl("a", { itemId: "i1", name: "กลีเซอรีน" }), dl("b", { itemId: "i2", name: "กลีเซอรีน" })]);
+    expect(dups.size).toBe(0);
   });
 });

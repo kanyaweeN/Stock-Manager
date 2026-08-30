@@ -300,3 +300,96 @@ export function emptyRecipe(): Recipe {
     sellPrice: undefined,
   };
 }
+
+// ─────────────────────────────────────────────────────────────
+// สูตร ↔ สต็อก: ค่าที่ก๊อปมาตอนเลือกสินค้า "ค้าง" อยู่กับที่
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * `RecipeLine` เก็บราคา/ขนาดแพ็คเป็น**สแนปช็อต** ที่ก๊อปมาตอนกดเลือกสินค้าเท่านั้น
+ * (`lineFromItem`) — แก้ราคาหรือกรอก `packAmount` ที่หน้าสินค้าทีหลัง บรรทัดในสูตรไม่ขยับตาม
+ *
+ * ตั้งใจให้เป็นสแนปช็อต (สูตรที่กรอกราคาโปรโมชั่นเองไม่ควรโดนราคาปัจจุบันทับ) แต่ผู้ใช้ต้อง
+ * **เห็น**ว่ามันไม่ตรงกันแล้ว ไม่งั้นจะเจอ "กรอกขนาดแพ็คที่หน้าสินค้าแล้ว แต่สูตรยังบอกว่าไม่รู้"
+ * — ตัวนี้ตอบว่าไม่ตรงตรงไหน แล้วให้ UI เสนอปุ่มดึงค่าล่าสุดมาทับ
+ */
+export interface StockDrift {
+  /** ค่าตามสต็อก**ปัจจุบัน** เฉพาะฟิลด์ที่ต่างจากในสูตร */
+  buyPrice?: number;
+  packAmount?: number;
+  unit?: string;
+  /** สูตรยังไม่รู้ขนาดแพ็ค แต่สต็อกรู้แล้ว = เติมของที่ขาด ไม่ใช่ทับค่าที่ตั้งใจกรอก */
+  fillsUnknownPack: boolean;
+}
+
+type DriftLine = Pick<RecipeLine, "itemId" | "buyPrice" | "packAmount" | "unit">;
+
+/**
+ * เทียบบรรทัดในสูตรกับสินค้าในสต็อกตอนนี้ — คืน `null` เมื่อตรงกันหมด, ไม่ได้ผูกกับสต็อก,
+ * หรือหาสินค้าไม่เจอแล้ว (กรณีหลังมี ⚠️ ของตัวเองอยู่แล้ว)
+ *
+ * ราคาที่สต็อกยังไม่กรอก (`price == null`) ไม่นับว่าต่าง — ถือว่า "ไม่รู้" ห้ามลากราคาในสูตรลง 0
+ * และขนาดแพ็คที่สต็อกเดาไม่ออกก็ไม่นับเช่นกัน (`packOf` คืน null)
+ */
+export function stockDrift(line: DriftLine, item?: StockItem): StockDrift | null {
+  if (!line.itemId || !item) return null;
+  const pack = packOf(item);
+  const drift: StockDrift = { fillsUnknownPack: !(line.packAmount > 0) && !!pack };
+  if (item.price != null && Number.isFinite(item.price) && item.price !== line.buyPrice) {
+    drift.buyPrice = item.price;
+  }
+  if (pack) {
+    if (pack.amount !== line.packAmount) drift.packAmount = pack.amount;
+    if (pack.unit !== line.unit) drift.unit = pack.unit;
+  }
+  if (drift.buyPrice === undefined && drift.packAmount === undefined && drift.unit === undefined) {
+    return null;
+  }
+  return drift;
+}
+
+/** ประโยคไทยอธิบายว่าไม่ตรงตรงไหน — เก็บไว้ที่เดียวเพราะใช้ทั้งใน `RecipeModal` และหน้า `/cost` */
+export function driftNote(drift: StockDrift, line: DriftLine): string {
+  if (drift.fillsUnknownPack) {
+    return `สต็อกระบุไว้แล้วว่า 1 แพ็ค = ${amountText(drift.packAmount ?? 0)} ${drift.unit ?? line.unit}`;
+  }
+  const parts: string[] = [];
+  if (drift.buyPrice !== undefined) parts.push(`ราคา ${baht(line.buyPrice)} → ${baht(drift.buyPrice)}`);
+  if (drift.packAmount !== undefined || drift.unit !== undefined) {
+    const from = `${amountText(line.packAmount)} ${line.unit}`;
+    const to = `${amountText(drift.packAmount ?? line.packAmount)} ${drift.unit ?? line.unit}`;
+    parts.push(`1 แพ็ค ${from} → ${to}`);
+  }
+  return `ค่าในสูตรไม่ตรงกับสต็อกตอนนี้: ${parts.join(" · ")}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// วัตถุดิบชิ้นเดียวกันถูกใส่ซ้ำในสูตรเดียว
+// ─────────────────────────────────────────────────────────────
+
+type DupLine = Pick<RecipeLine, "id" | "itemId" | "name">;
+
+/**
+ * บรรทัดที่ซ้ำกับบรรทัดก่อนหน้าในสูตรเดียวกัน — คืน id ของ**ตัวที่มาทีหลัง**เท่านั้น
+ * (ตัวแรกไม่ใช่ตัวซ้ำ ถ้าเตือนทั้งคู่จะไม่รู้ว่าต้องลบตัวไหน)
+ *
+ * ซ้ำ = ผูกกับสินค้าในสต็อกชิ้นเดียวกัน (`itemId`) หรือถ้ากรอกเองก็ดูที่ชื่อ (ตัดช่องว่างหัวท้าย
+ * ไม่สนตัวพิมพ์เล็กใหญ่) — บรรทัดที่ยังไม่มีทั้ง `itemId` และชื่อไม่นับ เพราะบรรทัดเปล่าหลาย
+ * บรรทัดคือกำลังกรอกอยู่ ไม่ใช่ความผิดพลาด
+ *
+ * **เตือนอย่างเดียว ไม่กันไว้** — ต้นทุนของบรรทัดที่ซ้ำถูกบวกเข้าค่าวัตถุดิบรวมสองรอบเงียบๆ
+ * (`recipeTotals` วนบวกทุกบรรทัด) แต่ใช้ของชิ้นเดียวกันสองขั้นตอนในสูตรเดียวก็มีจริง
+ * จึงให้ผู้ใช้ตัดสินเอง
+ */
+export function duplicateLineIds(lines: DupLine[]): Set<string> {
+  const seen = new Set<string>();
+  const dups = new Set<string>();
+  for (const l of lines) {
+    const name = l.name.trim();
+    if (!l.itemId && !name) continue;
+    const key = l.itemId ? `id:${l.itemId}` : `name:${name.toLowerCase()}`;
+    if (seen.has(key)) dups.add(l.id);
+    else seen.add(key);
+  }
+  return dups;
+}

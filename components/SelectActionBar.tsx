@@ -28,7 +28,7 @@ export default function SelectActionBar({
       </button>
       {/* จัดกลุ่มของชิ้นเดียวไม่มีความหมาย จึงต้องเลือกอย่างน้อย 2 ต่างจากปุ่มอื่นที่ 1 ก็พอ */}
       <button className="btn-primary" disabled={selectedCount < 2} onClick={onGroup}>👥 จัดกลุ่มที่เลือก</button>
-      <button className="btn-ghost" disabled={selectedCount < 1} onClick={onMoveCats}>🏷️ ย้ายหมวดหมู่</button>
+      <button className="btn-ghost" disabled={selectedCount < 1} onClick={onMoveCats}>🏷️ จัดหมวดหมู่</button>
       <button className="btn-ghost" disabled={selectedCount < 1} onClick={onToggleFav}>⭐ ของโปรด</button>
       <button className="btn-ghost" disabled={selectedCount < 1} onClick={onAddToRecipe}>🧮 ใส่ในสูตรต้นทุน</button>
       <button className="btn-ghost" disabled={selectedCount < 1} onClick={onAddToPlan}>🛒 ใส่ในแผนซื้อของ</button>

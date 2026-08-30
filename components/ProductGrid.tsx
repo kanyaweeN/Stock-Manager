@@ -11,6 +11,7 @@ import { isLow, isOutOfStock } from "@/lib/stock";
 import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/usage";
 import { buyTimes, priceStats, FREQUENT_MIN_TIMES } from "@/lib/price";
 import { shopKey } from "@/lib/orders";
+import { sourceLabel } from "@/lib/importSites";
 import { amountText, bahtPerUnit, perUnitPrice, totalPieces, type PerUnitPrice, type PieceCount } from "@/lib/cost";
 import type { SkinProfile } from "@/lib/db";
 
@@ -258,9 +259,9 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
           <div className="product-card__category">
             {i.cats.length > 0 ? i.cats.join(" · ") : "ไม่มีหมวดหมู่"}
           </div>
-          {(i.source === "shopee" || i.variant || i.shop) && (
+          {(sourceLabel(i.source) || i.variant || i.shop) && (
             <div className="product-card__tags">
-              {i.source === "shopee" && <span className="source-tag">Shopee</span>}
+              {sourceLabel(i.source) && <span className="source-tag">{sourceLabel(i.source)}</span>}
               {i.shop && (onFilterShop ? (
                 <button
                   type="button"
