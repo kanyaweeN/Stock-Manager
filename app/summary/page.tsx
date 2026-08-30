@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { baht } from "@/lib/cost";
-import { daysAgoISO, formatThaiShortDate, todayISO } from "@/lib/date";
-import { extrasInRange, orderExtras, orderNet, sortOrders, totalExtras } from "@/lib/orders";
-import { useStockDB } from "@/lib/StockDBProvider";
-import { useOrderActions } from "@/lib/useOrderActions";
+import { baht } from "@/lib/domain/cost";
+import { daysAgoISO, formatThaiShortDate, todayISO } from "@/lib/core/date";
+import { extrasInRange, orderExtras, orderNet, sortOrders, totalExtras } from "@/lib/domain/orders";
+import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { useOrderActions } from "@/lib/hooks/useOrderActions";
 import {
   byCategory,
   byItem,
@@ -17,7 +17,7 @@ import {
   summaryInsights,
   totalSpend,
   type SpendRow,
-} from "@/lib/summary";
+} from "@/lib/domain/summary";
 
 type RangeMode = "30d" | "90d" | "year" | "all" | "custom";
 

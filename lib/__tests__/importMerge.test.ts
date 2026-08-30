@@ -11,7 +11,7 @@ import {
   oldFieldValue,
   orderMetaFrom,
   rowLineTotal,
-} from "@/lib/importMerge";
+} from "@/lib/import/merge";
 import type { ImportCandidate, StockItem } from "@/lib/types";
 
 const cand = (over: Partial<ImportCandidate> = {}): ImportCandidate => ({

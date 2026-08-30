@@ -8,7 +8,7 @@ import {
   shopKey,
   sortOrders,
   totalExtras,
-} from "@/lib/orders";
+} from "@/lib/domain/orders";
 import type { PurchaseOrder } from "@/lib/types";
 
 const order = (over: Partial<PurchaseOrder> = {}): PurchaseOrder => ({

@@ -11,9 +11,9 @@ import {
   toPlanLineDraft,
   type PlanDraft,
   type PlanLineDraft,
-} from "@/lib/planDraft";
-import { baht } from "@/lib/cost";
-import { todayISO } from "@/lib/date";
+} from "@/lib/forms/planDraft";
+import { baht } from "@/lib/domain/cost";
+import { todayISO } from "@/lib/core/date";
 import {
   SUGGEST_LABELS,
   emptyPlanLine,
@@ -23,7 +23,7 @@ import {
   planTotals,
   suggestDetail,
   suggestForPlan,
-} from "@/lib/plan";
+} from "@/lib/domain/plan";
 import type { PlanPriority, PurchasePlan, StockItem } from "@/lib/types";
 
 interface Props {

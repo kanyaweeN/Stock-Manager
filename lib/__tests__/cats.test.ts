@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyCatEdit, catsInUse, commonCats, dropRedundantParentCats, matchesCatFilter, previewCatEdit } from "../cats";
+import { applyCatEdit, catsInUse, commonCats, dropRedundantParentCats, matchesCatFilter, previewCatEdit } from "@/lib/core/cats";
 
 describe("applyCatEdit", () => {
   it("โหมดเพิ่ม: ติดหมวดใหม่ต่อท้าย ของเดิมยังอยู่ครบ", () => {

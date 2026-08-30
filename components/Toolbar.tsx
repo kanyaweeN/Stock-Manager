@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
-import { TAG_META, type IngredientTag } from "@/lib/ingredients";
-import type { SortKey } from "@/lib/useProductFilters";
+import { TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
+import type { SortKey } from "@/lib/hooks/useProductFilters";
 
 const SORT_LABELS: Record<SortKey, string> = {
   "bought-desc": "ซื้อล่าสุด",

@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { STATUS_OPTIONS } from "@/lib/statusOptions";
+import { STATUS_OPTIONS } from "@/lib/core/statusOptions";
 import CategoryMultiSelect from "@/components/CategoryMultiSelect";
 import IngredientInput from "@/components/IngredientInput";
 import IngredientPanel from "@/components/IngredientPanel";
 import ModalShell from "@/components/ModalShell";
-import { fromProductForm, toProductForm, type ProductForm } from "@/lib/productForm";
+import { fromProductForm, toProductForm, type ProductForm } from "@/lib/forms/productForm";
 import TextField from "@/components/TextField";
-import { amountText, baht, bahtPerUnit, perUnitPrice } from "@/lib/cost";
-import { todayISO, formatThaiShortDate } from "@/lib/date";
-import { effectiveExpiry, expiryLabel } from "@/lib/expiry";
-import { daysUntilEmpty, usageStats } from "@/lib/usage";
+import { amountText, baht, bahtPerUnit, perUnitPrice } from "@/lib/domain/cost";
+import { todayISO, formatThaiShortDate } from "@/lib/core/date";
+import { effectiveExpiry, expiryLabel } from "@/lib/domain/expiry";
+import { daysUntilEmpty, usageStats } from "@/lib/domain/usage";
 import type { SkinProfile } from "@/lib/db";
-import { priceStats, pushPricePoint } from "@/lib/price";
+import { priceStats, pushPricePoint } from "@/lib/domain/price";
 import type { ItemStatus, StockItem } from "@/lib/types";
 
 interface Props {
@@ -67,7 +67,7 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
   const stats = priceStats(form.priceHistory);
   // ราคาต่อชิ้นย่อยตามที่กรอกค้างอยู่ — แปลงฟอร์มเป็นสินค้าจริงด้วยตัวแปลงตัวเดียวกับตอนกดบันทึก
   const perUnit = perUnitPrice(fromProductForm(form, item));
-  // เตือนตั้งแต่ในฟอร์มว่าวันไหนคือวันที่ "ใช้จริง" — ฉลากกับ PAO มักไม่ตรงกัน (ดู lib/expiry.ts)
+  // เตือนตั้งแต่ในฟอร์มว่าวันไหนคือวันที่ "ใช้จริง" — ฉลากกับ PAO มักไม่ตรงกัน (ดู lib/domain/expiry.ts)
   const usage = item ? usageStats(item) : null;
   const runoutDays = item
     ? daysUntilEmpty({

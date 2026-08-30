@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { importSite } from "@/lib/importSites";
+import { importSite } from "@/lib/import/sites";
 import {
   extractCharges,
   extractOrderDate,
@@ -8,7 +8,7 @@ import {
   parseProductText,
   parseQtyLeaf,
   parseQtyLoose,
-} from "@/lib/importText";
+} from "@/lib/import/text";
 
 const charges = (id: Parameters<typeof importSite>[0], text: string) =>
   extractCharges(text, importSite(id).charges);

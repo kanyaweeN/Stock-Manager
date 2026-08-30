@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { searchStockItems } from "@/lib/stockSearch";
+import { searchStockItems } from "@/lib/domain/stockSearch";
 import type { StockItem } from "@/lib/types";
 
 /**

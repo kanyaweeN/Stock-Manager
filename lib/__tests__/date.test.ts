@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysBetween, daysUntil, endOfMonthISO, formatThaiShortDate, monthISO, todayISO } from "@/lib/date";
+import { daysBetween, daysUntil, endOfMonthISO, formatThaiShortDate, monthISO, todayISO } from "@/lib/core/date";
 
 describe("todayISO — ต้องอิงเวลาเครื่อง ไม่ใช่ UTC", () => {
   it("ตี 2 ของวันที่ 29 ต้องได้ 29 ไม่ใช่ 28", () => {

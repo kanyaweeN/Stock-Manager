@@ -6,7 +6,7 @@ import {
   pushUsage,
   runningOut,
   usageStats,
-} from "@/lib/usage";
+} from "@/lib/domain/usage";
 import type { UsagePoint } from "@/lib/types";
 
 describe("pushUsage", () => {

@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import IngredientPanel, { TagChip, WarningList } from "@/components/IngredientPanel";
-import { useStockDB } from "@/lib/StockDBProvider";
+import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import { SKIN_TYPE_LABELS, SKIN_CONCERN_LABELS, type SkinType, type SkinConcern } from "@/lib/db";
-import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, compareIngredients, TAG_META } from "@/lib/ingredients";
+import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, compareIngredients, TAG_META } from "@/lib/domain/ingredients";
 
 function SkinScoreBadge({ score, level }: { score: number; level: string }) {
   return (

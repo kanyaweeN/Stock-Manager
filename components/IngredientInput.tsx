@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { searchProducts, type ProductEntry } from "@/lib/productDb";
+import { searchProducts, type ProductEntry } from "@/lib/domain/productDb";
 import { PasteIcon, ClearIcon } from "@/components/icons";
 
 interface Props {

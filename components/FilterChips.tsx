@@ -1,6 +1,6 @@
 "use client";
 
-import type { StockTab } from "@/lib/useProductFilters";
+import type { StockTab } from "@/lib/hooks/useProductFilters";
 
 /** คีย์ของชิป = แท็บสต็อก + "uncategorized" ที่เดิมเป็น toggle แยก ตอนนี้รวมเป็นชุดเดียวเลือกได้ทีละอัน */
 export type ChipKey = StockTab | "uncategorized";
@@ -14,9 +14,9 @@ export interface ChipCounts {
   uncategorized: number;
   grouped: number;
   fav: number;
-  /** ซื้อซ้ำมาแล้วหลายครั้ง (นับจาก priceHistory ดู lib/price.ts) */
+  /** ซื้อซ้ำมาแล้วหลายครั้ง (นับจาก priceHistory ดู lib/domain/price.ts) */
   frequent: number;
-  /** หมดอายุแล้ว + ใกล้หมดอายุ (ดู lib/expiry.ts) */
+  /** หมดอายุแล้ว + ใกล้หมดอายุ (ดู lib/domain/expiry.ts) */
   expiring: number;
   categories: number;
 }

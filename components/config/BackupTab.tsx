@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { formatThaiShortDate, todayISO } from "@/lib/date";
-import { downloadFile } from "@/lib/download";
-import { sortTrash, TRASH_MAX } from "@/lib/trash";
+import { formatThaiShortDate, todayISO } from "@/lib/core/date";
+import { downloadFile } from "@/lib/core/download";
+import { sortTrash, TRASH_MAX } from "@/lib/domain/trash";
 import type { StockItem } from "@/lib/types";
 import type { StockDB } from "@/lib/db";
 import { DEFAULT_DB, migrateDB } from "@/lib/db";
@@ -11,7 +11,7 @@ import { DEFAULT_DB, migrateDB } from "@/lib/db";
 interface Props {
   db: StockDB;
   onRestore: (db: StockDB) => void;
-  /** กู้ของกลับเข้าสต็อก / ลบถาวร — มาจาก `useProductActions` (ดู lib/trash.ts) */
+  /** กู้ของกลับเข้าสต็อก / ลบถาวร — มาจาก `useProductActions` (ดู lib/domain/trash.ts) */
   onRestoreItem: (id: string) => void;
   onDeleteForever: (item: StockItem) => void;
   onEmptyTrash: (count: number) => void;

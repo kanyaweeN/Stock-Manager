@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import RecipeModal from "@/components/RecipeModal";
 import MaterialLabel from "@/components/MaterialLabel";
-import { useStockDB } from "@/lib/StockDBProvider";
-import { useRecipeActions } from "@/lib/useRecipeActions";
-import { baht, driftNote, emptyRecipe, lineCost, lineIssue, recipeTotals, stockDrift } from "@/lib/cost";
-import { DEFAULT_PRICING, pct, suggestPrice } from "@/lib/pricing";
+import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { useRecipeActions } from "@/lib/hooks/useRecipeActions";
+import { baht, driftNote, emptyRecipe, lineCost, lineIssue, recipeTotals, stockDrift } from "@/lib/domain/cost";
+import { DEFAULT_PRICING, pct, suggestPrice } from "@/lib/domain/pricing";
 import type { Recipe } from "@/lib/types";
 
 export default function CostPage() {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planLineFromItem, planTotals, priorityOf, suggestDetail, suggestForPlan } from "@/lib/plan";
+import { planLineFromItem, planTotals, priorityOf, suggestDetail, suggestForPlan } from "@/lib/domain/plan";
 import type { PlanLine, PurchasePlan, StockItem } from "@/lib/types";
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({

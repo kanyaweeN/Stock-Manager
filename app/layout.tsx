@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { StockDBProvider } from "@/lib/StockDBProvider";
+import { StockDBProvider } from "@/lib/hooks/StockDBProvider";
 import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {

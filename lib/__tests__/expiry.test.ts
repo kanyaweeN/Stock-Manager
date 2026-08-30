@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EXPIRY_SOON_DAYS, effectiveExpiry, expiryLabel, needsAttention, paoExpiry } from "@/lib/expiry";
+import { EXPIRY_SOON_DAYS, effectiveExpiry, expiryLabel, needsAttention, paoExpiry } from "@/lib/domain/expiry";
 
 const NOW = new Date(2026, 7, 29); // 29 ส.ค. 2026 (เวลาเครื่อง ไม่ใช่ UTC)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PICKER_MAX_RESULTS, searchStockItems } from "@/lib/stockSearch";
+import { PICKER_MAX_RESULTS, searchStockItems } from "@/lib/domain/stockSearch";
 import type { StockItem } from "@/lib/types";
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({

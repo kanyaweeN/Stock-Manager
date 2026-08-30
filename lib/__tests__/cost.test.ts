@@ -10,8 +10,8 @@ import {
   productionSummary,
   recipeTotals,
   totalPieces,
-} from "@/lib/cost";
-import { priceForMargin, roundPrice } from "@/lib/pricing";
+} from "@/lib/domain/cost";
+import { priceForMargin, roundPrice } from "@/lib/domain/pricing";
 import type { PricingSettings, Recipe, RecipeLine, StockItem } from "@/lib/types";
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({

@@ -1333,12 +1333,12 @@ td.thumb-cell { width: 46px; }
   color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .badge-out { color: var(--danger); font-size: 11px; font-weight: 600; }
-/* จะใช้หมดอีกกี่วัน — ประมาณจากอัตราการใช้ (ดู lib/usage.ts) คนละเรื่องกับวันหมดอายุ */
+/* จะใช้หมดอีกกี่วัน — ประมาณจากอัตราการใช้ (ดู lib/domain/usage.ts) คนละเรื่องกับวันหมดอายุ */
 .badge-runout { color: var(--violet); font-size: 11px; font-weight: 600; cursor: help; }
-/* วันหมดอายุ — เหลืองตอนใกล้หมด, แดงตอนเลยวันไปแล้ว (ดู lib/expiry.ts) */
+/* วันหมดอายุ — เหลืองตอนใกล้หมด, แดงตอนเลยวันไปแล้ว (ดู lib/domain/expiry.ts) */
 .badge-expiry { color: var(--low); font-size: 11px; font-weight: 600; cursor: help; }
 .badge-expiry--gone { color: var(--danger); }
-/* ซื้อบ่อย — นับจาก priceHistory ให้อัตโนมัติ (ดู FREQUENT_MIN_TIMES ใน lib/price.ts) */
+/* ซื้อบ่อย — นับจาก priceHistory ให้อัตโนมัติ (ดู FREQUENT_MIN_TIMES ใน lib/domain/price.ts) */
 .badge-frequent { color: var(--ok); font-size: 11px; font-weight: 600; cursor: help; }
 .product-card__price-row { display: flex; align-items: baseline; gap: 8px; }
 .product-card__price { font-weight: 700; color: var(--accent); font-size: 16px; letter-spacing: -.01em; }
@@ -1571,13 +1571,13 @@ td.thumb-cell { width: 46px; }
 .cost-num > span { font-size: 11px; color: var(--muted); }
 .cost-num input { width: 100%; }
 .cost-line__warn { color: var(--low); margin-top: 6px; line-height: 1.4; }
-/* ค่าในสูตรไม่ตรงกับสินค้าในสต็อกแล้ว (ดู stockDrift ใน lib/cost.ts) */
+/* ค่าในสูตรไม่ตรงกับสินค้าในสต็อกแล้ว (ดู stockDrift ใน lib/domain/cost.ts) */
 .cost-line__drift {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   margin-top: 6px; line-height: 1.4; color: var(--muted);
 }
 .cost-line__drift--fill { color: var(--accent); }
-/* วัตถุดิบชิ้นเดิมถูกใส่ซ้ำในสูตรเดียว (ดู duplicateLineIds ใน lib/cost.ts) */
+/* วัตถุดิบชิ้นเดิมถูกใส่ซ้ำในสูตรเดียว (ดู duplicateLineIds ใน lib/domain/cost.ts) */
 .cost-line__drift--dup { color: var(--low); }
 .cost-line__foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .cost-line__rate { color: var(--muted); }

@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import PlanModal from "@/components/PlanModal";
 import { MaterialThumb } from "@/components/MaterialLabel";
-import { baht } from "@/lib/cost";
-import { daysUntil, formatThaiShortDate } from "@/lib/date";
-import { useStockDB } from "@/lib/StockDBProvider";
-import { usePlanActions } from "@/lib/usePlanActions";
+import { baht } from "@/lib/domain/cost";
+import { daysUntil, formatThaiShortDate } from "@/lib/core/date";
+import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { usePlanActions } from "@/lib/hooks/usePlanActions";
 import {
   PLAN_PRESETS,
   boughtHint,
@@ -17,7 +17,7 @@ import {
   linePaid,
   planTotals,
   sortPlans,
-} from "@/lib/plan";
+} from "@/lib/domain/plan";
 import type { PurchasePlan } from "@/lib/types";
 
 /** ป้ายบอกว่าเหลือเวลาอีกเท่าไร — คืน null ถ้าแผนไม่ได้กำหนดวัน */

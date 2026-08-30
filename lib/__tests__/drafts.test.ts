@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { fromProductForm, toProductForm } from "@/lib/productForm";
-import { fromRecipeDraft, fromRecipeLineDraft, toRecipeDraft } from "@/lib/recipeDraft";
-import { fromPlanDraft, toPlanDraft, toPlanLineDraft } from "@/lib/planDraft";
-import { todayISO } from "@/lib/date";
+import { fromProductForm, toProductForm } from "@/lib/forms/productForm";
+import { fromRecipeDraft, fromRecipeLineDraft, toRecipeDraft } from "@/lib/forms/recipeDraft";
+import { fromPlanDraft, toPlanDraft, toPlanLineDraft } from "@/lib/forms/planDraft";
+import { todayISO } from "@/lib/core/date";
 import type { PurchasePlan, Recipe, StockItem } from "@/lib/types";
 
 /**

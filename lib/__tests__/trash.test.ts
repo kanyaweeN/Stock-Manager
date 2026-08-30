@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TRASH_MAX, pushToTrash, sortTrash, takeFromTrash } from "@/lib/trash";
+import { TRASH_MAX, pushToTrash, sortTrash, takeFromTrash } from "@/lib/domain/trash";
 import type { StockItem } from "@/lib/types";
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({

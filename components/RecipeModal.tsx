@@ -10,12 +10,12 @@ import {
   toRecipeLineDraft,
   type RecipeDraft,
   type RecipeLineDraft,
-} from "@/lib/recipeDraft";
-import { amountText, baht, driftNote, duplicateLineIds, emptyLine, lineCost, lineFromItem, lineIssue, productionSummary, recipeTotals, stockDrift, unitCost, type StockDrift } from "@/lib/cost";
-import { formatThaiShortDate, todayISO } from "@/lib/date";
+} from "@/lib/forms/recipeDraft";
+import { amountText, baht, driftNote, duplicateLineIds, emptyLine, lineCost, lineFromItem, lineIssue, productionSummary, recipeTotals, stockDrift, unitCost, type StockDrift } from "@/lib/domain/cost";
+import { formatThaiShortDate, todayISO } from "@/lib/core/date";
 import { MaterialThumb } from "@/components/MaterialLabel";
 import PriceAdvisor from "@/components/PriceAdvisor";
-import { usePricingSettings } from "@/lib/usePricingSettings";
+import { usePricingSettings } from "@/lib/hooks/usePricingSettings";
 import type { ProductionRun, Recipe, StockItem } from "@/lib/types";
 
 interface Props {
@@ -77,7 +77,7 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
 
   if (!open || !draft || !preview || !totals) return null;
 
-  /** บรรทัดที่ใส่สินค้าชิ้นเดิมซ้ำ — เตือนอย่างเดียว ไม่กันไว้ (ดู duplicateLineIds ใน lib/cost.ts) */
+  /** บรรทัดที่ใส่สินค้าชิ้นเดิมซ้ำ — เตือนอย่างเดียว ไม่กันไว้ (ดู duplicateLineIds ใน lib/domain/cost.ts) */
   const dupLineIds = duplicateLineIds(draft.lines);
 
   const patchLine = (id: string, patch: Partial<RecipeLineDraft>) =>

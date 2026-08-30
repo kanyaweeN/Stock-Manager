@@ -8,7 +8,7 @@ import {
   TAG_META,
   type IngredientTag,
   type IngredientWarning,
-} from "@/lib/ingredients";
+} from "@/lib/domain/ingredients";
 import type { SkinProfile } from "@/lib/db";
 
 /** ป้ายแท็กส่วนผสมหนึ่งอัน (สีตามระดับ good/neutral/caution) */

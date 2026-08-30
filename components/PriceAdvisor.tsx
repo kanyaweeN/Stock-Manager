@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { baht } from "@/lib/cost";
+import { baht } from "@/lib/domain/cost";
 import {
   ROUNDING_OPTIONS,
   pct,
@@ -9,8 +9,8 @@ import {
   priceOutcome,
   pricingNotes,
   suggestPrice,
-} from "@/lib/pricing";
-import { usePricingSettings } from "@/lib/usePricingSettings";
+} from "@/lib/domain/pricing";
+import { usePricingSettings } from "@/lib/hooks/usePricingSettings";
 import type { PriceRounding } from "@/lib/types";
 
 interface Props {
@@ -31,7 +31,7 @@ const n = (v: string) => {
 
 /**
  * "ควรขายเท่าไร" — คิดราคาขายจากต้นทุนต่อชิ้น + กำไรที่อยากได้ + ค่าธรรมเนียม
- * ค่าตั้งต่างๆ อยู่ที่ `db.pricing` (ใช้ร่วมกันทุกสูตร) ตัวคำนวณล้วนๆ อยู่ที่ lib/pricing.ts
+ * ค่าตั้งต่างๆ อยู่ที่ `db.pricing` (ใช้ร่วมกันทุกสูตร) ตัวคำนวณล้วนๆ อยู่ที่ lib/domain/pricing.ts
  */
 export default function PriceAdvisor({ cost, unitLabel = "ชิ้น", sellPrice, onUsePrice }: Props) {
   const [settings, setSettings] = usePricingSettings();

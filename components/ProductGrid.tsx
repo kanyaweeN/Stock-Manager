@@ -2,17 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { StockItem } from "@/lib/types";
-import { STATUS_LABELS } from "@/lib/statusOptions";
-import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/ingredients";
-import { formatThaiShortDate } from "@/lib/date";
+import { STATUS_LABELS } from "@/lib/core/statusOptions";
+import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
+import { formatThaiShortDate } from "@/lib/core/date";
 import ModalShell from "@/components/ModalShell";
-import { effectiveExpiry, expiryLabel, type ExpiryInfo } from "@/lib/expiry";
-import { isLow, isOutOfStock } from "@/lib/stock";
-import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/usage";
-import { buyTimes, priceStats, FREQUENT_MIN_TIMES } from "@/lib/price";
-import { shopKey } from "@/lib/orders";
-import { sourceLabel } from "@/lib/importSites";
-import { amountText, bahtPerUnit, perUnitPrice, totalPieces, type PerUnitPrice, type PieceCount } from "@/lib/cost";
+import { effectiveExpiry, expiryLabel, type ExpiryInfo } from "@/lib/domain/expiry";
+import { isLow, isOutOfStock } from "@/lib/domain/stock";
+import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/domain/usage";
+import { buyTimes, priceStats, FREQUENT_MIN_TIMES } from "@/lib/domain/price";
+import { shopKey } from "@/lib/domain/orders";
+import { sourceLabel } from "@/lib/import/sites";
+import { amountText, bahtPerUnit, perUnitPrice, totalPieces, type PerUnitPrice, type PieceCount } from "@/lib/domain/cost";
 import type { SkinProfile } from "@/lib/db";
 
 /** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
@@ -28,9 +28,9 @@ interface Props {
   onDelete: (item: StockItem) => void;
   /** ปัก/เอาดาวของโปรดออก — โชว์เป็นปุ่มดาวบนการ์ด และกรองด้วยชิป "⭐ ของโปรด" */
   onToggleFav?: (id: string) => void;
-  /** เพิ่มสินค้าชิ้นนี้เป็นวัตถุดิบในสูตรต้นทุน (ดู lib/cost.ts) */
+  /** เพิ่มสินค้าชิ้นนี้เป็นวัตถุดิบในสูตรต้นทุน (ดู lib/domain/cost.ts) */
   onAddToRecipe?: (item: StockItem) => void;
-  /** จดสินค้าชิ้นนี้ไว้ในแผนซื้อของ (ดู lib/plan.ts) */
+  /** จดสินค้าชิ้นนี้ไว้ในแผนซื้อของ (ดู lib/domain/plan.ts) */
   onAddToPlan?: (item: StockItem) => void;
   /** กดแท็ก 🏪 บนการ์ดแล้วกรองเฉพาะร้านนั้น (ไม่ส่งมา = แท็กเป็นข้อความเฉยๆ เหมือนเดิม) */
   onFilterShop?: (shop: string) => void;
@@ -122,7 +122,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
   }, [items]);
 
   /**
-   * ราคาต่อชิ้นย่อยของของที่ขายเป็นแพ็ค — ราคาตัวใหญ่บนการ์ดเป็นราคาต่อ 1 แพ็ค (ดู lib/cost.ts)
+   * ราคาต่อชิ้นย่อยของของที่ขายเป็นแพ็ค — ราคาตัวใหญ่บนการ์ดเป็นราคาต่อ 1 แพ็ค (ดู lib/domain/cost.ts)
    * คิดล่วงหน้าเหมือนกัน เพราะ `perUnitPrice` ต้องแกะข้อความ `size` ด้วย regex เมื่อไม่ได้กรอกขนาดแพ็คไว้
    */
   const perUnitById = useMemo(() => {
@@ -135,7 +135,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
   }, [items]);
 
   /**
-   * "เหลือกี่ชิ้น" ของของที่ขายยกแพ็ค — ตัวเลขข้างปุ่ม −/+ นับเป็นแพ็ค (ดู lib/stock.ts)
+   * "เหลือกี่ชิ้น" ของของที่ขายยกแพ็ค — ตัวเลขข้างปุ่ม −/+ นับเป็นแพ็ค (ดู lib/domain/stock.ts)
    * คิดล่วงหน้าด้วยเหตุผลเดียวกับ `perUnitById`: ต้องแกะข้อความ `size` เมื่อไม่ได้กรอกขนาดแพ็คไว้
    */
   const piecesById = useMemo(() => {
@@ -231,7 +231,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
                 </span>
               )}
               {runout != null && !outOfStock && (
-                <span className="badge-runout" title="ประมาณจากอัตราการใช้ย้อนหลัง (ดู lib/usage.ts)">
+                <span className="badge-runout" title="ประมาณจากอัตราการใช้ย้อนหลัง (ดู lib/domain/usage.ts)">
                   📉 หมดใน ~{runout} วัน
                 </span>
               )}

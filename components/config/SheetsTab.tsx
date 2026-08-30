@@ -1,4 +1,4 @@
-import type { useGoogleSheetsSync } from "@/lib/useGoogleSheetsSync";
+import type { useGoogleSheetsSync } from "@/lib/hooks/useGoogleSheetsSync";
 
 type SheetsSync = ReturnType<typeof useGoogleSheetsSync>;
 

@@ -12,16 +12,16 @@ import PlanModal from "@/components/PlanModal";
 import ModalShell from "@/components/ModalShell";
 import AddToTargetModal from "@/components/AddToTargetModal";
 import SelectActionBar from "@/components/SelectActionBar";
-import { useStockDB } from "@/lib/StockDBProvider";
-import { catsInUse, commonCats, previewCatEdit, type CatEditMode } from "@/lib/cats";
-import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/cost";
-import { formatThaiShortDate } from "@/lib/date";
-import { defaultDueDate, emptyPlan, isPlanDone, planLineFromItem, planTotals, sortPlans } from "@/lib/plan";
-import { useProductFilters } from "@/lib/useProductFilters";
-import { useProductActions } from "@/lib/useProductActions";
-import { useSelection } from "@/lib/useSelection";
-import { useRecipeActions } from "@/lib/useRecipeActions";
-import { usePlanActions } from "@/lib/usePlanActions";
+import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { catsInUse, commonCats, previewCatEdit, type CatEditMode } from "@/lib/core/cats";
+import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/domain/cost";
+import { formatThaiShortDate } from "@/lib/core/date";
+import { defaultDueDate, emptyPlan, isPlanDone, planLineFromItem, planTotals, sortPlans } from "@/lib/domain/plan";
+import { useProductFilters } from "@/lib/hooks/useProductFilters";
+import { useProductActions } from "@/lib/hooks/useProductActions";
+import { useSelection } from "@/lib/hooks/useSelection";
+import { useRecipeActions } from "@/lib/hooks/useRecipeActions";
+import { usePlanActions } from "@/lib/hooks/usePlanActions";
 import type { PurchasePlan, Recipe, StockItem } from "@/lib/types";
 
 /** 3 ทางเลือกของกล่องจัดหมวดหมู่ — คำอธิบายอยู่ในตารางนี้ที่เดียว ทั้งข้อความช่วย ชื่อช่อง และคำบนปุ่มยืนยัน */
@@ -107,7 +107,7 @@ export default function Home() {
     setMoveCatValue(mode === "replace" ? commonCats(selectedItems.map((i) => i.cats)) : []);
   };
 
-  /** ตัวอย่างผลลัพธ์ของทุกชิ้นที่เลือก — ดู previewCatEdit ใน lib/cats.ts */
+  /** ตัวอย่างผลลัพธ์ของทุกชิ้นที่เลือก — ดู previewCatEdit ใน lib/core/cats.ts */
   const moveCatPreview = useMemo(
     () => selectedItems.map((item) => ({ item, ...previewCatEdit(item.cats, moveCatValue, moveCatMode) })),
     [selectedItems, moveCatValue, moveCatMode],

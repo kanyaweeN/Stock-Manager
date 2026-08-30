@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useStockDB } from "@/lib/StockDBProvider";
+import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import packageJson from "@/package.json";
 
 /** เมนูหลัก — ใช้ทั้งแถบข้าง (จอกว้าง) และแถบล่าง (มือถือ) */

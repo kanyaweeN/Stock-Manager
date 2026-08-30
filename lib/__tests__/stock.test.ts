@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countUnits, isLow, isOutOfStock, remainingUnits } from "@/lib/stock";
+import { countUnits, isLow, isOutOfStock, remainingUnits } from "@/lib/domain/stock";
 import type { StockItem } from "@/lib/types";
 
 const item = (over: Partial<StockItem> = {}): StockItem => ({

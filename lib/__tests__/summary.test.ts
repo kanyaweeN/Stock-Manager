@@ -10,8 +10,8 @@ import {
   spendOverview,
   totalSpend,
   widestShopGap,
-} from "@/lib/summary";
-import { orderExtras } from "@/lib/orders";
+} from "@/lib/domain/summary";
+import { orderExtras } from "@/lib/domain/orders";
 import type { PurchaseOrder, StockItem } from "@/lib/types";
 
 const NOW = new Date(2026, 7, 29); // ส.ค. 2026
