@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import CategoryMultiSelect from "@/components/CategoryMultiSelect";
+import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
 import { TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
 import type { SortKey } from "@/lib/hooks/useProductFilters";
 

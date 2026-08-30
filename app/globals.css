@@ -179,7 +179,7 @@ body {
 h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
 .sub { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
 
-/* ── แถบบนหน้าสินค้า — components/Toolbar.tsx ── */
+/* ── แถบบนหน้าสินค้า — components/product/Toolbar.tsx ── */
 /* ตรึงแถบบน+ตัวกรองไว้บนสุด — ช่องค้นหากับเมนู ⋯ (เลือกหลายรายการ/ส่งออก)
    ต้องกดได้จากทุกจุดของหน้า ไม่ใช่เลื่อนกลับขึ้นไปบนสุดก่อ· margin ลบบนคือกิน padding ของ
    .shell__main กลับมาเป็น padding ของตัวเอง พื้นหลังจะได้ทึบถึงขอบบนจริง ไม่งั้นการ์ดจะไหลผ่านช่องว่างให้เห็น */
@@ -265,7 +265,7 @@ h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
 }
 .chip-toggle.is-active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 
-/* ── ชิปตัวเลขที่กดกรองได้ — components/FilterChips.tsx ── */
+/* ── ชิปตัวเลขที่กดกรองได้ — components/product/FilterChips.tsx ── */
 .fchips {
   display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 16px;
 }
@@ -1602,7 +1602,7 @@ td.thumb-cell { width: 46px; }
 .cost-summary__row--profit strong { color: var(--ok); }
 .cost-summary__row--loss strong { color: var(--danger); }
 
-/* ── คิดราคาขาย "ควรขายเท่าไร" — components/PriceAdvisor.tsx ── */
+/* ── คิดราคาขาย "ควรขายเท่าไร" — components/recipe/PriceAdvisor.tsx ── */
 .price-advisor {
   margin-top: 6px;
   border: 1px solid var(--border);
@@ -1667,7 +1667,7 @@ td.thumb-cell { width: 46px; }
 .recipe-table { margin-top: 4px; }
 .recipe-card__note { color: var(--muted); margin: 10px 0 0; white-space: pre-wrap; }
 
-/* ── วางแผนซื้อของ — app/plan/page.tsx + components/PlanModal.tsx ── */
+/* ── วางแผนซื้อของ — app/plan/page.tsx + components/plan/PlanModal.tsx ── */
 .plan-card { border-top-color: var(--violet); }
 .plan-card--done { border-top-color: var(--ok); opacity: .8; }
 .plan-due { font-weight: 600; }

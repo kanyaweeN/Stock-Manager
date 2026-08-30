@@ -1,17 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import FilterChips, { type ChipKey } from "@/components/FilterChips";
-import Toolbar from "@/components/Toolbar";
-import CategoryMultiSelect from "@/components/CategoryMultiSelect";
-import ProductGrid from "@/components/ProductGrid";
-import ProductModal from "@/components/ProductModal";
-import ImportModal from "@/components/ImportModal";
-import RecipeModal from "@/components/RecipeModal";
-import PlanModal from "@/components/PlanModal";
-import ModalShell from "@/components/ModalShell";
-import AddToTargetModal from "@/components/AddToTargetModal";
-import SelectActionBar from "@/components/SelectActionBar";
+import FilterChips, { type ChipKey } from "@/components/product/FilterChips";
+import Toolbar from "@/components/product/Toolbar";
+import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
+import ProductGrid from "@/components/product/ProductGrid";
+import ProductModal from "@/components/product/ProductModal";
+import ImportModal from "@/components/import/ImportModal";
+import RecipeModal from "@/components/recipe/RecipeModal";
+import PlanModal from "@/components/plan/PlanModal";
+import ModalShell from "@/components/ui/ModalShell";
+import AddToTargetModal from "@/components/product/AddToTargetModal";
+import SelectActionBar from "@/components/product/SelectActionBar";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import { catsInUse, commonCats, previewCatEdit, type CatEditMode } from "@/lib/core/cats";
 import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/domain/cost";

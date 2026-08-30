@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import PlanModal from "@/components/PlanModal";
-import { MaterialThumb } from "@/components/MaterialLabel";
+import PlanModal from "@/components/plan/PlanModal";
+import { MaterialThumb } from "@/components/ui/MaterialLabel";
 import { baht } from "@/lib/domain/cost";
 import { daysUntil, formatThaiShortDate } from "@/lib/core/date";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";

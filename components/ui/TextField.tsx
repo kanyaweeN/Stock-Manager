@@ -1,6 +1,6 @@
 "use client";
 
-import { ClearIcon, CopyIcon, PasteIcon } from "@/components/icons";
+import { ClearIcon, CopyIcon, PasteIcon } from "@/components/ui/icons";
 
 interface Props {
   label: string;

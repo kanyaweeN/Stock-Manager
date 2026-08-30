@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import ModalShell from "@/components/ModalShell";
-import StockPicker from "@/components/StockPicker";
+import ModalShell from "@/components/ui/ModalShell";
+import StockPicker from "@/components/ui/StockPicker";
 import {
   fromRecipeDraft,
   toRecipeDraft,
@@ -13,8 +13,8 @@ import {
 } from "@/lib/forms/recipeDraft";
 import { amountText, baht, driftNote, duplicateLineIds, emptyLine, lineCost, lineFromItem, lineIssue, productionSummary, recipeTotals, stockDrift, unitCost, type StockDrift } from "@/lib/domain/cost";
 import { formatThaiShortDate, todayISO } from "@/lib/core/date";
-import { MaterialThumb } from "@/components/MaterialLabel";
-import PriceAdvisor from "@/components/PriceAdvisor";
+import { MaterialThumb } from "@/components/ui/MaterialLabel";
+import PriceAdvisor from "@/components/recipe/PriceAdvisor";
 import { usePricingSettings } from "@/lib/hooks/usePricingSettings";
 import type { ProductionRun, Recipe, StockItem } from "@/lib/types";
 

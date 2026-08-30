@@ -1,6 +1,6 @@
 "use client";
 
-import ModalShell from "@/components/ModalShell";
+import ModalShell from "@/components/ui/ModalShell";
 import type { StockItem } from "@/lib/types";
 
 interface Props<T> {

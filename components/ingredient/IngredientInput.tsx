@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { searchProducts, type ProductEntry } from "@/lib/domain/productDb";
-import { PasteIcon, ClearIcon } from "@/components/icons";
+import { PasteIcon, ClearIcon } from "@/components/ui/icons";
 
 interface Props {
   value: string;

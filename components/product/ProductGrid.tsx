@@ -5,7 +5,7 @@ import type { StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/core/statusOptions";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
 import { formatThaiShortDate } from "@/lib/core/date";
-import ModalShell from "@/components/ModalShell";
+import ModalShell from "@/components/ui/ModalShell";
 import { effectiveExpiry, expiryLabel, type ExpiryInfo } from "@/lib/domain/expiry";
 import { isLow, isOutOfStock } from "@/lib/domain/stock";
 import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/domain/usage";

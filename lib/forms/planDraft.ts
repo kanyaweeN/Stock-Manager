@@ -1,7 +1,7 @@
 /**
  * แปลงแผนซื้อของ ↔ ค่าที่กรอกในฟอร์ม — คำนวณล้วนๆ ไม่มี state
  *
- * แยกออกจาก `components/PlanModal.tsx` เพื่อให้เทสต์ได้ เหมือน `lib/forms/recipeDraft.ts`
+ * แยกออกจาก `components/plan/PlanModal.tsx` เพื่อให้เทสต์ได้ เหมือน `lib/forms/recipeDraft.ts`
  * **เพิ่มฟิลด์ใหม่ = แก้ `PlanDraft` + `toPlanDraft` + `fromPlanDraft` เท่านั้น**
  */
 import { todayISO } from "@/lib/core/date";

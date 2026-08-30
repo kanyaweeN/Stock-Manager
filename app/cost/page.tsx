@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import RecipeModal from "@/components/RecipeModal";
-import MaterialLabel from "@/components/MaterialLabel";
+import RecipeModal from "@/components/recipe/RecipeModal";
+import MaterialLabel from "@/components/ui/MaterialLabel";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import { useRecipeActions } from "@/lib/hooks/useRecipeActions";
 import { baht, driftNote, emptyRecipe, lineCost, lineIssue, recipeTotals, stockDrift } from "@/lib/domain/cost";

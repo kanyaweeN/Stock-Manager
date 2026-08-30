@@ -1,7 +1,7 @@
 /**
  * แปลงสูตรต้นทุน ↔ ค่าที่กรอกในฟอร์ม — คำนวณล้วนๆ ไม่มี state
  *
- * แยกออกจาก `components/RecipeModal.tsx` ด้วยเหตุผลเดียวกับ `lib/import/merge.ts`:
+ * แยกออกจาก `components/recipe/RecipeModal.tsx` ด้วยเหตุผลเดียวกับ `lib/import/merge.ts`:
  * การแปลงตัวเลขตรงนี้พลาดแล้ว**ต้นทุนเพี้ยนเงียบๆ** (ดู `packAmount` ข้างล่าง) แต่ตอนอยู่
  * ในไฟล์ component มันเทสต์ไม่ได้เลย
  *

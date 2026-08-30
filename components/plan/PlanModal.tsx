@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MaterialThumb } from "@/components/MaterialLabel";
-import ModalShell from "@/components/ModalShell";
-import StockPicker, { StockPickerEmpty, StockPickerRow, StockPickerShell } from "@/components/StockPicker";
+import { MaterialThumb } from "@/components/ui/MaterialLabel";
+import ModalShell from "@/components/ui/ModalShell";
+import StockPicker, { StockPickerEmpty, StockPickerRow, StockPickerShell } from "@/components/ui/StockPicker";
 import {
   fromPlanDraft,
   toPlanDraft,

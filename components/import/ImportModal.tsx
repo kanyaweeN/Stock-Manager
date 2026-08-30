@@ -19,9 +19,9 @@ import { findDuplicateOrder } from "@/lib/domain/orders";
 import { DEFAULT_IMPORT_SOURCE, IMPORT_SITES, importSite } from "@/lib/import/sites";
 import { extractOrderPage } from "@/lib/import/orderPage";
 import { STATUS_OPTIONS } from "@/lib/core/statusOptions";
-import CategoryMultiSelect from "@/components/CategoryMultiSelect";
-import ModalShell from "@/components/ModalShell";
-import { ClearIcon, PasteIcon } from "@/components/icons";
+import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
+import ModalShell from "@/components/ui/ModalShell";
+import { ClearIcon, PasteIcon } from "@/components/ui/icons";
 import type { ImportCandidate, ImportSource, ItemStatus, PurchaseOrder, StockItem } from "@/lib/types";
 
 interface Props {

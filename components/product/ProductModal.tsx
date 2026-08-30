@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { STATUS_OPTIONS } from "@/lib/core/statusOptions";
-import CategoryMultiSelect from "@/components/CategoryMultiSelect";
-import IngredientInput from "@/components/IngredientInput";
-import IngredientPanel from "@/components/IngredientPanel";
-import ModalShell from "@/components/ModalShell";
+import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
+import IngredientInput from "@/components/ingredient/IngredientInput";
+import IngredientPanel from "@/components/ingredient/IngredientPanel";
+import ModalShell from "@/components/ui/ModalShell";
 import { fromProductForm, toProductForm, type ProductForm } from "@/lib/forms/productForm";
-import TextField from "@/components/TextField";
+import TextField from "@/components/ui/TextField";
 import { amountText, baht, bahtPerUnit, perUnitPrice } from "@/lib/domain/cost";
 import { todayISO, formatThaiShortDate } from "@/lib/core/date";
 import { effectiveExpiry, expiryLabel } from "@/lib/domain/expiry";

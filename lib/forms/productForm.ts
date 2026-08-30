@@ -1,7 +1,7 @@
 /**
  * แปลงสินค้า ↔ ค่าที่กรอกในฟอร์ม — คำนวณล้วนๆ ไม่มี state
  *
- * แยกออกจาก `components/ProductModal.tsx` ให้เข้าชุดกับ `lib/forms/recipeDraft.ts` / `lib/forms/planDraft.ts`
+ * แยกออกจาก `components/product/ProductModal.tsx` ให้เข้าชุดกับ `lib/forms/recipeDraft.ts` / `lib/forms/planDraft.ts`
  * และเพื่อให้เทสต์การแปลงตัวเลขได้ (0 กับ "ไม่ได้กรอก" ต้องไม่ปนกัน ดู helper ข้างล่าง)
  *
  * **เพิ่มฟิลด์ใหม่ = แก้ `ProductForm` + `toProductForm` + `fromProductForm` เท่านั้น**
