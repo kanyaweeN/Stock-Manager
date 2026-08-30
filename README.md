@@ -54,7 +54,7 @@ npm run start     # รันเวอร์ชัน production ที่ build
 
 ```
 app/
-  page.tsx            หน้าหลัก (รายการสินค้า)
+  page.tsx             หน้าหลัก (รายการสินค้า)
   analyze/page.tsx     เปรียบเทียบส่วนผสมหลายชิ้น + ลิสต์ส่วนผสมที่แพ้
   cost/page.tsx        สูตรผลิต → ต้นทุนต่อชิ้น / กำไร / ราคาที่ควรขาย
   plan/page.tsx        แผนซื้อของ (เช็กลิสต์ + งบ + ยอดที่ยังต้องจ่าย)
@@ -63,63 +63,50 @@ app/
   layout.tsx           mount AppShell ให้ทุกหน้า
   globals.css          รายการ @import เรียงลำดับ (สไตล์จริงอยู่ใน styles/)
   styles/*.css         สไตล์ทั้งแอป แยกตามส่วน — ลำดับใน globals.css ห้ามสลับ
+```
+
+`components/` แยกตามหน้าที่ โดยมีชั้น `ui/` ที่ไม่รู้จัก domain เลย (ใช้ซ้ำได้ทุกที่):
+
+```
 components/
   AppShell.tsx           แถบนำทาง (sidebar บนจอใหญ่ / แถบล่างบนมือถือ) + สถานะซิงก์
-  Toolbar.tsx            แถบค้นหา/กรอง/เรียง ของหน้าหลัก (ตรึงไว้บนสุด)
-  FilterChips.tsx        ชิปนับจำนวนที่กดกรองได้
-  ProductGrid.tsx        การ์ดแสดงรายการสินค้า
-  ProductModal.tsx       ฟอร์มเพิ่ม/แก้ไขสินค้า
-  ImportModal.tsx        หน้าต่างนำเข้าออเดอร์ (เลือกร้าน → วาง HTML → รีวิว)
-  IngredientPanel.tsx    แท็ก/คำเตือน/รายการส่วนผสมที่แกะได้
-  RecipeModal.tsx        ฟอร์มสูตรต้นทุน
-  PriceAdvisor.tsx       บล็อก "ควรขายเท่าไร" (ราคาแนะนำ + ตารางเป้ากำไร + ตั้งค่าค่าธรรมเนียม)
-  PlanModal.tsx          ฟอร์มแผนซื้อของ
-  ModalShell.tsx         เปลือกของกล่องโมดัลทุกอัน (โฟกัส/Escape/ARIA จัดการให้ครบที่เดียว)
-  StockPicker.tsx        กล่อง "เลือกจากสต็อก" ที่สูตรต้นทุนกับแผนซื้อใช้ร่วมกัน
-  AddToTargetModal.tsx   เลือกว่าจะใส่ของที่เลือกไว้ลงสูตร/แผนไหน
-  SelectActionBar.tsx    แถบคำสั่งท้ายจอของโหมดเลือกหลายรายการ
-  CategoryMultiSelect.tsx เลือกหมวดหมู่หลายหมวด (ใช้ทั้งแถบกรองและฟอร์มสินค้า)
-  TextField.tsx          ช่องกรอกพร้อมปุ่มคัดลอก/วาง/ล้าง
+  ui/                    ModalShell (เปลือกโมดัลทุกอัน — โฟกัส/Escape/ARIA ที่เดียว) ·
+                         StockPicker (กล่อง "เลือกจากสต็อก") · CategoryMultiSelect ·
+                         TextField (ช่องกรอก + ปุ่มคัดลอก/วาง/ล้าง) · MaterialLabel · icons
+  product/               ProductGrid (การ์ดสินค้า) · ProductModal (ฟอร์มเพิ่ม/แก้ไข) ·
+                         Toolbar (ค้นหา/กรอง/เรียง ตรึงบนสุด) · FilterChips (ชิปนับจำนวน) ·
+                         SelectActionBar (แถบคำสั่งโหมดเลือกหลายรายการ) · AddToTargetModal
+  import/ImportModal     นำเข้าออเดอร์ (เลือกร้าน → วาง HTML → รีวิว)
+  recipe/                RecipeModal (ฟอร์มสูตรต้นทุน) · PriceAdvisor ("ควรขายเท่าไร")
+  plan/PlanModal         ฟอร์มแผนซื้อของ
+  ingredient/            IngredientPanel (แท็ก/คำเตือน/รายการส่วนผสม) · IngredientInput
   config/                คอมโพเนนต์ของแต่ละแท็บในหน้าตั้งค่า
+```
+
+`lib/` แยกตามชั้น — `core`/`domain`/`import`/`forms` เป็นฟังก์ชันบริสุทธิ์ (ส่วนที่เทสต์ครอบ) ส่วน `hooks`/`sync` มี state/เครือข่าย ทุก import ในโปรเจกต์ใช้ `@/...` ล้วน:
+
+```
 lib/
-  types.ts              type ของสินค้า/สูตร/รายการนำเข้า
-  db.ts                  โครงสร้างข้อมูลรวม + migration ของเวอร์ชันเก่า
-  usePersistedDB.ts      hook จัดการ OPFS/localStorage/ไฟล์ที่ผูกไว้
-  StockDBProvider.tsx    React Context แชร์ข้อมูลระหว่างหน้า
-  stock.ts               คำถามพื้นฐานของสินค้า 1 ชิ้น (ใกล้หมด/หมด/เหลือกี่ชิ้นจริง)
-  useProductFilters.ts   ค้นหา/กรอง/เรียงลำดับ
-  useProductActions.ts   CRUD สินค้า, จัดกลุ่ม, นำเข้า, ส่งออก CSV
-  useSelection.ts        สถานะโหมดเลือกหลายรายการ
-  trash.ts               ถังขยะ (ย้ายของออกจากสต็อกจริง ไม่ใช่ซ่อนด้วยแฟล็ก)
-  expiry.ts              วันหมดอายุจากฉลาก vs. PAO — คืนวันที่มาถึงก่อน
-  usage.ts               อัตราการใช้ → ประเมินว่าจะหมดในอีกกี่วัน
-  importMerge.ts         จับคู่/รวมรายการตอนนำเข้าออเดอร์ + วิธีคิดราคาต่อชิ้น
-  stockSearch.ts         ตัวค้นสินค้าที่กล่อง "เลือกจากสต็อก" ใช้
-  productForm.ts         แปลงสินค้า ↔ ค่าที่กรอกในฟอร์ม (คู่กับ recipeDraft.ts / planDraft.ts)
-  download.ts            สร้าง CSV/ไฟล์ดาวน์โหลด (ใส่ BOM ให้ Excel อ่านภาษาไทยออก)
-  ingredients.ts         ดิกชันนารีส่วนผสม + กฎการชนกัน (ออฟไลน์)
-  cost.ts                คำนวณต้นทุน/กำไร + แกะขนาดบรรจุจากข้อความ (เช่น "1 กก." → 1000 g)
-  useRecipeActions.ts    CRUD สูตร
-  pricing.ts             คิดราคาขายจากต้นทุน + กำไรที่อยากได้ + ค่าธรรมเนียม (คำนวณล้วนๆ)
-  usePricingSettings.ts  ค่าตั้งการคิดราคาที่ใช้ร่วมกันทุกสูตร
-  plan.ts                คำนวณยอดของแผนซื้อ + ตัวเสนอของที่ควรซื้อ
-  usePlanActions.ts      CRUD แผนซื้อ
-  summary.ts             แตกประวัติราคาเป็น "ครั้งที่ซื้อ" แล้วสรุปยอด + สร้างประโยคสรุป
-  orders.ts              ค่าส่ง/ส่วนลดระดับออเดอร์ + ชื่อร้าน (คู่กับ useOrderActions.ts)
-  price.ts               ราคาเฉลี่ย/ต่ำสุด/สูงสุด + นับว่า "ซื้อบ่อย" หรือยัง
-  date.ts                วันที่แบบ YYYY-MM-DD ตามเวลาเครื่อง (ไม่ใช่ UTC)
-  cats.ts                กฎหมวดหมู่ — เพิ่ม/เอาออก/แทนที่, ตัวอย่างผลลัพธ์, ตัวกรองหมวดแม่-หมวดย่อย
-  importSites.ts         ทะเบียนร้านที่นำเข้าได้ (Shopee/Lazada/Watsons/Konvy)
-  importText.ts          แกะยอดเงิน/วันที่/จำนวน/ชื่อสินค้า จากข้อความ (เทสต์ได้)
-  importDom.ts           เครื่องมือเดินโครงหน้าเว็บที่ตัวแยกทุกร้านใช้ร่วมกัน
-  orderPage.ts           ตัวแยกรายการกลาง (Lazada/Watsons/Konvy) + ประตูเรียกใช้
-  shopee.ts              ตัวแยกรายการสินค้าจาก HTML ของ Shopee
-  googleAuth.ts          ขอ access token ผ่าน Google Identity Services
-  googleDrive.ts         อ่าน/เขียนไฟล์ข้อมูลใน Drive appDataFolder
-  useGoogleDriveSync.ts  hook เชื่อมต่อ/ซิงก์ Google Drive
-  googleSheets.ts        เขียนข้อมูลลง Google Sheets (ส่งออกอย่างเดียว)
-  useGoogleSheetsSync.ts hook เชื่อมต่อ/ส่งออก Google Sheets
-  __tests__/             เทสต์ของชั้นคำนวณ (vitest) — import โมดูลจริง ไม่ก๊อปตรรกะมาเขียนใหม่
+  types.ts        ชนิดข้อมูลกลาง (สินค้า/สูตร/แผน/รายการนำเข้า) ทุกชั้นอ้างถึงได้
+  core/           date (YYYY-MM-DD ตามเวลาเครื่อง ไม่ใช่ UTC) · uid ·
+                  download (CSV + BOM ให้ Excel อ่านภาษาไทยออก) ·
+                  cats (เพิ่ม/เอาออก/แทนที่หมวด + ตัวกรองหมวดแม่-หมวดย่อย) · statusOptions
+  domain/         stock (ใกล้หมด/หมด/เหลือกี่ชิ้นจริง) · expiry (ฉลาก vs. PAO) ·
+                  usage (อัตราการใช้ → จะหมดในกี่วัน) · price (ราคาเฉลี่ย/ต่ำสุด/สูงสุด + "ซื้อบ่อย") ·
+                  orders (ค่าส่ง/ส่วนลดระดับออเดอร์ + ชื่อร้าน) · trash (ถังขยะ) ·
+                  cost (ต้นทุน/กำไร + แกะขนาดบรรจุ) · pricing (ราคาที่ควรขาย) ·
+                  plan · summary · stockSearch · ingredients (ดิกชันนารีออฟไลน์) · productDb
+  import/         text (ยอดเงิน/วันที่/จำนวน/ชื่อ — เทสต์ได้) · dom (เดินโครงหน้าเว็บ) ·
+                  sites (ทะเบียนร้าน) · shopee · orderPage (ประตูเดียวของตัวแกะ) ·
+                  merge (จับคู่/รวมรายการ + วิธีคิดราคาต่อชิ้น)
+  forms/          productForm · recipeDraft · planDraft — แปลงของจริง ↔ ค่าที่กรอกในฟอร์ม
+  db/             schema · migrations (เวอร์ชันโครงสร้างข้อมูล) · normalize (+ index = ประตูเดียว)
+  sync/           googleAuth · googleDrive · googleSheets
+  hooks/          StockDBProvider · usePersistedDB (OPFS/localStorage/ไฟล์ที่ผูกไว้) ·
+                  useProductFilters · useProductActions · useSelection · useCatEditor ·
+                  useTargetDraft · useRecipeActions · usePlanActions · useOrderActions ·
+                  usePricingSettings · useGoogleDriveSync · useGoogleSheetsSync
+  __tests__/      เทสต์ของชั้นคำนวณ (vitest) — import โมดูลจริง ไม่ก๊อปตรรกะมาเขียนใหม่
 ```
 
 ## การเก็บข้อมูล
