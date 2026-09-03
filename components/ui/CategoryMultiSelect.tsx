@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { groupCategories, joinCatPath, splitCatPath } from "@/lib/core/cats";
 
 interface Props {
   categories: string[];
@@ -9,26 +10,6 @@ interface Props {
   /** ถ้ากำหนดไว้ จะมีช่องให้พิมพ์เพิ่มหมวดหมู่ใหม่ (ใช้ตอนเพิ่ม/แก้ไขสินค้า) */
   allowCreate?: boolean;
   emptyLabel?: string;
-}
-
-/**
- * หมวดหมู่ย่อยตั้งชื่อแบบ "หลัก > ย่อย" — จัดกลุ่มเป็นรายการหมวดหลัก 1 แถวต่อชื่อ (ไม่ซ้ำ)
- * แต่ละหมวดหลักอาจมีทั้งค่าของตัวเอง (standalone) และมีลูกซ้อนอยู่ก็ได้
- */
-function groupCategories(categories: string[]) {
-  const topNames = new Set<string>();
-  const childrenMap = new Map<string, string[]>();
-  for (const c of categories) {
-    const idx = c.indexOf(" > ");
-    if (idx === -1) {
-      topNames.add(c);
-    } else {
-      const parent = c.slice(0, idx);
-      topNames.add(parent);
-      childrenMap.set(parent, [...(childrenMap.get(parent) || []), c]);
-    }
-  }
-  return { topList: [...topNames].sort(), childrenMap };
 }
 
 /** ตำแหน่ง/ขนาดของแผงที่คำนวณเทียบจอ (fixed) — ทางใดทางหนึ่งระหว่าง `top` กับ `bottom` */
@@ -108,8 +89,8 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
     setExpanded((prev) => {
       const next = new Set(prev);
       for (const c of selected) {
-        const idx = c.indexOf(" > ");
-        if (idx !== -1) next.add(c.slice(0, idx));
+        const parts = splitCatPath(c);
+        if (parts) next.add(parts.parent);
       }
       return next;
     });
@@ -121,11 +102,10 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
       return;
     }
     let next = [...selected, cat];
-    const idx = cat.indexOf(" > ");
-    if (idx !== -1) {
+    const parts = splitCatPath(cat);
+    if (parts) {
       // เลือกซับหมวดหมู่แล้ว ไม่ต้องเก็บหมวดหลักเปล่าๆ ซ้อนไว้ด้วย เพราะซับหมวดหมู่ระบุชัดเจนกว่าอยู่แล้ว
-      const parent = cat.slice(0, idx);
-      next = next.filter((c) => c !== parent);
+      next = next.filter((c) => c !== parts.parent);
     }
     onChange(next);
   };
@@ -143,7 +123,7 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
     const name = newName.trim();
     if (!name) return;
     const parent = newParent.trim();
-    const cat = parent ? `${parent} > ${name}` : name;
+    const cat = joinCatPath(parent, name);
     if (parent) setExpanded((prev) => new Set(prev).add(parent));
     if (!selected.includes(cat)) toggle(cat);
     setNewName("");
@@ -215,7 +195,7 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
                   {children.sort().map((c) => (
                     <label key={c} className="cat-multiselect__option cat-multiselect__option--sub">
                       <input type="checkbox" checked={selected.includes(c)} onChange={() => toggle(c)} />
-                      <span className="cat-multiselect__name">{c.slice(name.length + 3)}</span>
+                      <span className="cat-multiselect__name">{splitCatPath(c)?.leaf ?? c}</span>
                     </label>
                   ))}
                 </div>

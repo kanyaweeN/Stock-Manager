@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { applyCatEdit, catsInUse, commonCats, dropRedundantParentCats, matchesCatFilter, previewCatEdit } from "@/lib/core/cats";
+import { applyCatEdit, catsInUse, commonCats, dropRedundantParentCats, groupCategories, joinCatPath, matchesCatFilter, previewCatEdit, splitCatPath } from "@/lib/core/cats";
 
 describe("applyCatEdit", () => {
   it("โหมดเพิ่ม: ติดหมวดใหม่ต่อท้าย ของเดิมยังอยู่ครบ", () => {
@@ -75,6 +75,44 @@ describe("matchesCatFilter", () => {
     expect(matchesCatFilter(["อาหาร"], ["ของใช้", "อาหาร"])).toBe(true);
     expect(matchesCatFilter([], [])).toBe(true);
     expect(matchesCatFilter([], ["ของใช้"])).toBe(false);
+  });
+});
+
+describe("splitCatPath / joinCatPath", () => {
+  it("หมวดหลัก (ไม่มีตัวคั่น) คืน null", () => {
+    expect(splitCatPath("ของใช้")).toBeNull();
+  });
+
+  it("แยก 'หลัก > ย่อย' ออกเป็นสองก้อน", () => {
+    expect(splitCatPath("ของใช้ > สบู่")).toEqual({ parent: "ของใช้", leaf: "สบู่" });
+  });
+
+  it("ตัวคั่นซ้อนหลายชั้น แยกที่ตัวแรก (โครงเก็บ 2 ชั้น ไม่ nested)", () => {
+    expect(splitCatPath("ของใช้ > ห้องน้ำ > สบู่")).toEqual({ parent: "ของใช้", leaf: "ห้องน้ำ > สบู่" });
+  });
+
+  it("join กลับได้ path เดิม (splitCatPath ∘ joinCatPath = identity)", () => {
+    const cat = "ของใช้ > สบู่";
+    const parts = splitCatPath(cat)!;
+    expect(joinCatPath(parts.parent, parts.leaf)).toBe(cat);
+  });
+
+  it("join กับ parent ว่าง = คืนแค่ leaf (ยกเป็นหมวดหลัก)", () => {
+    expect(joinCatPath("", "สบู่")).toBe("สบู่");
+  });
+});
+
+describe("groupCategories", () => {
+  it("หมวดหลักโผล่จาก prefix ของซับหมวดด้วย ถึงยังไม่ได้ลงทะเบียนแม่ไว้ตรงๆ", () => {
+    const { topList, childrenMap } = groupCategories(["ของใช้ > สบู่", "ของใช้ > แชมพู", "อาหาร"]);
+    expect(topList).toEqual(["ของใช้", "อาหาร"]);
+    expect(childrenMap.get("ของใช้")).toEqual(["ของใช้ > สบู่", "ของใช้ > แชมพู"]);
+    expect(childrenMap.has("อาหาร")).toBe(false);
+  });
+
+  it("เรียงหมวดหลักตามลำดับภาษาไทย (สระเดี่ยว 'เ' นำหน้ามาก่อนพยัญชนะ 'ย'/'อ')", () => {
+    const { topList } = groupCategories(["ยา", "อาหาร", "เครื่องใช้"]);
+    expect(topList).toEqual(["เครื่องใช้", "ยา", "อาหาร"]);
   });
 });
 

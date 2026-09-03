@@ -9,9 +9,43 @@
 
 export type CatEditMode = "add" | "remove" | "replace";
 
+/** ตัวคั่นระหว่างหมวดหลักกับซับหมวด — เปลี่ยนที่นี่ที่เดียวจบ (โครงเก็บเป็น path เดียวไม่ nested เพราะ Google Sheets/CSV แบนอยู่แล้ว) */
+export const CAT_SEP = " > ";
+
+/** แยก "หลัก > ย่อย" ออกเป็นสองก้อน — คืน null ถ้าเป็นหมวดหลัก (ไม่มีตัวคั่น) */
+export function splitCatPath(cat: string): { parent: string; leaf: string } | null {
+  const idx = cat.indexOf(CAT_SEP);
+  if (idx === -1) return null;
+  return { parent: cat.slice(0, idx), leaf: cat.slice(idx + CAT_SEP.length) };
+}
+
+/** สร้าง path จากหมวดหลัก+ชื่อลูก — parent ว่างคืนแค่ leaf (= หมวดหลัก) */
+export function joinCatPath(parent: string, leaf: string): string {
+  return parent ? `${parent}${CAT_SEP}${leaf}` : leaf;
+}
+
+/**
+ * จัดกลุ่มลิสต์หมวดหมู่ (path เดียว) เป็นต้นไม้ 2 ชั้น — หมวดหลัก ↔ ซับหมวด
+ * หมวดหลักโผล่มาจากทั้งที่ถูกลงทะเบียนตรงๆ **และ**ที่เป็น prefix ของซับหมวด (จะได้ไม่มีซับที่แม่หาย)
+ */
+export function groupCategories(cats: string[]): { topList: string[]; childrenMap: Map<string, string[]> } {
+  const topNames = new Set<string>();
+  const childrenMap = new Map<string, string[]>();
+  for (const c of cats) {
+    const parts = splitCatPath(c);
+    if (!parts) {
+      topNames.add(c);
+    } else {
+      topNames.add(parts.parent);
+      childrenMap.set(parts.parent, [...(childrenMap.get(parts.parent) || []), c]);
+    }
+  }
+  return { topList: [...topNames].sort((a, b) => a.localeCompare(b, "th")), childrenMap };
+}
+
 /** เอาหมวดแม่เปล่าๆ ทิ้ง ถ้ามีซับหมวดของหมวดนั้นเลือกไว้อยู่แล้ว (เช่น มีทั้ง "เครื่องใช้" และ "เครื่องใช้ > ของแต่งห้อง") */
 export function dropRedundantParentCats(cats: string[]): string[] {
-  return cats.filter((c) => !cats.some((other) => other !== c && other.startsWith(`${c} > `)));
+  return cats.filter((c) => !cats.some((other) => other !== c && other.startsWith(`${c}${CAT_SEP}`)));
 }
 
 function dedupe(cats: string[]): string[] {
