@@ -16,6 +16,7 @@ export interface PlanLineDraft {
   qty: string;
   price: string;
   note: string;
+  link: string;
   bought: boolean;
   boughtAt: string;
   paidPrice: string;
@@ -44,6 +45,7 @@ export const toPlanLineDraft = (l: PlanLine): PlanLineDraft => ({
   qty: String(l.qty || 1),
   price: l.price ? String(l.price) : "",
   note: l.note,
+  link: l.link ?? "",
   bought: l.bought,
   boughtAt: l.boughtAt ?? "",
   paidPrice: l.paidPrice != null ? String(l.paidPrice) : "",
@@ -58,6 +60,7 @@ export const fromPlanLineDraft = (l: PlanLineDraft): PlanLine => ({
   qty: Math.max(1, n(l.qty) || 1),
   price: n(l.price),
   note: l.note.trim(),
+  link: l.link.trim() || undefined,
   bought: l.bought,
   boughtAt: l.bought ? l.boughtAt || todayISO() : undefined,
   paidPrice: l.bought && l.paidPrice.trim() ? n(l.paidPrice) : undefined,

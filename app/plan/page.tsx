@@ -167,7 +167,20 @@ export default function PlanPage() {
                           </label>
                           <MaterialThumb item={item} linked={!!l.itemId} />
                           <span className="plan-item__text">
-                            <span className="plan-item__name">{l.name || "(ไม่มีชื่อ)"}</span>
+                            <span className="plan-item__name">
+                              {l.name || "(ไม่มีชื่อ)"}
+                              {(l.link || item?.link) && (
+                                <a
+                                  className="link-icon"
+                                  href={l.link || item!.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="เปิดลิงก์สินค้า"
+                                >
+                                  🔗
+                                </a>
+                              )}
+                            </span>
                             <small className="plan-item__meta">
                               {l.qty} × {baht(l.price)}
                               {l.bought && l.boughtAt ? ` · ซื้อเมื่อ ${formatThaiShortDate(l.boughtAt)}` : ""}

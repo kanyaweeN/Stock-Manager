@@ -163,6 +163,7 @@ function normalizePlan(raw: unknown, idx: number): PurchasePlan {
         qty: num(line.qty, 1) > 0 ? num(line.qty, 1) : 1,
         price: num(line.price),
         note: str(line.note),
+        link: str(line.link) || undefined,
         bought: line.bought === true,
         boughtAt: str(line.boughtAt) || undefined,
         paidPrice: typeof line.paidPrice === "number" && Number.isFinite(line.paidPrice) ? line.paidPrice : undefined,

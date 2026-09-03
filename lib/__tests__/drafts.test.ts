@@ -145,7 +145,7 @@ describe("planDraft", () => {
   it("แปลงไป-กลับได้ค่าเดิม", () => {
     const original = plan({
       dueDate: "2026-09-30", budget: 1000,
-      lines: [{ id: "l", name: "สบู่", qty: 2, price: 100, note: "", bought: false, priority: "must" }],
+      lines: [{ id: "l", name: "สบู่", qty: 2, price: 100, note: "", link: "https://shopee.co.th/x", bought: false, priority: "must" }],
     });
     expect(fromPlanDraft(toPlanDraft(original))).toEqual(original);
   });
@@ -177,6 +177,14 @@ describe("planDraft", () => {
     const out = fromPlanDraft({ ...d, lines: [{ ...d.lines[0], bought: false, boughtAt: "2026-08-01", paidPrice: "99" }] });
     expect(out.lines[0].boughtAt).toBeUndefined();
     expect(out.lines[0].paidPrice).toBeUndefined();
+  });
+
+  it("ลิงก์ว่าง = ไม่เก็บลงไฟล์", () => {
+    const d = toPlanDraft(plan({ lines: [{ id: "l", name: "x", qty: 1, price: 0, note: "", bought: false }] }));
+    expect(d.lines[0].link).toBe("");
+    expect(fromPlanDraft(d).lines[0].link).toBeUndefined();
+    expect(fromPlanDraft({ ...d, lines: [{ ...d.lines[0], link: "  https://shopee.co.th/x  " }] }).lines[0].link)
+      .toBe("https://shopee.co.th/x");
   });
 
   it("บรรทัดที่ไม่มีชื่อถูกทิ้ง", () => {

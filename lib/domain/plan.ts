@@ -157,6 +157,7 @@ export function planLineFromItem(item: StockItem): PlanLine {
     qty,
     price: item.price ?? 0,
     note: "",
+    link: item.link || undefined,
     bought: false,
   };
 }

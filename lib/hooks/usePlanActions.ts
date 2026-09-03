@@ -10,7 +10,7 @@ import { uid } from "@/lib/core/uid";
 /** ส่งออกแผนเป็น CSV — 1 แถวต่อของ 1 อย่าง แล้วต่อท้ายด้วยสรุปยอด */
 function exportPlanCsv(plan: PurchasePlan) {
   const t = planTotals(plan);
-  const header = "รายการ,จำนวน,ราคา/ชิ้น,ยอดรวม,สถานะ,วันที่ซื้อ,จ่ายจริง,หมายเหตุ\n";
+  const header = "รายการ,จำนวน,ราคา/ชิ้น,ยอดรวม,สถานะ,วันที่ซื้อ,จ่ายจริง,หมายเหตุ,ลิงก์\n";
   const rows = csvRows(
     plan.lines.map((l) => [
       l.name,
@@ -21,6 +21,7 @@ function exportPlanCsv(plan: PurchasePlan) {
       l.boughtAt ?? "",
       l.bought ? linePaid(l).toFixed(2) : "",
       l.note,
+      l.link ?? "",
     ])
   );
   const summary = csvRows([

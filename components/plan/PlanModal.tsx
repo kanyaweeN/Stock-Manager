@@ -211,6 +211,28 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
                         onChange={(e) => patchLine(l.id, { note: e.target.value })}
                       />
                     </label>
+                    <label className="cost-num plan-num-wide">
+                      <span>
+                        ลิงก์สินค้า
+                        {(l.link.trim() || linked?.link) && (
+                          <a
+                            className="link-icon"
+                            href={l.link.trim() || linked!.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="เปิดลิงก์นี้"
+                          >
+                            🔗
+                          </a>
+                        )}
+                      </span>
+                      <input
+                        type="url"
+                        placeholder={linked?.link || "วางลิงก์จากร้าน เช่น https://shopee.co.th/..."}
+                        value={l.link}
+                        onChange={(e) => patchLine(l.id, { link: e.target.value })}
+                      />
+                    </label>
                   </div>
 
                   {l.bought && (
