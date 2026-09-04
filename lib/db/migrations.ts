@@ -123,6 +123,12 @@ export const MIGRATIONS: Migration[] = [
     // (ของที่เคยถูกลบไปก่อนหน้านี้กู้คืนไม่ได้ ไม่เคยมีใครเก็บไว้)
     up: (db) => ({ ...db, trash: asArray(db.trash) }),
   },
+  {
+    to: 12,
+    note: "เพิ่ม db.forecastItemIds (รายการ id ที่ผู้ใช้เลือกให้ติดตามในหน้าคาดคะเนซื้อ)",
+    // เปิดช่องให้มีอยู่จริง — ตัวกรอง id ที่ไม่ตรงกับสินค้าจริงอยู่ที่ normalizeDB (รันทุกครั้ง)
+    up: (db) => ({ ...db, forecastItemIds: asArray(db.forecastItemIds) }),
+  },
 ];
 
 /** เวอร์ชันล่าสุด = ปลายทางของ migration step สุดท้าย (คำนวณให้ ไม่ต้องแก้มือ) */
@@ -141,4 +147,5 @@ export const DEFAULT_DB: StockDB = {
   pricing: { ...DEFAULT_PRICING },
   orders: [],
   trash: [],
+  forecastItemIds: [],
 };

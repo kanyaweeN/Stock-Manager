@@ -57,11 +57,12 @@ describe("migrateDB — ข้อมูลยุค v0", () => {
     expect(out.items[1].priceHistory).toEqual([]);
   });
 
-  it("v4/v7/v8/v9/v11: เปิดช่องเก็บของใหม่ให้ครบ", () => {
+  it("v4/v7/v8/v9/v11/v12: เปิดช่องเก็บของใหม่ให้ครบ", () => {
     expect(out.recipes).toEqual([]);
     expect(out.plans).toEqual([]);
     expect(out.orders).toEqual([]);
     expect(out.trash).toEqual([]);
+    expect(out.forecastItemIds).toEqual([]);
     expect(out.pricing).toBeDefined();
   });
 
@@ -189,6 +190,20 @@ describe("migrateDB — ข้อมูลพัง/แก้มือมาผ�
     const db = migrateDB({ items: [{ id: "a", name: "x", qty: "5", min: -3, note: "" }] });
     expect(db.items[0].qty).toBe(5); // "5" → 5 (ไม่งั้น `qty + delta` ได้ "51" ตอนกดปุ่ม +)
     expect(db.items[0].min).toBe(0); // ติดลบไม่มีความหมาย หนีบเป็น 0
+  });
+
+  it("forecastItemIds: ตัด id ที่ชี้ไปสินค้าที่ไม่มีอยู่ + dedupe", () => {
+    // ไม่งั้นลิสต์บวมขึ้นเรื่อยๆ ทุกครั้งที่ผู้ใช้ลบสินค้า และไฟล์กู้คืน/แก้มืออาจมี id ซ้ำ
+    const db = migrateDB({
+      items: [{ id: "a", name: "x", cats: [], qty: 1, min: 0, note: "" }],
+      forecastItemIds: ["a", "a", "ghost", "b"],
+    });
+    expect(db.forecastItemIds).toEqual(["a"]);
+  });
+
+  it("forecastItemIds: ค่าที่ไม่ใช่อาร์เรย์/ไม่ใช่สตริงถูกทิ้ง (ไฟล์เพี้ยน/แก้มือ)", () => {
+    expect(migrateDB({ forecastItemIds: "abc" }).forecastItemIds).toEqual([]);
+    expect(migrateDB({ forecastItemIds: [1, null, {}, "x"] }).forecastItemIds).toEqual([]);
   });
 
   it("ข้อมูลที่ใหม่กว่าที่แอปรู้จักต้องคงเลขเวอร์ชันเดิมไว้ ไม่ถูกลดลง", () => {

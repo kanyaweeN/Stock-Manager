@@ -9,6 +9,7 @@ import packageJson from "@/package.json";
 const NAV = [
   { href: "/", icon: "🏠", label: "สินค้า", short: "สินค้า" },
   { href: "/plan", icon: "🛒", label: "วางแผนซื้อ", short: "แผนซื้อ" },
+  { href: "/forecast", icon: "🔮", label: "คาดคะเนซื้อ", short: "คาดคะเน" },
   { href: "/summary", icon: "📊", label: "สรุปยอด", short: "สรุปยอด" },
   { href: "/cost", icon: "🧮", label: "คำนวณต้นทุน", short: "ต้นทุน" },
   { href: "/analyze", icon: "🧪", label: "วิเคราะห์ส่วนผสม", short: "ส่วนผสม" },

@@ -50,6 +50,13 @@ export interface StockDB {
   orders?: PurchaseOrder[];
   /** ของที่ลบไปแล้วแต่ยังกู้คืนได้ — **ไม่ได้อยู่ใน `items`** แล้ว (ดู lib/domain/trash.ts) */
   trash?: StockItem[];
+  /**
+   * รายการ id ของสินค้าที่ผู้ใช้เลือกให้ติดตามในหน้า `/forecast` (คาดคะเนวันซื้ออีกครั้ง)
+   *
+   * เก็บใน StockDB (แทนที่จะเป็น localStorage) เพื่อให้ซิงก์ข้ามเครื่องผ่าน Drive
+   * id ที่ชี้ไปยังสินค้าที่ถูกลบแล้วจะถูกฟิลเตอร์ทิ้งใน `normalizeDB` เพื่อไม่ให้บวมขึ้นเรื่อยๆ
+   */
+  forecastItemIds?: string[];
   updatedAt?: string;
 }
 

@@ -189,11 +189,17 @@ function normalizePricing(raw: unknown): PricingSettings {
 
 export function normalizeDB(db: RawDB, version: number): StockDB {
   const skinProfile = db.skinProfile;
+  const items = asArray(db.items).map(normalizeItem);
+  // id ในลิสต์ติดตามคาดคะเนต้องชี้ไปสินค้าที่ยังอยู่จริง — id ของที่ลบไปแล้วตกค้าง
+  // จะทำให้ลิสต์บวมขึ้นเรื่อยๆ ไม่มีทางล้างเอง และ dedupe กันตัวซ้ำที่มาจากไฟล์เพี้ยน/แก้มือ
+  const itemIdSet = new Set(items.map((i) => i.id));
+  const forecastIds = asArray(db.forecastItemIds)
+    .filter((id): id is string => typeof id === "string" && itemIdSet.has(id));
   return {
     ...db,
     // ข้อมูลที่ใหม่กว่าที่แอปรู้จักให้คงเลขเดิมไว้ จะได้ไม่โดน migrate ซ้ำตอนกลับไปเปิดในแอปเวอร์ชันใหม่
     schemaVersion: Math.max(version, CURRENT_SCHEMA_VERSION),
-    items: asArray(db.items).map(normalizeItem),
+    items,
     categoryPresets: Array.isArray(db.categoryPresets)
       ? (db.categoryPresets as string[])
       : DEFAULT_DB.categoryPresets,
@@ -205,6 +211,7 @@ export function normalizeDB(db: RawDB, version: number): StockDB {
     pricing: normalizePricing(db.pricing),
     orders: asArray(db.orders).map(normalizeOrder),
     trash: asArray(db.trash).map(normalizeTrashItem),
+    forecastItemIds: [...new Set(forecastIds)],
     updatedAt: typeof db.updatedAt === "string" ? db.updatedAt : undefined,
   };
 }
