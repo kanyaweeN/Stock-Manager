@@ -92,8 +92,9 @@ export default function SummaryPage() {
   }, [rangeMode, from, to]);
 
   const insights = useMemo(
-    () => summaryInsights(db.items, overview, rangeEvents, rangeLabel),
-    [db.items, overview, rangeEvents, rangeLabel]
+    // ส่ง `events` ต่อไปด้วย ไม่ให้ summaryInsights ไปคำนวณ spendEvents ซ้ำจาก items
+    () => summaryInsights(db.items, overview, rangeEvents, rangeLabel, undefined, events),
+    [db.items, overview, rangeEvents, rangeLabel, events]
   );
 
   const catRows = useMemo(() => byCategory(rangeEvents), [rangeEvents]);

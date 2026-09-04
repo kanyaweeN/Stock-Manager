@@ -336,13 +336,17 @@ const money = (n: number) => `฿${roundBaht(n).toLocaleString("th-TH", { maximu
 /**
  * แปลงตัวเลขเป็นประโยคภาษาคน — เดือนนี้จ่ายเท่าไร เกินค่าเฉลี่ยไหม อะไรกินงบ ราคาอะไรขึ้น และข้อมูลไหนยังขาด
  * `rangeEvents`/`rangeLabel` คือช่วงวันที่ที่ผู้ใช้เลือกอยู่บนหน้าจอ (ไม่ใช่ทั้งหมด)
+ *
+ * `allEvents` เป็นทางเลือก — ผู้เรียกที่มีอยู่แล้ว (`app/summary/page.tsx` คำนวณ `events` ครั้งเดียว
+ * ใน useMemo แล้วส่งต่อ) ให้ส่งมาเพื่อไม่ให้เดินสร้างใหม่ทุก render ที่ /summary
  */
 export function summaryInsights(
   items: StockItem[],
   overview: SpendOverview,
   rangeEvents: SpendEvent[],
   rangeLabel: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  allEvents?: SpendEvent[]
 ): Insight[] {
   const out: Insight[] = [];
   const thisMonthName = thaiMonthLabel(monthISO(0, now));
@@ -457,7 +461,8 @@ export function summaryInsights(
       text: `มี ${noPrice} รายการที่ยังไม่ได้กรอกราคา ยอดจริงจึงสูงกว่าที่เห็น — เติมราคาในหน้าสินค้าแล้วตัวเลขจะครบ`,
     });
   }
-  const noDate = new Set(spendEvents(items).filter((e) => !e.date).map((e) => e.itemId)).size;
+  const eventsForCheck = allEvents ?? spendEvents(items);
+  const noDate = new Set(eventsForCheck.filter((e) => !e.date).map((e) => e.itemId)).size;
   if (noDate > 0) {
     out.push({
       key: "no-date",
