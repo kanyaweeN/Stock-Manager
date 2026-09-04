@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_DB, migrateDB, type StockDB } from "@/lib/db";
 
 const DB_FILENAME = "stock-manager-db.json";
@@ -235,5 +235,11 @@ export function usePersistedStockDB() {
     setDb(next);
   }, []);
 
-  return { db, setDb, replaceDb, status, linkedFileName: linkedFile?.name ?? null, toggleLink, loaded };
+  // ค่าที่ส่งออกไปเป็น context value — ห่อ useMemo ให้ identity คงที่ตราบใดที่ field พื้นฐานไม่เปลี่ยน
+  // ไม่งั้น StockDBProvider จะสร้าง value ใหม่ทุก render แล้วทำให้ทุกหน้าที่ subscribe re-render พร้อมกัน
+  const linkedFileName = linkedFile?.name ?? null;
+  return useMemo(
+    () => ({ db, setDb, replaceDb, status, linkedFileName, toggleLink, loaded }),
+    [db, replaceDb, status, linkedFileName, toggleLink, loaded],
+  );
 }

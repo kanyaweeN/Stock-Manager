@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StockDB } from "@/lib/db";
 import { countUnits } from "@/lib/domain/stock";
 import { requestAccessToken } from "@/lib/sync/googleAuth";
@@ -206,16 +206,16 @@ export function useGoogleDriveSync(
      
   }, []);
 
-  const saveClientId = (next: string) => {
+  const saveClientId = useCallback((next: string) => {
     setClientId(next);
     localStorage.setItem(CLIENT_ID_KEY, next);
-  };
+  }, []);
 
-  const setAutoSync = (on: boolean) => {
+  const setAutoSync = useCallback((on: boolean) => {
     setAutoSyncState(on);
     localStorage.setItem(AUTOSYNC_KEY, on ? "1" : "0");
     if (on) setAutoPaused(false);
-  };
+  }, []);
 
   /** token หมดอายุราวชั่วโมงละครั้ง — โดน 401 ให้ขอใหม่เงียบๆ แล้วลองซ้ำหนึ่งรอบ ไม่งั้นซิงก์อัตโนมัติจะตายเงียบๆ */
   const withToken = useCallback(async <T,>(fn: (t: string) => Promise<T>): Promise<T> => {
@@ -243,7 +243,7 @@ export function useGoogleDriveSync(
     setAutoPaused(false);
   }, []);
 
-  const connect = async () => {
+  const connect = useCallback(async () => {
     if (!clientId.trim()) {
       setMessage("กรอก Client ID ก่อน");
       return;
@@ -268,7 +268,7 @@ export function useGoogleDriveSync(
     } finally {
       setBusy(false);
     }
-  };
+  }, [clientId]);
 
   /**
    * ส่งข้อมูลทั้งก้อนขึ้น Drive — ตรวจสภาพไฟล์ปลายทางก่อนเขียนทับเสมอ (ดู `overwriteRisks`)
@@ -338,7 +338,7 @@ export function useGoogleDriveSync(
     [fileId, markSynced, withToken]
   );
 
-  const pull = async () => {
+  const pull = useCallback(async () => {
     if (!tokenRef.current || busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -372,16 +372,16 @@ export function useGoogleDriveSync(
       busyRef.current = false;
       setBusy(false);
     }
-  };
+  }, [db, withToken, markSynced, setDb]);
 
-  const forget = () => {
+  const forget = useCallback(() => {
     setToken(null);
     tokenRef.current = null;
     setFileId(null);
     setRemoteTime(null);
     localStorage.removeItem(REMEMBER_KEY);
     setMessage("เลิกจำการเชื่อมต่อแล้ว");
-  };
+  }, []);
 
   // ─── ซิงก์อัตโนมัติ ──────────────────────────────────────────
   /*
@@ -418,9 +418,18 @@ export function useGoogleDriveSync(
     return () => document.removeEventListener("visibilitychange", onHide);
   }, [autoSync, dirty, autoPaused, push]);
 
-  return {
-    clientId, token, remoteTime, message, busy, checking, origin,
-    autoSync, setAutoSync, dirty, autoPaused,
-    saveClientId, connect, push, pull, forget,
-  };
+  // ห่อ useMemo ให้ identity คงที่ตราบใดที่ field ไม่เปลี่ยน — คู่กับ StockDBProvider ที่ memoize
+  // context value ต่ออีกชั้น ไม่งั้น value ใหม่ถูกสร้างทุก render แม้ไม่มีอะไรเปลี่ยน แล้วทุก consumer re-render พร้อมกัน
+  return useMemo(
+    () => ({
+      clientId, token, remoteTime, message, busy, checking, origin,
+      autoSync, setAutoSync, dirty, autoPaused,
+      saveClientId, connect, push, pull, forget,
+    }),
+    [
+      clientId, token, remoteTime, message, busy, checking, origin,
+      autoSync, setAutoSync, dirty, autoPaused,
+      saveClientId, connect, push, pull, forget,
+    ],
+  );
 }
