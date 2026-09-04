@@ -427,8 +427,10 @@ const analysisCache = new Map<string, IngredientAnalysis>();
 export function analyzeIngredients(text: string | undefined, avoid: string[] = []): IngredientAnalysis {
   if (!text || !text.trim()) return EMPTY_ANALYSIS;
 
-  // คีย์แคชต้องแยก text ออกจาก avoid แบบไม่กำกวม — JSON.stringify จัดการ escape ให้เอง
-  const cacheKey = JSON.stringify([text, avoid]);
+  // หน้าแรกเรียก fn นี้ครั้งละ 1000+ ครั้ง (การ์ดละ 1 ครั้ง) ทุก render — คีย์แคชต้องราคาถูกที่สุด
+  // avoid ว่างเป็น default (ผู้ใช้ส่วนใหญ่ไม่ตั้ง) → ใช้ text ตรงๆ เป็นคีย์ ข้าม JSON.stringify ของ text ยาวๆ ทิ้ง
+  // เมื่อมี avoid ให้ prefix ด้วย \x00 กันชนกับคำที่ขึ้นต้นด้วย `[` (ทำให้ text ล้วนๆ เป็นคีย์ไม่ปลอดภัย)
+  const cacheKey = avoid.length === 0 ? text : `\x00${JSON.stringify(avoid)}\x00${text}`;
   const cached = analysisCache.get(cacheKey);
   if (cached) return cached;
 
