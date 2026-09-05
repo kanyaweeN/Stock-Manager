@@ -12,6 +12,7 @@ import { amountText, baht, bahtPerUnit, perUnitPrice } from "@/lib/domain/cost";
 import { todayISO, formatThaiShortDate } from "@/lib/core/date";
 import { effectiveExpiry, expiryLabel } from "@/lib/domain/expiry";
 import { daysUntilEmpty, usageStats } from "@/lib/domain/usage";
+import { spendRate } from "@/lib/domain/spendRate";
 import type { SkinProfile } from "@/lib/db";
 import { priceStats, pushPricePoint } from "@/lib/domain/price";
 import type { ItemStatus, StockItem } from "@/lib/types";
@@ -69,6 +70,7 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
   const perUnit = perUnitPrice(fromProductForm(form, item));
   // เตือนตั้งแต่ในฟอร์มว่าวันไหนคือวันที่ "ใช้จริง" — ฉลากกับ PAO มักไม่ตรงกัน (ดู lib/domain/expiry.ts)
   const usage = item ? usageStats(item) : null;
+  const spend = item ? spendRate(item) : null;
   const runoutDays = item
     ? daysUntilEmpty({
         qty: Number(form.qty) || 0,
@@ -368,6 +370,16 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
               <p className="sub text-xs">
                 ยังคำนวณไม่ได้ — ระบบจดให้อัตโนมัติทุกครั้งที่กด ＋/− บนการ์ดสินค้า
                 พอมีข้อมูลสัก 2 ครั้งห่างกันเกิน 1 สัปดาห์ จะบอกได้ว่าของจะหมดอีกกี่วัน
+              </p>
+            )}
+            {spend && (
+              <p className="sub text-xs">
+                ตกวันละ <strong>{baht(spend.bahtPerDay)}</strong>
+                {" "}({baht(spend.bahtPerMonth)}/เดือน)
+                {" — "}
+                {spend.source === "usage"
+                  ? "จากอัตราการใช้ × ราคาเฉลี่ยที่ซื้อ"
+                  : `จากช่วงห่างการซื้อ (~${Math.round(spend.daysPerPack)} วัน/แพ็ค × ราคาเฉลี่ย)`}
               </p>
             )}
           </div>
