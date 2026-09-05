@@ -14,6 +14,7 @@ const NAV = [
   { href: "/cost", icon: "🧮", label: "คำนวณต้นทุน", short: "ต้นทุน" },
   { href: "/analyze", icon: "🧪", label: "วิเคราะห์ส่วนผสม", short: "ส่วนผสม" },
   { href: "/config", icon: "⚙️", label: "ตั้งค่า", short: "ตั้งค่า" },
+  { href: "/help", icon: "📘", label: "คู่มือ", short: "คู่มือ" },
 ] as const;
 
 /**
