@@ -276,8 +276,62 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     });
   };
 
+  /**
+   * ขยาย id ให้ครอบพี่น้องในกลุ่มเดียวกัน (ดู `groupItems`) — สินค้าชนิดเดียวกันคนละยี่ห้อ/ร้าน
+   * ต้องคาดคะเนรวมกันเป็นก้อนเดียว ไม่งั้นแยกเป็นสองการ์ดที่ข้อมูลแต่ละก้อนไม่พอเดา
+   */
+  const withGroupSiblings = (items: StockItem[], ids: Iterable<string>): string[] => {
+    const idSet = new Set(ids);
+    const groupIds = new Set<string>();
+    for (const item of items) {
+      if (item.groupId && idSet.has(item.id)) groupIds.add(item.groupId);
+    }
+    if (groupIds.size === 0) return [...idSet];
+    for (const item of items) {
+      if (item.groupId && groupIds.has(item.groupId)) idSet.add(item.id);
+    }
+    return [...idSet];
+  };
+
+  /**
+   * สลับติดตาม/เลิกติดตามในหน้าคาดคะเนซื้อ (ดู app/forecast/page.tsx)
+   *
+   * สินค้าที่อยู่ในกลุ่ม (เช่น อาหารแมว A + B) จะสลับทั้งกลุ่มพร้อมกัน — มีสมาชิกใดถูกติดตาม
+   * อยู่ = ถอดทั้งกลุ่ม, ไม่มีเลย = เพิ่มทั้งกลุ่ม เพราะการ์ดคาดคะเนต้องคิดจากประวัติรวมของสมาชิกทั้งกลุ่ม
+   */
+  const toggleForecast = (id: string) => {
+    setDb((prev) => {
+      const item = prev.items.find((i) => i.id === id);
+      const targets = item?.groupId
+        ? prev.items.filter((i) => i.groupId === item.groupId).map((i) => i.id)
+        : [id];
+      const current = prev.forecastItemIds ?? [];
+      const currentSet = new Set(current);
+      const targetSet = new Set(targets);
+      const anyTracked = targets.some((t) => currentSet.has(t));
+      const next = anyTracked
+        ? current.filter((x) => !targetSet.has(x))
+        : [...current, ...targets.filter((t) => !currentSet.has(t))];
+      return { ...prev, forecastItemIds: next };
+    });
+  };
+
+  /** เพิ่มการติดตามให้หลายรายการพร้อมกัน — ไม่เอาออก เพราะปุ่มในแถบเลือกหลายอันสื่อ "เพิ่ม" อย่างเดียว */
+  const addToForecastMany = (ids: string[]) => {
+    setDb((prev) => {
+      const expanded = withGroupSiblings(prev.items, ids);
+      const current = prev.forecastItemIds ?? [];
+      const set = new Set(current);
+      for (const id of expanded) set.add(id);
+      // ไม่มี id ใหม่ = ไม่ต้อง copy ใหม่ (กัน re-render ไม่จำเป็น)
+      if (set.size === current.length) return prev;
+      return { ...prev, forecastItemIds: [...set] };
+    });
+  };
+
   return {
     save, remove, removeMany, restoreFromTrash, deleteForever, emptyTrash,
     groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, importOrder, exportCsv,
+    toggleForecast, addToForecastMany,
   };
 }

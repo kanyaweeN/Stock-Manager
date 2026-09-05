@@ -49,6 +49,7 @@ export default function Home() {
   const planActions = usePlanActions(setDb);
   const recipes = db.recipes ?? [];
   const plans = useMemo(() => sortPlans(db.plans ?? []), [db.plans]);
+  const forecastIds = useMemo(() => new Set(db.forecastItemIds ?? []), [db.forecastItemIds]);
 
   const [modalItem, setModalItem] = useState<StockItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -183,6 +184,7 @@ export default function Home() {
           onToggleFav={() => { actions.toggleFavForItems([...selectedIds]); exitSelectMode(); }}
           onAddToRecipe={() => { recipe.openAddTo(selectedItems); exitSelectMode(); }}
           onAddToPlan={() => { plan.openAddTo(selectedItems); exitSelectMode(); }}
+          onAddToForecast={() => { actions.addToForecastMany([...selectedIds]); exitSelectMode(); }}
           // ยกเลิกใน confirm แล้วต้องไม่หลุดออกจากโหมดเลือก ไม่งั้นที่เลือกไว้หายหมดฟรีๆ
           onRemove={() => { if (actions.removeMany(selectedItems)) exitSelectMode(); }}
           onCancel={exitSelectMode}
@@ -200,6 +202,8 @@ export default function Home() {
         onToggleFav={actions.toggleFav}
         onAddToRecipe={(item) => recipe.openAddTo([item])}
         onAddToPlan={(item) => plan.openAddTo([item])}
+        onToggleForecast={(item) => actions.toggleForecast(item.id)}
+        forecastIds={forecastIds}
         onFilterShop={toggleShopFilter}
         activeShopKey={filterShop}
         selectMode={selectMode}

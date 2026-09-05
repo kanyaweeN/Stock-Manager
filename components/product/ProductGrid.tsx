@@ -32,6 +32,10 @@ interface Props {
   onAddToRecipe?: (item: StockItem) => void;
   /** จดสินค้าชิ้นนี้ไว้ในแผนซื้อของ (ดู lib/domain/plan.ts) */
   onAddToPlan?: (item: StockItem) => void;
+  /** สลับติดตามในหน้าคาดคะเนซื้อ (ดู app/forecast/page.tsx) — เมนูจะสลับคำระหว่าง "ติดตาม" กับ "เลิกติดตาม" ตาม `forecastIds` */
+  onToggleForecast?: (item: StockItem) => void;
+  /** เซ็ต id ที่ถูกติดตามอยู่ — ไว้สลับคำในเมนู ⋯ ไม่ต้องส่งถ้าไม่ใช้ `onToggleForecast` */
+  forecastIds?: Set<string>;
   /** กดแท็ก 🏪 บนการ์ดแล้วกรองเฉพาะร้านนั้น (ไม่ส่งมา = แท็กเป็นข้อความเฉยๆ เหมือนเดิม) */
   onFilterShop?: (shop: string) => void;
   /** `shopKey` ของร้านที่กรองอยู่ — ไว้ไฮไลต์แท็กที่กำลังกรอง */
@@ -62,7 +66,7 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   /** id ของการ์ดที่เปิดเมนู ⋯ อยู่ (เปิดได้ทีละใบ) */
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -382,6 +386,11 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
                   {onAddToPlan && (
                     <button className="menu__item" onClick={() => { setMenuId(null); onAddToPlan(i); }}>
                       <i>🛒</i> ใส่ในแผนซื้อของ
+                    </button>
+                  )}
+                  {onToggleForecast && (
+                    <button className="menu__item" onClick={() => { setMenuId(null); onToggleForecast(i); }}>
+                      <i>🔮</i> {forecastIds?.has(i.id) ? "เลิกติดตามคาดคะเนซื้อ" : "ติดตามคาดคะเนซื้อ"}
                     </button>
                   )}
                   {i.link && (

@@ -11,6 +11,7 @@ interface Props {
   onToggleFav: () => void;
   onAddToRecipe: () => void;
   onAddToPlan: () => void;
+  onAddToForecast: () => void;
   onRemove: () => void;
   onCancel: () => void;
 }
@@ -18,7 +19,7 @@ interface Props {
 /** แถบคำสั่งของโหมดเลือกหลายอัน — ลอยอยู่ท้ายจอหน้าแรกตอน `selectMode` เปิด */
 export default function SelectActionBar({
   selectedCount, filteredCount, allFilteredSelected,
-  onToggleSelectAll, onGroup, onMoveCats, onToggleFav, onAddToRecipe, onAddToPlan, onRemove, onCancel,
+  onToggleSelectAll, onGroup, onMoveCats, onToggleFav, onAddToRecipe, onAddToPlan, onAddToForecast, onRemove, onCancel,
 }: Props) {
   return (
     <div className="select-action-bar">
@@ -32,6 +33,7 @@ export default function SelectActionBar({
       <button className="btn-ghost" disabled={selectedCount < 1} onClick={onToggleFav}>⭐ ของโปรด</button>
       <button className="btn-ghost" disabled={selectedCount < 1} onClick={onAddToRecipe}>🧮 ใส่ในสูตรต้นทุน</button>
       <button className="btn-ghost" disabled={selectedCount < 1} onClick={onAddToPlan}>🛒 ใส่ในแผนซื้อของ</button>
+      <button className="btn-ghost" disabled={selectedCount < 1} onClick={onAddToForecast}>🔮 ติดตามคาดคะเน</button>
       <button className="btn-danger" disabled={selectedCount < 1} onClick={onRemove}>🗑️ ลบที่เลือก</button>
       <button className="btn-ghost" onClick={onCancel}>ยกเลิก</button>
     </div>
