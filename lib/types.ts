@@ -239,6 +239,11 @@ export interface PurchasePlan {
  */
 export type ImportSource = "shopee" | "lazada" | "watsons" | "konvy";
 
+/** ฟิลด์ที่เลือกได้ว่าจะให้ค่าใหม่ทับของเดิมไหมตอนซื้อซ้ำ — ต้องมีอยู่ทั้งใน `StockItem` และ `ImportCandidate` */
+export type MergeField =
+  | "qty" | "price"
+  | "img" | "variant" | "size" | "unit" | "packAmount" | "note" | "status" | "ingredients" | "shop";
+
 export interface ImportCandidate {
   name: string;
   qty: number;
@@ -270,5 +275,5 @@ export interface ImportCandidate {
   /** ถ้าเป็นการซื้อซ้ำ ให้รวมจำนวนเข้ารายการเดิมแทนที่จะสร้างใหม่ (ค่าเริ่มต้น true เมื่อเจอรายการซ้ำ) */
   mergeExisting?: boolean;
   /** ตอนซื้อซ้ำ เลือกได้ว่าจะเอาค่าใหม่มาอัปเดตฟิลด์ไหนบ้าง (ค่าเริ่มต้น: อัปเดตทุกฟิลด์ที่มีค่าใหม่) */
-  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "unit" | "packAmount" | "note" | "status" | "ingredients" | "shop", boolean>>;
+  mergeFields?: Partial<Record<MergeField, boolean>>;
 }

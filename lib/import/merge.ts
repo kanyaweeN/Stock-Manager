@@ -6,10 +6,9 @@
  * แต่ตอนอยู่ในไฟล์ component มันเทสต์ไม่ได้เลย
  */
 import { roundBaht } from "@/lib/domain/price";
-import type { ImportCandidate, StockItem } from "@/lib/types";
+import type { ImportCandidate, MergeField, StockItem } from "@/lib/types";
 
-/** ฟิลด์ที่เลือกได้ว่าจะให้ค่าใหม่ทับของเดิมไหมตอนซื้อซ้ำ */
-export type MergeField = "qty" | "price" | "img" | "variant" | "size" | "unit" | "packAmount" | "note" | "status" | "ingredients" | "shop";
+export type { MergeField } from "@/lib/types";
 
 export const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   qty: "จำนวน",
@@ -24,6 +23,18 @@ export const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   ingredients: "ส่วนผสม",
   shop: "ร้านค้า",
 };
+
+/** ฟิลด์ที่ merge แบบตรงๆ ("ถ้ามีค่าและต่างจากเดิม ให้ค่าใหม่ทับ") — ไม่รวม qty/price ที่มีตรรกะแยก */
+type PlainMergeField = Exclude<MergeField, "qty" | "price">;
+
+/**
+ * ฟิลด์ตัวเลขที่ **0 ก็ถือว่ามีค่า** (แพ็คขนาด 0 ไม่มีความหมายอยู่แล้ว แต่กันไว้เผื่อ)
+ * ที่เหลือเช็คแบบ truthy ป้องกันสตริงว่างเปล่ามาทับของเดิม
+ */
+const NULLABLE_FIELDS: readonly PlainMergeField[] = ["packAmount"];
+
+const hasNewValue = (field: PlainMergeField, v: string | number | undefined): boolean =>
+  NULLABLE_FIELDS.includes(field) ? v != null : !!v;
 
 const norm = (s: string | undefined) => (s || "").trim().toLowerCase();
 
@@ -42,33 +53,16 @@ export function findExisting(c: ImportCandidate, items: StockItem[]): StockItem 
 
 /** ค่าใหม่ของฟิลด์นี้จากรายการนำเข้า (เทียบกับของเดิม) ถ้ามีค่าจริงและต่างจากเดิมจึงถือเป็นฟิลด์ที่ "มีค่าใหม่" ให้เลือกอัปเดตได้ */
 export function newFieldValue(field: MergeField, c: ImportCandidate, existing: StockItem): string | number | undefined {
+  // qty/price ต่างจากที่เหลือ: ไม่เช็ค "ต่างจากเดิม" — จำนวนจะบวกเข้าอยู่แล้ว, ราคาที่นำเข้าคือค่ารอบล่าสุด
   if (field === "qty") return c.qty;
   if (field === "price") return c.price;
-  if (field === "img") return c.img && c.img !== existing.img ? c.img : undefined;
-  if (field === "variant") return c.variant && c.variant !== existing.variant ? c.variant : undefined;
-  if (field === "size") return c.size && c.size !== existing.size ? c.size : undefined;
-  if (field === "unit") return c.unit && c.unit !== existing.unit ? c.unit : undefined;
-  if (field === "packAmount") return c.packAmount != null && c.packAmount !== existing.packAmount ? c.packAmount : undefined;
-  if (field === "note") return c.note && c.note !== existing.note ? c.note : undefined;
-  if (field === "status") return c.status && c.status !== existing.status ? c.status : undefined;
-  if (field === "ingredients") return c.ingredients && c.ingredients !== existing.ingredients ? c.ingredients : undefined;
-  if (field === "shop") return c.shop && c.shop !== existing.shop ? c.shop : undefined;
-  return undefined;
+  const nv = c[field] as string | number | undefined;
+  const ov = existing[field] as string | number | undefined;
+  return hasNewValue(field, nv) && nv !== ov ? nv : undefined;
 }
 
 export function oldFieldValue(field: MergeField, existing: StockItem): string | number | undefined {
-  if (field === "qty") return existing.qty;
-  if (field === "price") return existing.price;
-  if (field === "img") return existing.img;
-  if (field === "variant") return existing.variant;
-  if (field === "size") return existing.size;
-  if (field === "unit") return existing.unit;
-  if (field === "packAmount") return existing.packAmount;
-  if (field === "note") return existing.note;
-  if (field === "status") return existing.status;
-  if (field === "ingredients") return existing.ingredients;
-  if (field === "shop") return existing.shop;
-  return undefined;
+  return existing[field] as string | number | undefined;
 }
 
 /** ตั้งค่าเริ่มต้นว่าจะอัปเดตฟิลด์ไหนบ้าง = ทุกฟิลด์ที่มีค่าใหม่จริงๆ */
