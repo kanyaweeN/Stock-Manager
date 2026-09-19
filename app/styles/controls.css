@@ -90,6 +90,44 @@
   box-shadow: var(--shadow-2);
   animation: cat-multiselect-pop .12s ease-out;
 }
+/* ช่องค้นหาบนสุดของแผง — ค้างอยู่กับที่ ไม่เลื่อนตามรายการ */
+.cat-multiselect__search {
+  position: relative;
+  padding: 8px 8px 4px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.cat-multiselect__search input {
+  width: 100%;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.cat-multiselect__search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.cat-multiselect__search-clear {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 50%;
+}
+.cat-multiselect__search-clear:hover { background: var(--danger-soft); color: var(--danger); }
 /* รายการกินพื้นที่ที่เหลือทั้งหมดแล้วสกรอลล์ในตัว — แถบท้าย (เพิ่ม/ล้าง) ค้างอยู่กับที่ */
 .cat-multiselect__list {
   flex: 1;

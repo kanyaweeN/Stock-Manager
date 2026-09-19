@@ -31,6 +31,7 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
   const [newName, setNewName] = useState("");
   const [panelStyle, setPanelStyle] = useState<PanelStyle | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const parentListId = useId();
 
@@ -58,7 +59,7 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
   useEffect(() => {
     const el = detailsRef.current;
     if (!el) return;
-    const onToggle = () => { if (el.open) updatePosition(); else setCreating(false); };
+    const onToggle = () => { if (el.open) updatePosition(); else { setCreating(false); setQuery(""); } };
     el.addEventListener("toggle", onToggle);
     return () => el.removeEventListener("toggle", onToggle);
   }, []);
@@ -133,8 +134,23 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
   const label = selected.length === 0 ? emptyLabel : selected[0];
 
   const options = [...new Set([...categories, ...selected])];
-  const { topList, childrenMap } = groupCategories(options);
-  const parentOptions = topList;
+  const { topList: allTopList, childrenMap } = groupCategories(options);
+  const parentOptions = allTopList;
+
+  // ค้นแบบไม่สนตัวพิมพ์เล็ก/ใหญ่ — top ที่ตรงเองโชว์ลูกทั้งหมด, top ที่ไม่ตรงแต่มีลูกตรง โชว์เฉพาะลูกที่ตรง
+  const q = query.trim().toLowerCase();
+  const matchesQuery = (s: string) => s.toLowerCase().includes(q);
+  const filteredChildrenFor = (name: string): string[] | undefined => {
+    const children = childrenMap.get(name);
+    if (!children) return undefined;
+    if (!q || matchesQuery(name)) return children;
+    return children.filter((c) => matchesQuery(splitCatPath(c)?.leaf ?? c));
+  };
+  const topList = q
+    ? allTopList.filter((name) => matchesQuery(name) || (filteredChildrenFor(name)?.length ?? 0) > 0)
+    : allTopList;
+  // ค้นอยู่ = กางหมวดที่มีลูกตรงให้เห็นเลย ไม่ต้องกดกางเอง
+  const forceExpandAll = q.length > 0;
 
   return (
     <details className="cat-multiselect" ref={detailsRef}>
@@ -156,11 +172,31 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
         className="cat-multiselect__panel"
         style={panelStyle ?? undefined}
       >
+        <div className="cat-multiselect__search">
+          <input
+            type="search"
+            placeholder="ค้นหาหมวดหมู่..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape" && query) { e.preventDefault(); e.stopPropagation(); setQuery(""); } }}
+          />
+          {query && (
+            <button
+              type="button"
+              className="cat-multiselect__search-clear"
+              onClick={() => setQuery("")}
+              title="ล้างคำค้น"
+            >×</button>
+          )}
+        </div>
         <div className="cat-multiselect__list">
-        {topList.length === 0 && <div className="cat-multiselect__empty">ยังไม่มีหมวดหมู่</div>}
+        {allTopList.length === 0 && <div className="cat-multiselect__empty">ยังไม่มีหมวดหมู่</div>}
+        {allTopList.length > 0 && topList.length === 0 && (
+          <div className="cat-multiselect__empty">ไม่พบหมวดหมู่ที่ตรงกับ &quot;{query}&quot;</div>
+        )}
         {topList.map((name) => {
-          const children = childrenMap.get(name);
-          const isExpanded = expanded.has(name);
+          const children = filteredChildrenFor(name);
+          const isExpanded = forceExpandAll || expanded.has(name);
           const checked = selected.includes(name);
           // ติ๊กบางส่วน — ยังไม่ได้เลือกหมวดหลักตรงๆ แต่มีซับหมวดข้างในถูกเลือกอยู่
           // (สำคัญตอนหมวดถูกพับไว้ ไม่งั้นช่องติ๊กว่างเปล่าทั้งที่ในนั้นมีของถูกเลือก)
