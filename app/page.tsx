@@ -197,6 +197,8 @@ export default function Home() {
         skinProfile={db.skinProfile}
         onInc={actions.inc}
         onDec={actions.dec}
+        onIncPiece={actions.incPiece}
+        onDecPiece={actions.decPiece}
         onEdit={openEdit}
         onDelete={actions.remove}
         onToggleFav={actions.toggleFav}

@@ -4,8 +4,10 @@ import { applyCatEdit, type CatEditMode } from "@/lib/core/cats";
 import { todayISO } from "@/lib/core/date";
 import type { StockDB } from "@/lib/db";
 import { csvRows, downloadFile } from "@/lib/core/download";
+import { packOf } from "@/lib/domain/cost";
 import { effectiveExpiry } from "@/lib/domain/expiry";
 import { priceStats, pushPricePoint } from "@/lib/domain/price";
+import { applyPieceDelta } from "@/lib/domain/stock";
 import { pushToTrash, takeFromTrash } from "@/lib/domain/trash";
 import { pushUsage } from "@/lib/domain/usage";
 import { uid } from "@/lib/core/uid";
@@ -153,6 +155,33 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
 
   const inc = (id: string) => changeQty(id, 1);
   const dec = (id: string) => changeQty(id, -1);
+
+  /**
+   * ปรับจำนวนทีละ**ชิ้นย่อย** ของของที่ขายยกแพ็ค (เช่น แพ็คละ 10 ชิ้น ใช้ไป 1 ชิ้น เหลือ 9 ชิ้น)
+   *
+   * แพลนกับ `openPct` เบื้องหลังให้อัตโนมัติ ผู้ใช้ไม่ต้องคำนวณเปอร์เซ็นต์เอง (ดู `applyPieceDelta`
+   * ใน lib/domain/stock.ts) — และจดลง `usageLog` เป็นเศษของแพ็คตามเดิม อัตราการใช้จะได้ต่อเนื่อง
+   * ไม่ว่าจะปรับทีละแพ็คหรือทีละชิ้น
+   */
+  const changePieces = (id: string, deltaPieces: number) =>
+    setItems((prev) =>
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        const pack = packOf(i);
+        if (!pack) return i;
+        const adj = applyPieceDelta(i, deltaPieces, pack.amount);
+        if (adj.packDelta === 0) return i;
+        return {
+          ...i,
+          qty: adj.qty,
+          openPct: adj.openPct,
+          usageLog: pushUsage(i.usageLog, adj.packDelta),
+        };
+      })
+    );
+
+  const incPiece = (id: string) => changePieces(id, 1);
+  const decPiece = (id: string) => changePieces(id, -1);
 
   /**
    * นำเข้ารายการจากออเดอร์ร้านออนไลน์ (Shopee / Lazada / Watsons / Konvy — ดู lib/import/sites.ts)
@@ -335,7 +364,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
 
   return {
     save, remove, removeMany, restoreFromTrash, deleteForever, emptyTrash,
-    groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, importOrder, exportCsv,
+    groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, incPiece, decPiece, importOrder, exportCsv,
     toggleForecast, addToForecastMany,
   };
 }

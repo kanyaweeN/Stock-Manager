@@ -18,12 +18,51 @@ import type { SkinProfile } from "@/lib/db";
 /** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
 const CARD_TAG_LIMIT = 3;
 
+/**
+ * ปุ่ม −/+ พร้อมตัวเลข — ใช้ได้ทั้งชุดหลัก (แพ็ค) และชุดรอง (ชิ้น)
+ * แยกออกมาเพราะโครง `<button/><span/><button/>` เดียวกันเป๊ะ ส่วนที่ต่างจริงคือ
+ * ค่าที่โชว์ ตัว handler และธีมสี (`variant="pieces"` = โทน accent อ่อน)
+ */
+function QtyControl({
+  value, variant, title, onDec, onInc, decLabel, incLabel,
+}: {
+  value: React.ReactNode;
+  /** ปุ่มระดับชิ้น = ธีมรอง (โทน accent อ่อน) ค่าอื่น = ธีมหลัก (พื้นเทา) */
+  variant?: "pieces";
+  title?: string;
+  onDec: () => void;
+  onInc: () => void;
+  decLabel?: string;
+  incLabel?: string;
+}) {
+  return (
+    <div className={variant === "pieces" ? "qty qty--pieces" : "qty"} title={title}>
+      <button className="qty-btn" onClick={onDec} aria-label={decLabel}>−</button>
+      <span>{value}</span>
+      <button className="qty-btn" onClick={onInc} aria-label={incLabel}>+</button>
+    </div>
+  );
+}
+
+/** ตัวเลข + ป้ายหน่วยเบาๆ ("แพ็ค"/"ชิ้น") ใช้เป็นค่าใน `QtyControl` */
+function QtyValue({ value, unit }: { value: React.ReactNode; unit?: string }) {
+  return (
+    <>
+      {value}
+      {unit && <em className="qty__unit"> {unit}</em>}
+    </>
+  );
+}
+
 interface Props {
   items: StockItem[];
   avoidIngredients?: string[];
   skinProfile?: SkinProfile;
   onInc: (id: string) => void;
   onDec: (id: string) => void;
+  /** ปรับจำนวนทีละ**ชิ้นย่อย** ของของที่ขายยกแพ็ค (แพ็คละ 10 ชิ้น กด −1 ชิ้น เหลือ 9 ชิ้น) — ไม่ส่ง = ไม่โชว์ปุ่ม */
+  onIncPiece?: (id: string) => void;
+  onDecPiece?: (id: string) => void;
   onEdit: (item: StockItem) => void;
   onDelete: (item: StockItem) => void;
   /** ปัก/เอาดาวของโปรดออก — โชว์เป็นปุ่มดาวบนการ์ด และกรองด้วยชิป "⭐ ของโปรด" */
@@ -66,7 +105,7 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   /** id ของการ์ดที่เปิดเมนู ⋯ อยู่ (เปิดได้ทีละใบ) */
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -335,22 +374,45 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
           {i.note && <div className="product-card__note">📝 {i.note}</div>}
 
           <div className="product-card__footer" onClick={(e) => e.stopPropagation()}>
-            <div className="qty">
-              <button className="qty-btn" onClick={() => onDec(i.id)}>−</button>
-              <span> {i.qty} </span>
-              <button className="qty-btn" onClick={() => onInc(i.id)}>+</button>
+            {/*
+              คู่ปุ่ม −/+ ของของที่ขายยกแพ็ค: ตัวซ้าย = ระดับแพ็ค (ซื้อเพิ่ม/ใช้หมดแพ็ค),
+              ตัวขวา = ระดับชิ้น (ใช้/เพิ่ม 1 ชิ้น แอบปรับ openPct ให้)
+              ห่อเป็น .qty-stack เพื่อให้เกาะกันเป็นก้อนเดียว ไม่แตกออกจากกันเวลามีป้ายอื่นแทรก
+              ป้ายหน่วย ("แพ็ค"/"ชิ้น") โผล่เฉพาะตอนมีปุ่มสองชุด ไม่งั้นเป็นข้อมูลซ้ำเปล่าๆ
+            */}
+            <div className="qty-stack">
+              <QtyControl
+                value={<QtyValue value={i.qty} unit={pieces ? "แพ็ค" : undefined} />}
+                title={pieces ? "ปรับทีละแพ็ค (ซื้อเพิ่ม/ใช้หมดทั้งแพ็ค)" : undefined}
+                onDec={() => onDec(i.id)}
+                onInc={() => onInc(i.id)}
+                decLabel="ลดจำนวน"
+                incLabel="เพิ่มจำนวน"
+              />
+              {pieces && (onIncPiece && onDecPiece ? (
+                <QtyControl
+                  variant="pieces"
+                  value={<QtyValue value={amountText(pieces.pieces)} unit={pieces.unit} />}
+                  title={`ปรับทีละชิ้น (${amountText(pieces.packs)} แพ็ค × ${amountText(pieces.amount)} ${pieces.unit} ต่อแพ็ค)`}
+                  onDec={() => onDecPiece(i.id)}
+                  onInc={() => onIncPiece(i.id)}
+                  decLabel="ใช้ 1 ชิ้น"
+                  incLabel="เพิ่ม 1 ชิ้น"
+                />
+              ) : (
+                <span
+                  className="product-card__pieces"
+                  title={`${amountText(pieces.packs)} แพ็ค × ${amountText(pieces.amount)} ${pieces.unit} ต่อแพ็ค`}
+                >
+                  = {amountText(pieces.pieces)} {pieces.unit}
+                </span>
+              ))}
             </div>
-            {/* ตัวเลขข้างปุ่ม −/+ นับเป็นแพ็ค — ของที่แพ็คละหลายชิ้นจึงบอก "รวมกี่ชิ้น" ต่อท้ายให้ */}
-            {pieces && (
-              <span
-                className="product-card__pieces"
-                title={`${amountText(pieces.packs)} แพ็ค × ${amountText(pieces.amount)} ${pieces.unit} ต่อแพ็ค`}
-              >
-                = {amountText(pieces.pieces)} {pieces.unit}
-              </span>
-            )}
-            {/* ตอนใกล้หมดมีป้าย "ใกล้หมด · ขั้นต่ำ n" อยู่แล้ว ไม่ต้องบอกซ้ำ */}
-            {i.openPct != null && i.qty > 0 && (
+            {/*
+              เปิดแล้ว % — โชว์เฉพาะตอนไม่มีปุ่มระดับชิ้น (ไม่งั้นข้อมูลซ้ำกับตัวเลข "N ชิ้น" ที่เห็นอยู่)
+              และตอนใกล้หมดมีป้าย "ใกล้หมด · ขั้นต่ำ n" อยู่แล้วก็ไม่ต้องบอกซ้ำ
+            */}
+            {i.openPct != null && i.qty > 0 && !pieces && (
               <span className="product-card__open" title="ขวด/แพ็คที่เปิดอยู่เหลืออยู่เท่าไร">
                 เปิดแล้ว {i.openPct}%
               </span>

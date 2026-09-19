@@ -39,6 +39,47 @@ export function remainingUnits(item: Pick<StockItem, "qty" | "openPct">): number
   return item.qty - 1 + Math.min(100, Math.max(0, item.openPct)) / 100;
 }
 
+export interface PieceAdjustment {
+  qty: number;
+  openPct?: number;
+  /** เปลี่ยนแปลงจริงเป็นแพ็ค (ติดลบ = ใช้ไป) — เอาไปจดลง `usageLog` ผ่าน `pushUsage` */
+  packDelta: number;
+}
+
+/**
+ * ปรับจำนวนที่เหลือ **ทีละชิ้นย่อย** ของของที่ขายยกแพ็ค — ตอบโจทย์ "แพ็คละ 10 ชิ้น ใช้ไป 1 ชิ้น เหลือ 9 ชิ้น"
+ *
+ * ผู้ใช้อยากลด/เพิ่มทีละชิ้น (ที่เห็นบนการ์ด) ไม่ใช่ทีละแพ็ค — แต่โครงข้อมูลเก็บเป็นแพ็คเต็ม (`qty`)
+ * + เศษของแพ็คที่เปิดอยู่ (`openPct`) เท่านั้น ตัวนี้เป็นตัวแปลง: รับจำนวนชิ้นที่จะลด/เพิ่ม
+ * แล้วคืนค่า `qty`/`openPct` ใหม่ให้เข้ากับโครงเดิม พร้อม `packDelta` (การใช้จริงเป็นแพ็ค)
+ * ที่เอาไปจดลง `usageLog` ต่อได้เลย
+ *
+ * `openPct` เก็บเป็น**ทศนิยม**ตามที่ `normalizeItem` ยอมรับ — ปัดเป็นจำนวนเต็มไม่ได้ ไม่งั้น
+ * กด −1 ชิ้นซ้ำๆ กับแพ็คขนาด 3 จะเพี้ยนสะสม (33.33% ปัดเป็น 33% → 3×0.33 = 0.99 → 0)
+ * ทำให้ 3 ชิ้นสุดท้ายหายไป 1 ชิ้นเงียบๆ
+ */
+export function applyPieceDelta(
+  item: Pick<StockItem, "qty" | "openPct">,
+  deltaPieces: number,
+  packAmount: number,
+): PieceAdjustment {
+  if (packAmount <= 0 || !Number.isFinite(deltaPieces) || deltaPieces === 0) {
+    return { qty: item.qty, openPct: item.openPct, packDelta: 0 };
+  }
+  const currentPacks = remainingUnits(item);
+  const currentPieces = currentPacks * packAmount;
+  const nextPieces = Math.max(0, currentPieces + deltaPieces);
+  const packDelta = (nextPieces - currentPieces) / packAmount;
+  if (packDelta === 0) return { qty: item.qty, openPct: item.openPct, packDelta: 0 };
+  if (nextPieces <= 0) return { qty: 0, openPct: undefined, packDelta };
+  const nextPacks = nextPieces / packAmount;
+  const wholePacks = Math.floor(nextPacks);
+  const fraction = nextPacks - wholePacks;
+  // แพ็คเต็มพอดี = ไม่มีขวดที่เปิดค้าง ล้าง openPct ทิ้ง (เทียบ ≈ 0 กัน float rounding)
+  if (fraction <= 1e-9) return { qty: wholePacks, openPct: undefined, packDelta };
+  return { qty: wholePacks + 1, openPct: fraction * 100, packDelta };
+}
+
 /** นับจำนวน "หน่วย" ของสินค้า — สินค้าที่ถูกจัดกลุ่มไว้ (groupId เดียวกัน) นับรวมเป็น 1 หน่วยแทนที่จะนับแยกทีละชิ้น */
 export function countUnits(items: StockItem[]): number {
   const groupIds = new Set(items.filter((i) => i.groupId).map((i) => i.groupId));
