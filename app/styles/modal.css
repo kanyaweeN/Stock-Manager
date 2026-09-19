@@ -146,6 +146,8 @@ td.thumb-cell { width: 46px; }
 .import-row input[type="text"] { width: 100%; font-size: 13px; padding: 6px 8px; }
 .import-row input[type="number"] { width: 70px; font-size: 13px; padding: 6px 8px; }
 .import-row .import-qty { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.import-row .import-pack { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.import-row .import-pack input[type="text"] { width: 130px; }
 .import-row--dup { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .dup-note {
   display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;

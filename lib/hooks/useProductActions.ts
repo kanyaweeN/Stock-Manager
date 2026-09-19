@@ -213,6 +213,8 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
           img: use("img") && m.img ? m.img : i.img,
           variant: use("variant") && m.variant ? m.variant : i.variant,
           size: use("size") && m.size ? m.size : i.size,
+          unit: use("unit") && m.unit ? m.unit : i.unit,
+          packAmount: use("packAmount") && m.packAmount != null ? m.packAmount : i.packAmount,
           note: use("note") && m.note ? m.note : i.note,
           ingredients: use("ingredients") && m.ingredients ? m.ingredients : i.ingredients,
           status: use("status") && m.status ? m.status : i.status,
@@ -245,6 +247,8 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
             }]
           : [],
         size: c.size,
+        unit: c.unit,
+        packAmount: c.packAmount,
         variant: c.variant,
         shop: c.shop,
         purchasedAt: c.purchasedAt || today,

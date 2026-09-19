@@ -9,7 +9,7 @@ import { roundBaht } from "@/lib/domain/price";
 import type { ImportCandidate, StockItem } from "@/lib/types";
 
 /** ฟิลด์ที่เลือกได้ว่าจะให้ค่าใหม่ทับของเดิมไหมตอนซื้อซ้ำ */
-export type MergeField = "qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients" | "shop";
+export type MergeField = "qty" | "price" | "img" | "variant" | "size" | "unit" | "packAmount" | "note" | "status" | "ingredients" | "shop";
 
 export const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   qty: "จำนวน",
@@ -17,6 +17,8 @@ export const MERGE_FIELD_LABELS: Record<MergeField, string> = {
   img: "รูปภาพ",
   variant: "แท็กรอง",
   size: "ขนาด",
+  unit: "หน่วย",
+  packAmount: "ขนาดบรรจุ",
   note: "หมายเหตุ",
   status: "สถานะ",
   ingredients: "ส่วนผสม",
@@ -45,6 +47,8 @@ export function newFieldValue(field: MergeField, c: ImportCandidate, existing: S
   if (field === "img") return c.img && c.img !== existing.img ? c.img : undefined;
   if (field === "variant") return c.variant && c.variant !== existing.variant ? c.variant : undefined;
   if (field === "size") return c.size && c.size !== existing.size ? c.size : undefined;
+  if (field === "unit") return c.unit && c.unit !== existing.unit ? c.unit : undefined;
+  if (field === "packAmount") return c.packAmount != null && c.packAmount !== existing.packAmount ? c.packAmount : undefined;
   if (field === "note") return c.note && c.note !== existing.note ? c.note : undefined;
   if (field === "status") return c.status && c.status !== existing.status ? c.status : undefined;
   if (field === "ingredients") return c.ingredients && c.ingredients !== existing.ingredients ? c.ingredients : undefined;
@@ -58,6 +62,8 @@ export function oldFieldValue(field: MergeField, existing: StockItem): string | 
   if (field === "img") return existing.img;
   if (field === "variant") return existing.variant;
   if (field === "size") return existing.size;
+  if (field === "unit") return existing.unit;
+  if (field === "packAmount") return existing.packAmount;
   if (field === "note") return existing.note;
   if (field === "status") return existing.status;
   if (field === "ingredients") return existing.ingredients;

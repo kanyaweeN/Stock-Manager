@@ -432,6 +432,26 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
                         value={c.size || ""}
                         onChange={(e) => updateCandidate(idx, { size: e.target.value })}
                       />
+                      <div className="import-pack">
+                        ขนาดบรรจุ
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          placeholder="เช่น 1000"
+                          value={c.packAmount ?? ""}
+                          onChange={(e) => updateCandidate(idx, {
+                            packAmount: e.target.value ? Math.max(0, parseFloat(e.target.value)) : undefined,
+                          })}
+                        />
+                        <input
+                          type="text"
+                          placeholder="หน่วย เช่น g, ml, ชิ้น"
+                          value={c.unit || ""}
+                          onChange={(e) => updateCandidate(idx, { unit: e.target.value })}
+                        />
+                        <span className="sub text-xs">— กรอกแล้ว /cost จะไม่ต้องเดาจากช่องขนาด (ไม่บังคับ)</span>
+                      </div>
                       <input
                         type="text"
                         placeholder="ร้านค้า (ไม่บังคับ — แกะให้อัตโนมัติ)"

@@ -258,6 +258,10 @@ export interface ImportCandidate {
   /** ร้านที่แกะได้จากหน้าออเดอร์ (best-effort — Shopee สุ่มชื่อ class แก้เองได้ในหน้ารีวิว) */
   shop?: string;
   size?: string;
+  /** หน่วยของ `packAmount` เช่น g, ml, ชิ้น — ผู้ใช้กรอกเองในหน้ารีวิว (แกะจากหน้าเว็บไม่ได้แม่นพอ) */
+  unit?: string;
+  /** 1 แพ็ค/ขวดได้ปริมาณเท่าไร (หน่วยตาม `unit`) — กรอกแล้ว /cost จะไม่ต้องเดาจาก `size` */
+  packAmount?: number;
   variant?: string;
   note?: string;
   ingredients?: string;
@@ -266,5 +270,5 @@ export interface ImportCandidate {
   /** ถ้าเป็นการซื้อซ้ำ ให้รวมจำนวนเข้ารายการเดิมแทนที่จะสร้างใหม่ (ค่าเริ่มต้น true เมื่อเจอรายการซ้ำ) */
   mergeExisting?: boolean;
   /** ตอนซื้อซ้ำ เลือกได้ว่าจะเอาค่าใหม่มาอัปเดตฟิลด์ไหนบ้าง (ค่าเริ่มต้น: อัปเดตทุกฟิลด์ที่มีค่าใหม่) */
-  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "note" | "status" | "ingredients" | "shop", boolean>>;
+  mergeFields?: Partial<Record<"qty" | "price" | "img" | "variant" | "size" | "unit" | "packAmount" | "note" | "status" | "ingredients" | "shop", boolean>>;
 }
