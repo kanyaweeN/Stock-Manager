@@ -22,6 +22,14 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .product-group__toggle { margin-left: auto; font-weight: 600; opacity: .9; flex-shrink: 0; }
+/* ปุ่มดินสอในหัวก้อน — เดิมทั้งแถวเป็น <button> เดียว ต้องเป็น <span> ที่ stopPropagation ไม่งั้นกดปุ่มดินสอแล้วก้อนเปิดตามด้วย */
+.product-group__rename {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 6px; font-size: 13px; opacity: .8; cursor: pointer;
+  border-radius: 4px;
+}
+.product-group__rename:hover { opacity: 1; background: rgba(255, 255, 255, .18); }
+.product-group__rename:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 .product-group .product-card { box-shadow: none; }
 .product-group .product-card:hover { box-shadow: none; transform: none; }
 

@@ -29,12 +29,11 @@ describe("buildForecastClusters", () => {
     expect(clusters[0].merged.priceHistory).toEqual(a.priceHistory);
   });
 
-  it("สินค้าคนละยี่ห้อแต่ groupId เดียวกัน → 1 ก้อน · ชื่อ = groupName · รวมประวัติ", () => {
+  it("สินค้าคนละยี่ห้อแต่ groupId เดียวกัน → 1 ก้อน · ชื่อจาก groupNames · รวมประวัติ", () => {
     const a = item({
       id: "a",
       name: "อาหารแมว ยี่ห้อ A",
       groupId: "g1",
-      groupName: "อาหารแมว",
       priceHistory: [
         { date: "2026-01-01", price: 100, qty: 1 },
         { date: "2026-02-01", price: 100, qty: 1 },
@@ -44,10 +43,10 @@ describe("buildForecastClusters", () => {
       id: "b",
       name: "อาหารแมว ยี่ห้อ B",
       groupId: "g1",
-      groupName: "อาหารแมว",
       priceHistory: [{ date: "2026-01-15", price: 120, qty: 1 }],
     });
-    const clusters = buildForecastClusters([a, b]);
+    const groupNames = new Map([["g1", "อาหารแมว"]]);
+    const clusters = buildForecastClusters([a, b], groupNames);
     expect(clusters).toHaveLength(1);
     expect(clusters[0].key).toBe("g1");
     expect(clusters[0].name).toBe("อาหารแมว");
@@ -57,10 +56,17 @@ describe("buildForecastClusters", () => {
   });
 
   it("subtitle ของกลุ่มบอกจำนวนรายการ + ชื่อสมาชิก", () => {
-    const a = item({ id: "a", name: "ยี่ห้อ A", groupId: "g1", groupName: "อาหารแมว" });
-    const b = item({ id: "b", name: "ยี่ห้อ B", groupId: "g1", groupName: "อาหารแมว" });
-    const [c] = buildForecastClusters([a, b]);
+    const a = item({ id: "a", name: "ยี่ห้อ A", groupId: "g1" });
+    const b = item({ id: "b", name: "ยี่ห้อ B", groupId: "g1" });
+    const [c] = buildForecastClusters([a, b], new Map([["g1", "อาหารแมว"]]));
     expect(c.subtitle).toBe("2 รายการ · ยี่ห้อ A, ยี่ห้อ B");
+  });
+
+  it("ไม่มีชื่อกลุ่มใน groupNames → ใช้ชื่อสมาชิกตัวแรกแทน (กันโชว์เป็นค่าว่าง)", () => {
+    const a = item({ id: "a", name: "ยี่ห้อ A", groupId: "g1" });
+    const b = item({ id: "b", name: "ยี่ห้อ B", groupId: "g1" });
+    const [c] = buildForecastClusters([a, b]);
+    expect(c.name).toBe("ยี่ห้อ A");
   });
 
   it("รูปของกลุ่ม = รูปตัวแรกที่มีในสมาชิก (ไม่ใช่ตัวแรกเสมอ)", () => {
@@ -101,10 +107,10 @@ describe("buildForecastClusters", () => {
 
   it("สินค้าเดี่ยว + สินค้าในกลุ่ม อยู่รวมกันได้ · ก้อนเรียงตามลำดับที่พบครั้งแรก", () => {
     const solo = item({ id: "solo", name: "แชมพู" });
-    const a = item({ id: "a", groupId: "g1", groupName: "อาหารแมว" });
-    const b = item({ id: "b", groupId: "g1", groupName: "อาหารแมว" });
+    const a = item({ id: "a", groupId: "g1" });
+    const b = item({ id: "b", groupId: "g1" });
     // input: solo, a, b — solo มาก่อน แต่ b ก็ยังต้องถูก merge เข้ากลุ่ม g1
-    const clusters = buildForecastClusters([solo, a, b]);
+    const clusters = buildForecastClusters([solo, a, b], new Map([["g1", "อาหารแมว"]]));
     // กลุ่ม (2 ก้อน: g1 กับ solo) — ลำดับปัจจุบัน: group ก่อน แล้ว single
     // แต่ตัวไหนมาก่อนใน result ต้องคงที่และคาดเดาได้
     expect(clusters.map((c) => c.key).sort()).toEqual(["g1", "solo"]);

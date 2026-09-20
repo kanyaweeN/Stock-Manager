@@ -101,15 +101,44 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
     setDb((prev) => ({ ...prev, trash: [] }));
   };
 
-  /** ผสาน sourceId เข้ากับ targetId — บวกจำนวนรวมกัน เก็บข้อมูลอื่นๆ ของ target ไว้ แล้วลบ source ทิ้ง */
-  /** จัดกลุ่มสินค้าหลายชิ้นที่เป็นตัวเดียวกันเข้าด้วยกัน โดยไม่ลบทิ้ง — แค่ติด groupId/groupName เดียวกันให้ทุกอัน */
+  /**
+   * จัดกลุ่มสินค้าหลายชิ้นที่เป็นตัวเดียวกันเข้าด้วยกัน โดยไม่ลบทิ้ง — แค่ติด `groupId` เดียวกันให้ทุกอัน
+   * ชื่อกลุ่มไปเก็บที่ก้อนกลาง `db.groups` ให้แก้ครั้งเดียวมีผลทุกสมาชิก (ดู `renameGroup`)
+   * ล้างกลุ่มเดิมที่กลายเป็น orphan (ถ้าดึงของทั้งกลุ่มมาเข้ากลุ่มใหม่) ทิ้งเลย ไม่ต้องรอ `normalizeDB`
+   */
   const groupItems = (ids: string[], groupName: string) => {
     const groupId = uid();
-    setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, groupId, groupName } : i)));
+    const idSet = new Set(ids);
+    setDb((prev) => {
+      const items = prev.items.map((i) => (idSet.has(i.id) ? { ...i, groupId } : i));
+      const stillUsed = new Set(items.map((i) => i.groupId).filter((v): v is string => !!v));
+      const kept = (prev.groups ?? []).filter((g) => stillUsed.has(g.id));
+      return { ...prev, items, groups: [...kept, { id: groupId, name: groupName.trim() }] };
+    });
   };
 
+  /**
+   * ปลดสินค้า 1 ชิ้นออกจากกลุ่ม — ถ้าเป็นสมาชิกคนสุดท้ายก็สลายกลุ่มทิ้งเลย
+   * (จริงๆ `normalizeDB` ก็ตัดกลุ่มไร้สมาชิกทิ้งให้อยู่แล้ว แต่ทำที่นี่ด้วยเพื่อไม่ต้องรอ normalize รอบถัดไป)
+   */
   const ungroup = (id: string) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, groupId: undefined, groupName: undefined } : i)));
+    setDb((prev) => {
+      const item = prev.items.find((i) => i.id === id);
+      if (!item?.groupId) return prev;
+      const gid = item.groupId;
+      const items = prev.items.map((i) => (i.id === id ? { ...i, groupId: undefined } : i));
+      const stillUsed = items.some((i) => i.groupId === gid);
+      const groups = stillUsed ? prev.groups : (prev.groups ?? []).filter((g) => g.id !== gid);
+      return { ...prev, items, groups };
+    });
+  };
+
+  /** เปลี่ยนชื่อกลุ่ม — แก้ที่ก้อนกลางเดียว ทุกสมาชิกโชว์ชื่อใหม่พร้อมกัน (UI กันชื่อว่างในโมดัลแล้ว) */
+  const renameGroup = (groupId: string, name: string) => {
+    setDb((prev) => ({
+      ...prev,
+      groups: (prev.groups ?? []).map((g) => (g.id === groupId ? { ...g, name: name.trim() } : g)),
+    }));
   };
 
   /**
@@ -364,7 +393,7 @@ export function useProductActions(setDb: (updater: (prev: StockDB) => StockDB) =
 
   return {
     save, remove, removeMany, restoreFromTrash, deleteForever, emptyTrash,
-    groupItems, ungroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, incPiece, decPiece, importOrder, exportCsv,
+    groupItems, ungroup, renameGroup, setCatsForItems, toggleFav, toggleFavForItems, inc, dec, incPiece, decPiece, importOrder, exportCsv,
     toggleForecast, addToForecastMany,
   };
 }

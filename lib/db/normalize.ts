@@ -2,7 +2,7 @@
  * เติมค่าเริ่มต้น/บีบ type ให้ตรง — รันทุกครั้งไม่ว่าข้อมูลจะมาจากเวอร์ชันไหน
  * ของที่เป็นแค่ "เติม default" ให้ใส่ที่นี่ ไม่ต้องเพิ่ม migration step
  */
-import type { PlanLine, PlanPriority, PricePoint, PricingSettings, ProductionRun, PurchaseOrder, PurchasePlan, Recipe, RecipeLine, StockItem, UsagePoint } from "@/lib/types";
+import type { PlanLine, PlanPriority, PricePoint, PricingSettings, ProductionRun, PurchaseOrder, PurchasePlan, Recipe, RecipeLine, StockGroup, StockItem, UsagePoint } from "@/lib/types";
 import { normalizeShopName } from "@/lib/domain/orders";
 import { dropRedundantParentCats } from "@/lib/core/cats";
 import { DEFAULT_PRICING, ROUNDING_VALUES } from "@/lib/domain/pricing";
@@ -195,6 +195,20 @@ export function normalizeDB(db: RawDB, version: number): StockDB {
   const itemIdSet = new Set(items.map((i) => i.id));
   const forecastIds = asArray(db.forecastItemIds)
     .filter((id): id is string => typeof id === "string" && itemIdSet.has(id));
+  // กลุ่มที่ไม่มีสมาชิกเหลือแล้ว = ลบสมาชิกคนสุดท้ายไปแล้ว ให้ตัดทิ้งอัตโนมัติ
+  // (ไม่งั้นลิสต์บวมขึ้นเรื่อยๆ ทุกครั้งที่จัดกลุ่มใหม่แล้วสลาย)
+  const referencedGroupIds = new Set(
+    items.map((i) => i.groupId).filter((v): v is string => typeof v === "string" && !!v)
+  );
+  const seenGroupId = new Set<string>();
+  const groups: StockGroup[] = [];
+  for (const raw of asArray(db.groups)) {
+    const g = (raw ?? {}) as Partial<StockGroup>;
+    const id = str(g.id);
+    if (!id || seenGroupId.has(id) || !referencedGroupIds.has(id)) continue;
+    seenGroupId.add(id);
+    groups.push({ id, name: str(g.name) });
+  }
   return {
     ...db,
     // ข้อมูลที่ใหม่กว่าที่แอปรู้จักให้คงเลขเดิมไว้ จะได้ไม่โดน migrate ซ้ำตอนกลับไปเปิดในแอปเวอร์ชันใหม่
@@ -212,6 +226,7 @@ export function normalizeDB(db: RawDB, version: number): StockDB {
     orders: asArray(db.orders).map(normalizeOrder),
     trash: asArray(db.trash).map(normalizeTrashItem),
     forecastItemIds: [...new Set(forecastIds)],
+    groups,
     updatedAt: typeof db.updatedAt === "string" ? db.updatedAt : undefined,
   };
 }

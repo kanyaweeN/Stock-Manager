@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { StockItem } from "@/lib/types";
+import type { StockGroup, StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/core/statusOptions";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
 import { formatThaiShortDate } from "@/lib/core/date";
+import { groupNameMap } from "@/lib/domain/groups";
 import ModalShell from "@/components/ui/ModalShell";
+import GroupNamePromptModal from "@/components/product/GroupNamePromptModal";
 import { effectiveExpiry, expiryLabel, type ExpiryInfo } from "@/lib/domain/expiry";
 import { isLow, isOutOfStock } from "@/lib/domain/stock";
 import { daysUntilEmpty, RUNOUT_SOON_DAYS } from "@/lib/domain/usage";
@@ -82,6 +84,10 @@ interface Props {
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  /** กลุ่มสินค้า (จาก `db.groups`) — ใช้หาชื่อกลุ่มมาโชว์บนหัวก้อน */
+  groups?: StockGroup[];
+  /** เปลี่ยนชื่อกลุ่ม — ไม่ส่ง = ซ่อนปุ่มแก้ชื่อกลุ่ม */
+  onRenameGroup?: (groupId: string, name: string) => void;
 }
 
 /** จัดกลุ่มรายการที่มี groupId เดียวกันให้อยู่ติดกัน (เรียงตามตำแหน่งที่เจอตัวแรกของกลุ่ม) เพื่อวางเป็นกองเดียวกันในกริด */
@@ -105,10 +111,16 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect, groups, onRenameGroup }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  /** id + ชื่อเดิมของกลุ่มที่กำลังแก้ชื่ออยู่ — เก็บชื่อเดิมไว้ให้ modal ใช้เป็น initialValue เพราะกลุ่มอาจถูกลบ/rename ระหว่างเปิด modal */
+  const [renaming, setRenaming] = useState<{ id: string; initial: string } | null>(null);
   /** id ของการ์ดที่เปิดเมนู ⋯ อยู่ (เปิดได้ทีละใบ) */
   const [menuId, setMenuId] = useState<string | null>(null);
+
+  const groupNameById = useMemo(() => groupNameMap(groups), [groups]);
+  /** ชื่อกลุ่มที่จะโชว์ — ไม่มีในลิสต์ (ข้อมูลเพี้ยน) fallback เป็นชื่อสมาชิกตัวแรกกันโชว์ว่าง */
+  const groupLabel = (cluster: StockItem[]) => groupNameById.get(cluster[0].groupId!) || cluster[0].name;
 
   useEffect(() => {
     if (!menuId) return;
@@ -499,7 +511,29 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               className="product-group__label"
               onClick={() => (selectMode ? toggleClusterSelect(cluster) : setOpenGroupId(groupId))}
             >
-              👥 {cluster[0].groupName} · รวม {totalQty} ชิ้น · {cluster.length} รายการ
+              👥 {groupLabel(cluster)} · รวม {totalQty} ชิ้น · {cluster.length} รายการ
+              {onRenameGroup && !selectMode && (() => {
+                // เปิดโมดัลแก้ชื่อ — ยัดเป็น <span role="button"> เพราะซ้อนใน <button> ของหัวก้อนแล้ว nested <button> ไม่ valid
+                const startRename = () => setRenaming({ id: groupId, initial: groupLabel(cluster) });
+                return (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="product-group__rename"
+                    title="แก้ชื่อกลุ่ม"
+                    onClick={(e) => { e.stopPropagation(); startRename(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startRename();
+                      }
+                    }}
+                  >
+                    ✏️
+                  </span>
+                );
+              })()}
               <span className="product-group__toggle">
                 {selectMode ? (clusterSelected ? "✓ เลือกแล้ว" : "แตะเพื่อเลือกทั้งกลุ่ม") : "▼ ดูทั้งหมด"}
               </span>
@@ -526,13 +560,23 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
       {openCluster && (
         <ModalShell
           open
-          title={`👥 ${openCluster[0].groupName} · ${openCluster.length} รายการ`}
+          title={`👥 ${groupLabel(openCluster)} · ${openCluster.length} รายการ`}
           onClose={() => setOpenGroupId(null)}
           className="product-group-modal"
           closeOnBackdrop
         >
           <div className="product-group__stack">{openCluster.map((i) => renderCard(i))}</div>
         </ModalShell>
+      )}
+
+      {renaming && onRenameGroup && (
+        <GroupNamePromptModal
+          open
+          title="แก้ชื่อกลุ่ม"
+          initialValue={renaming.initial}
+          onSave={(name) => { onRenameGroup(renaming.id, name); setRenaming(null); }}
+          onClose={() => setRenaming(null)}
+        />
       )}
     </div>
   );

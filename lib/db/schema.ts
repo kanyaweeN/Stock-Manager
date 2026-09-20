@@ -2,7 +2,7 @@
  * รูปร่างของข้อมูล (`StockDB`) + ตัวช่วยอ่าน "ข้อมูลดิบ" ที่ยังไม่การันตี type
  * ไฟล์นี้ไม่มีตรรกะแปลงข้อมูล — migration อยู่ที่ `migrations.ts` การเติมค่า default อยู่ที่ `normalize.ts`
  */
-import type { PricingSettings, PurchaseOrder, PurchasePlan, Recipe, StockItem } from "@/lib/types";
+import type { PricingSettings, PurchaseOrder, PurchasePlan, Recipe, StockGroup, StockItem } from "@/lib/types";
 
 export type SkinType = "" | "oily" | "dry" | "combination" | "normal" | "sensitive";
 export type SkinConcern = "acne" | "aging" | "dark-spots" | "redness" | "dryness" | "oiliness" | "pores" | "dullness";
@@ -50,6 +50,11 @@ export interface StockDB {
   orders?: PurchaseOrder[];
   /** ของที่ลบไปแล้วแต่ยังกู้คืนได้ — **ไม่ได้อยู่ใน `items`** แล้ว (ดู lib/domain/trash.ts) */
   trash?: StockItem[];
+  /**
+   * กลุ่มสินค้าที่ถูกจัดไว้ — ชื่อเก็บที่นี่ก้อนเดียว ตัว item ถือแค่ `groupId` ชี้เข้ามา
+   * `normalizeDB` ตัดกลุ่มที่ไม่มีสมาชิกทิ้งให้เอง (ลบสมาชิกคนสุดท้ายก็เลิกกลุ่มโดยปริยาย)
+   */
+  groups?: StockGroup[];
   /**
    * รายการ id ของสินค้าที่ผู้ใช้เลือกให้ติดตามในหน้า `/forecast` (คาดคะเนวันซื้ออีกครั้ง)
    *

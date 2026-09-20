@@ -9,6 +9,7 @@ import { buyTimes } from "@/lib/domain/price";
 import { repurchaseStats, sortByDueSoonest, type RepurchaseStats } from "@/lib/domain/repurchase";
 import { spendRate, type SpendRate } from "@/lib/domain/spendRate";
 import { buildForecastClusters, type ForecastCluster } from "@/lib/domain/forecast";
+import { groupNameMap } from "@/lib/domain/groups";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import { useProductActions } from "@/lib/hooks/useProductActions";
 
@@ -83,11 +84,13 @@ export default function ForecastPage() {
     return db.items.filter((i) => idSet.has(i.id) || (i.groupId && trackedGroupIds.has(i.groupId)));
   }, [ids, db.items]);
 
+  const groupNames = useMemo(() => groupNameMap(db.groups), [db.groups]);
+
   /**
    * จัดกลุ่มของที่ติดตามเป็น "ก้อน" 1 การ์ด — สินค้าคนละยี่ห้อ/ร้านที่ผู้ใช้จัดกลุ่มไว้ว่าเป็นตัวเดียวกัน
    * (`groupId` เดียวกัน) รวมประวัติซื้อ/ใช้เข้าด้วยกัน ไม่งั้นแยกเป็นสองการ์ดที่ข้อมูลแต่ละก้อนไม่พอเดา
    */
-  const clusters = useMemo(() => buildForecastClusters(selectedItems), [selectedItems]);
+  const clusters = useMemo(() => buildForecastClusters(selectedItems, groupNames), [selectedItems, groupNames]);
 
   /** คำนวณสถิติทีละก้อน — ไม่วนทั้งสต็อก (นี่คือจุดที่ช่วยเรื่องประสิทธิภาพ) */
   const statsByKey = useMemo(() => {
@@ -168,10 +171,11 @@ export default function ForecastPage() {
             meta={(i) => {
               const times = buyTimes(i);
               const timesText = times >= 2 ? `ซื้อ ${times} ครั้ง` : `ประวัติไม่พอ (${times || 0} ครั้ง)`;
+              const gname = i.groupId ? groupNames.get(i.groupId) : "";
               // ถ้าเป็นสมาชิกของกลุ่ม บอกให้ผู้ใช้รู้ว่าจะติดตามทั้งกลุ่ม ไม่ใช่แค่ยี่ห้อเดียว
               return (
                 <span style={{ color: "var(--muted)" }}>
-                  {i.groupId && i.groupName ? `👥 ${i.groupName} · ` : ""}
+                  {gname ? `👥 ${gname} · ` : ""}
                   {timesText}
                 </span>
               );

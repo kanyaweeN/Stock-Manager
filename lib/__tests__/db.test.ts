@@ -57,17 +57,65 @@ describe("migrateDB — ข้อมูลยุค v0", () => {
     expect(out.items[1].priceHistory).toEqual([]);
   });
 
-  it("v4/v7/v8/v9/v11/v12: เปิดช่องเก็บของใหม่ให้ครบ", () => {
+  it("v4/v7/v8/v9/v11/v12/v13: เปิดช่องเก็บของใหม่ให้ครบ", () => {
     expect(out.recipes).toEqual([]);
     expect(out.plans).toEqual([]);
     expect(out.orders).toEqual([]);
     expect(out.trash).toEqual([]);
     expect(out.forecastItemIds).toEqual([]);
     expect(out.pricing).toBeDefined();
+    expect(out.groups).toEqual([]);
   });
 
   it("v10: usageLog เริ่มจากศูนย์ (ย้อนสร้างให้ไม่ได้)", () => {
     expect(out.items[0].usageLog).toEqual([]);
+  });
+});
+
+describe("migrateDB v13 — ชื่อกลุ่มย้ายจาก item ไป db.groups", () => {
+  it("อ่านชื่อจากสมาชิกแล้วเก็บที่ก้อนกลาง แล้วเลาะ groupName ออกจาก items", () => {
+    const db = migrateDB({
+      items: [
+        { id: "a", name: "ยี่ห้อ A", cats: [], qty: 1, min: 0, note: "", groupId: "g1", groupName: "อาหารแมว" },
+        { id: "b", name: "ยี่ห้อ B", cats: [], qty: 1, min: 0, note: "", groupId: "g1", groupName: "อาหารแมว" },
+      ],
+    });
+    expect(db.groups).toEqual([{ id: "g1", name: "อาหารแมว" }]);
+    expect("groupName" in db.items[0]).toBe(false);
+    expect("groupName" in db.items[1]).toBe(false);
+    expect(db.items[0].groupId).toBe("g1");
+  });
+
+  it("กลุ่มที่ไม่มีสมาชิกเหลือแล้วถูกตัดทิ้งใน normalize (GC ป้องกันลิสต์บวม)", () => {
+    const db = migrateDB({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      items: [{ id: "a", name: "x", cats: [], qty: 1, min: 0, note: "" }],
+      groups: [
+        { id: "g-alive", name: "ยังใช้อยู่" },
+        { id: "g-dead", name: "ไม่มีสมาชิกแล้ว" },
+      ],
+    });
+    // ไม่มีสมาชิกอ้างถึงเลย → หายไปทั้งคู่
+    expect(db.groups).toEqual([]);
+  });
+
+  it("กลุ่มที่ยังมีสมาชิกอ้างถึง = คงอยู่", () => {
+    const db = migrateDB({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      items: [{ id: "a", name: "x", cats: [], qty: 1, min: 0, note: "", groupId: "g1" }],
+      groups: [{ id: "g1", name: "อาหารแมว" }],
+    });
+    expect(db.groups).toEqual([{ id: "g1", name: "อาหารแมว" }]);
+  });
+
+  it("step v13 idempotent — รอบสองไม่แตะข้อมูลอีก แม้ต้นทางมี groupName", () => {
+    const step = MIGRATIONS.find((m) => m.to === 13)!;
+    const raw = {
+      items: [{ id: "a", name: "x", groupId: "g1", groupName: "อาหารแมว" }],
+    };
+    const first = step.up(structuredClone(raw) as Record<string, unknown>);
+    const second = step.up(structuredClone(first));
+    expect(second).toEqual(first);
   });
 });
 

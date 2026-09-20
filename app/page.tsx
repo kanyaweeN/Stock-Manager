@@ -11,9 +11,11 @@ import RecipeModal from "@/components/recipe/RecipeModal";
 import PlanModal from "@/components/plan/PlanModal";
 import ModalShell from "@/components/ui/ModalShell";
 import AddToTargetModal from "@/components/product/AddToTargetModal";
+import GroupNamePromptModal from "@/components/product/GroupNamePromptModal";
 import SelectActionBar from "@/components/product/SelectActionBar";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/domain/cost";
+import { groupNameMap } from "@/lib/domain/groups";
 import { formatThaiShortDate } from "@/lib/core/date";
 import { defaultDueDate, emptyPlan, isPlanDone, planLineFromItem, planTotals, sortPlans } from "@/lib/domain/plan";
 import { useProductFilters } from "@/lib/hooks/useProductFilters";
@@ -50,12 +52,12 @@ export default function Home() {
   const recipes = db.recipes ?? [];
   const plans = useMemo(() => sortPlans(db.plans ?? []), [db.plans]);
   const forecastIds = useMemo(() => new Set(db.forecastItemIds ?? []), [db.forecastItemIds]);
+  const groupNames = useMemo(() => groupNameMap(db.groups), [db.groups]);
 
   const [modalItem, setModalItem] = useState<StockItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [groupNameOpen, setGroupNameOpen] = useState(false);
-  const [groupNameInput, setGroupNameInput] = useState("");
 
   const catEditor = useCatEditor({
     selectedItems,
@@ -88,14 +90,9 @@ export default function Home() {
   };
 
 
-  const openGroupNamePrompt = () => {
-    setGroupNameInput(selectedItems[0]?.name || "");
-    setGroupNameOpen(true);
-  };
+  const openGroupNamePrompt = () => setGroupNameOpen(true);
 
-  const confirmGroupSelected = () => {
-    const name = groupNameInput.trim();
-    if (!name) return;
+  const confirmGroupSelected = (name: string) => {
     actions.groupItems([...selectedIds], name);
     setGroupNameOpen(false);
     exitSelectMode();
@@ -211,6 +208,8 @@ export default function Home() {
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
+        groups={db.groups}
+        onRenameGroup={actions.renameGroup}
       />
 
       <ProductModal
@@ -222,6 +221,7 @@ export default function Home() {
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
         onUngroup={actions.ungroup}
+        groupName={modalItem?.groupId ? groupNames.get(modalItem.groupId) : undefined}
       />
       <RecipeModal
         open={recipe.draft !== null}
@@ -304,34 +304,23 @@ export default function Home() {
         onImport={actions.importOrder}
       />
 
-      {groupNameOpen && (
-        <ModalShell open title={`จัดกลุ่ม ${selectedItems.length} รายการ`} onClose={() => setGroupNameOpen(false)}>
-          <div className="modal-body">
-            <p className="sub sub-tight text-xs">
-              ทุกรายการที่เลือกไว้จะยังอยู่แยกกันเหมือนเดิม (จำนวน/ราคาของใครของมัน) แค่ติดป้ายกลุ่มเดียวกันไว้ให้รู้ว่าเป็นสินค้าตัวเดียวกัน
-            </p>
-            <div className="category-list" style={{ marginBottom: 12 }}>
-              {selectedItems.map((i) => (
-                <div className="category-row" key={i.id}><span>{i.name} · {i.qty} ชิ้น</span></div>
-              ))}
-            </div>
-            <div className="field">
-              <label>ชื่อกลุ่ม</label>
-              <input
-                type="text"
-                value={groupNameInput}
-                onChange={(e) => setGroupNameInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") confirmGroupSelected(); }}
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className="modal-actions">
-            <button className="btn-ghost" onClick={() => setGroupNameOpen(false)}>ยกเลิก</button>
-            <button className="btn-primary" onClick={confirmGroupSelected}>จัดกลุ่ม</button>
-          </div>
-        </ModalShell>
-      )}
+      <GroupNamePromptModal
+        open={groupNameOpen}
+        title={`จัดกลุ่ม ${selectedItems.length} รายการ`}
+        initialValue={selectedItems[0]?.name || ""}
+        saveLabel="จัดกลุ่ม"
+        onSave={confirmGroupSelected}
+        onClose={() => setGroupNameOpen(false)}
+      >
+        <p className="sub sub-tight text-xs">
+          ทุกรายการที่เลือกไว้จะยังอยู่แยกกันเหมือนเดิม (จำนวน/ราคาของใครของมัน) แค่ติดป้ายกลุ่มเดียวกันไว้ให้รู้ว่าเป็นสินค้าตัวเดียวกัน
+        </p>
+        <div className="category-list" style={{ marginBottom: 12 }}>
+          {selectedItems.map((i) => (
+            <div className="category-row" key={i.id}><span>{i.name} · {i.qty} ชิ้น</span></div>
+          ))}
+        </div>
+      </GroupNamePromptModal>
 
       {catEditor.open && (
         <ModalShell open title={`จัดหมวดหมู่ ${selectedItems.length} รายการ`} onClose={() => catEditor.close()}>

@@ -26,6 +26,8 @@ interface Props {
   onClose: () => void;
   onSave: (data: Omit<StockItem, "id">, editId: string | null) => void;
   onUngroup: (id: string) => void;
+  /** ชื่อกลุ่มของ `item` (ถ้าอยู่ในกลุ่ม) — ผู้เรียกเปิดจาก `db.groups` ให้ */
+  groupName?: string;
 }
 
 const todayStr = () => todayISO();
@@ -60,7 +62,7 @@ function Section({
   );
 }
 
-export default function ProductModal({ open, item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup }: Props) {
+export default function ProductModal({ open, item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup, groupName }: Props) {
   const [form, setForm] = useState<ProductForm>(() => toProductForm(null));
 
   useEffect(() => setForm(toProductForm(item)), [item, open]);
@@ -410,7 +412,7 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
             <div className="field">
               <label>กลุ่มสินค้า</label>
               <div className="category-row">
-                <span>👥 {item.groupName}</span>
+                <span>👥 {groupName || "(ไม่มีชื่อกลุ่ม)"}</span>
                 <button className="icon-btn" onClick={() => onUngroup(item.id)}>ออกจากกลุ่ม</button>
               </div>
             </div>

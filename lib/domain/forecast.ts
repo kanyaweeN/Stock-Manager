@@ -12,7 +12,7 @@ import type { StockItem } from "@/lib/types";
 export interface ForecastCluster {
   /** stable key — `groupId` ถ้าเป็นกลุ่ม, `item.id` ถ้าเดี่ยว */
   key: string;
-  /** ชื่อหัวการ์ด — `groupName` ถ้าเป็นกลุ่ม, `item.name` ถ้าเดี่ยว */
+  /** ชื่อหัวการ์ด — ชื่อกลุ่มถ้าเป็นกลุ่ม, `item.name` ถ้าเดี่ยว */
   name: string;
   /** รูปตัวแรกที่มีในสมาชิก (กลุ่มที่สมาชิกใส่รูปไว้บ้างไม่ใส่บ้างจะได้ไม่เป็นกล่องเปล่า) */
   img?: string;
@@ -24,8 +24,14 @@ export interface ForecastCluster {
   merged: Pick<StockItem, "priceHistory" | "usageLog" | "price">;
 }
 
-/** จัดกลุ่มสินค้าที่ติดตามเป็นก้อนตาม `groupId` — ลำดับตามที่ปรากฏใน input */
-export function buildForecastClusters(items: StockItem[]): ForecastCluster[] {
+/**
+ * จัดกลุ่มสินค้าที่ติดตามเป็นก้อนตาม `groupId` — ลำดับตามที่ปรากฏใน input
+ * `groupNames` = ตัวหาชื่อกลุ่มจาก `db.groups` (ชื่อเก็บที่ก้อนกลางแล้ว ไม่ได้อยู่บนตัว item)
+ */
+export function buildForecastClusters(
+  items: StockItem[],
+  groupNames?: ReadonlyMap<string, string>,
+): ForecastCluster[] {
   const byGroup = new Map<string, StockItem[]>();
   const groupOrder: string[] = [];
   const singleOrder: StockItem[] = [];
@@ -50,7 +56,7 @@ export function buildForecastClusters(items: StockItem[]): ForecastCluster[] {
     const first = members[0];
     clusters.push({
       key: gid,
-      name: first.groupName || first.name,
+      name: groupNames?.get(gid) || first.name,
       img: members.find((m) => !!m.img)?.img,
       subtitle:
         members.length > 1

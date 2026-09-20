@@ -34,7 +34,7 @@ npm run lint
 ## Data model (`lib/types.ts`)
 
 ```ts
-StockItem { id, name, cats: string[], qty, min, note, img?, link?, status?, source?: ImportSource|"", price?, size?, unit?, packAmount?, location?, openPct?, reorderQty?, variant?, shop?, expiryAt?, openedAt?, paoMonths?, usageLog?, deletedAt?, groupId?, groupName?, purchasedAt?, createdAt?, ingredients? }
+StockItem { id, name, cats: string[], qty, min, note, img?, link?, status?, source?: ImportSource|"", price?, size?, unit?, packAmount?, location?, openPct?, reorderQty?, variant?, shop?, expiryAt?, openedAt?, paoMonths?, usageLog?, deletedAt?, groupId?, purchasedAt?, createdAt?, ingredients? }
 ```
 
 - `cats` is an **array** (multi-category since 2026-07-20). Anywhere `cat` (singular) appears, it's legacy — check `db.ts` migration.
@@ -45,6 +45,7 @@ StockItem { id, name, cats: string[], qty, min, note, img?, link?, status?, sour
 - `usageLog` จดให้อัตโนมัติตอนกด +/− บนการ์ดเท่านั้น (ดูตารางข้างล่าง) — การแก้ `qty` ในฟอร์มไม่จด เพราะนั่นคือ "แก้ตัวเลขให้ถูก" ไม่ใช่ "ใช้ไป"
 - `qty` นับ**แพ็คเต็มๆ** เท่านั้น ขวดที่ใช้ไปครึ่งยังนับเป็น 1 — เศษอยู่ที่ `openPct` แยกต่างหาก **อย่าอ่าน `qty` ตรงๆ เวลาต้องการ "เหลือเท่าไรจริงๆ" ให้เรียก `remainingUnits()`**
 - `deletedAt` มีค่าเฉพาะของที่อยู่ใน `StockDB.trash` — **ของที่ลบถูกย้ายออกจาก `db.items` จริง** ไม่ใช่ซ่อนด้วยแฟล็ก โค้ดที่วน `db.items` จึงไม่ต้องกรองอะไรเพิ่ม (ดูตารางข้างล่าง)
+- **กลุ่มสินค้า (`groupId`)**: ตัว item ถือแค่ `groupId` ชี้ไปยังก้อนกลาง `StockDB.groups: { id, name }[]` ชื่อกลุ่มเก็บที่นั่นก้อนเดียว แก้ครั้งเดียวมีผลทุกสมาชิก (เดิมทุกชิ้นพก `groupName` ของตัวเองแล้วอัปเดตไม่ครบ ชื่อสมาชิกแต่ละคนไม่ตรงกันได้) — `normalizeDB` ตัดกลุ่มไร้สมาชิกทิ้งอัตโนมัติ (สลายกลุ่มด้วยการปลดสมาชิกคนสุดท้ายก็ได้ ไม่ต้องเรียก API แยก) เพิ่ม/ตั้งชื่อผ่าน `groupItems(ids, name)` เปลี่ยนชื่อผ่าน `renameGroup(groupId, name)` ปลดชิ้นเดียวผ่าน `ungroup(id)` — ทุกอย่างอยู่ที่ `useProductActions`
 - `ImportCandidate` (แถวรอตรวจก่อนนำเข้า) carries `source: ImportSource` + `cats: string[]` + `mergeExisting`/`mergeFields` for the repeat-purchase flow — a candidate with `existingId` merges into the existing item instead of adding a row.
 
 ## โครงสร้าง `lib/` — แยกตามชั้น

@@ -1,5 +1,6 @@
 import { priceStats } from "@/lib/domain/price";
-import type { StockItem } from "@/lib/types";
+import { groupNameMap } from "@/lib/domain/groups";
+import type { StockGroup, StockItem } from "@/lib/types";
 
 /**
  * ส่งออกรายการสินค้าไปดูเป็นตารางใน Google Sheet — **ทางเดียว (push อย่างเดียว)**
@@ -35,7 +36,8 @@ const ITEMS_RANGE = `A1:${LAST_COL}100000`;
 /** เก็บ categoryPresets ไว้ช่องถัดจากตารางสินค้า — ชีตเก่าที่ยังเก็บไว้ช่องอื่นจะอ่านไม่เจอ แล้วใช้ค่าในเครื่องแทน (ดู useGoogleSheetsSync.pull) */
 const PRESETS_CELL = `${col(HEADER.length + 1)}1`;
 
-function itemsToRows(items: StockItem[]): string[][] {
+function itemsToRows(items: StockItem[], groups: StockGroup[] = []): string[][] {
+  const groupNames = groupNameMap(groups);
   return [
     [...HEADER],
     ...items.map((i) => {
@@ -56,7 +58,7 @@ function itemsToRows(items: StockItem[]): string[][] {
         i.ingredients || "",
         i.source || "",
         i.groupId || "",
-        i.groupName || "",
+        (i.groupId && groupNames.get(i.groupId)) || "",
         i.purchasedAt || "",
         i.createdAt || "",
         i.buyQty != null ? String(i.buyQty) : "",
@@ -95,9 +97,10 @@ export async function pushToSheet(
   token: string,
   spreadsheetId: string,
   items: StockItem[],
-  categoryPresets: string[]
+  categoryPresets: string[],
+  groups: StockGroup[] = []
 ): Promise<void> {
-  const rows = itemsToRows(items);
+  const rows = itemsToRows(items, groups);
   await sheetsFetch(token, spreadsheetId, `/values/${ITEMS_RANGE}:clear`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

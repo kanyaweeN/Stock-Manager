@@ -129,6 +129,34 @@ export const MIGRATIONS: Migration[] = [
     // เปิดช่องให้มีอยู่จริง — ตัวกรอง id ที่ไม่ตรงกับสินค้าจริงอยู่ที่ normalizeDB (รันทุกครั้ง)
     up: (db) => ({ ...db, forecastItemIds: asArray(db.forecastItemIds) }),
   },
+  {
+    to: 13,
+    note: "ย้ายชื่อกลุ่มจาก item.groupName ไปเก็บที่ก้อนกลาง db.groups (แก้ชื่อครั้งเดียวมีผลทุกสมาชิก)",
+    // เดิมทุกชิ้นในกลุ่มพก groupName ของตัวเอง อัปเดตไม่ครบเมื่อไรชื่อแต่ละสมาชิกจะไม่ตรงกัน
+    // step นี้อ่านชื่อจากสมาชิกตัวแรกที่มีของแต่ละ groupId มาลง db.groups แล้วเลาะฟิลด์ groupName ออกจาก items
+    // idempotent: รอบสองไม่มี groupName ให้เก็บแล้ว db.groups เดิมยังอยู่ครบ
+    up: (db) => {
+      const groupNames = new Map<string, string>();
+      for (const g of asArray(db.groups)) {
+        const obj = (g ?? {}) as { id?: unknown; name?: unknown };
+        if (typeof obj.id === "string" && obj.id && !groupNames.has(obj.id)) {
+          groupNames.set(obj.id, typeof obj.name === "string" ? obj.name : "");
+        }
+      }
+      const items = asArray(db.items).map((raw) => {
+        const i = (raw ?? {}) as RawItem & { groupName?: unknown };
+        const gid = typeof i.groupId === "string" ? i.groupId : "";
+        const gname = typeof i.groupName === "string" ? i.groupName : "";
+        // เก็บชื่อจากสมาชิกตัวแรกที่มี — ชื่อของสมาชิกคนหลังที่ไม่ตรงกันถูกทิ้ง (สภาพเดิมเคยไม่ตรงกันได้)
+        if (gid && gname && !groupNames.get(gid)) groupNames.set(gid, gname);
+        const next = { ...i };
+        delete next.groupName;
+        return next;
+      });
+      const groups = [...groupNames].map(([id, name]) => ({ id, name }));
+      return { ...db, items, groups };
+    },
+  },
 ];
 
 /** เวอร์ชันล่าสุด = ปลายทางของ migration step สุดท้าย (คำนวณให้ ไม่ต้องแก้มือ) */
@@ -148,4 +176,5 @@ export const DEFAULT_DB: StockDB = {
   orders: [],
   trash: [],
   forecastItemIds: [],
+  groups: [],
 };

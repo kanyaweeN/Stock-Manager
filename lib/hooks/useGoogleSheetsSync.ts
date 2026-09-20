@@ -79,7 +79,7 @@ export function useGoogleSheetsSync(db: StockDB) {
       setToken(t);
       localStorage.setItem(GS_REMEMBER_KEY, "1");
       setMessage("กำลังส่งข้อมูลขึ้น Sheet ครั้งแรก...");
-      await pushToSheet(t, sheetId.trim(), db.items, db.categoryPresets);
+      await pushToSheet(t, sheetId.trim(), db.items, db.categoryPresets, db.groups);
       setMessage(`✅ เชื่อมต่อและส่งข้อมูลขึ้น Sheet สำเร็จ · ${db.items.length} รายการ`);
     } catch (e) {
       setMessage("เชื่อมต่อไม่สำเร็จ: " + (e as Error).message);
@@ -93,7 +93,7 @@ export function useGoogleSheetsSync(db: StockDB) {
     setBusy(true);
     setMessage("กำลังส่งข้อมูลขึ้น Google Sheet...");
     try {
-      await pushToSheet(token, sheetId.trim(), db.items, db.categoryPresets);
+      await pushToSheet(token, sheetId.trim(), db.items, db.categoryPresets, db.groups);
       setMessage(`✅ ส่งขึ้น Sheet แล้ว · ${db.items.length} รายการ · ${new Date().toLocaleTimeString("th-TH")}`);
     } catch (e) {
       setMessage("ส่งข้อมูลไม่สำเร็จ: " + (e as Error).message);
