@@ -123,6 +123,19 @@
   font-size: 12px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/*
+  ชื่อหมวดบนการ์ดที่กดได้ = กรองเฉพาะหมวดนั้น (ดู ProductGrid.onFilterCat)
+  หน้าตาให้เนียนไปกับข้อความเดิมของ .product-card__category — ไม่ใช่ปุ่มลอย
+  โฮเวอร์ค่อยขึ้นสีให้รู้ว่ากดได้ กรองอยู่ = เน้นด้วย accent
+*/
+.cat-tag {
+  background: none; border: none; padding: 0; margin: 0;
+  color: inherit; font: inherit; cursor: pointer;
+  border-bottom: 1px dashed transparent;
+}
+.cat-tag:hover { color: var(--accent); border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.cat-tag.is-active { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); }
+.product-card__category-sep { color: var(--muted); }
 .product-card__tags {
   display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
 }

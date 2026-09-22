@@ -232,6 +232,16 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
     setFilterCats(cats);
   };
 
+  /**
+   * กดหมวดหมู่บนการ์ด — กดหมวดเดิมที่กรองอยู่เดี่ยวๆ ให้กดซ้ำเพื่อเลิกกรอง (เหมือน toggleShopFilter)
+   * ถ้ากรองหมวดอื่นอยู่หลายอัน กดแล้วเปลี่ยนเป็นกรองเฉพาะหมวดนี้ (ไม่บวกเข้าไปสะสม เพราะกดจากการ์ดตั้งใจจะ "ดูเฉพาะหมวดนี้")
+   */
+  const toggleCatFilter = (cat: string) => {
+    if (!cat) return;
+    if (uncategorizedOnly) setUncategorizedOnly(false);
+    setFilterCats((prev) => (prev.length === 1 && prev[0] === cat ? [] : [cat]));
+  };
+
   const toggleUncategorizedOnly = () => {
     setUncategorizedOnly((prev) => {
       if (!prev) setFilterCats([]);
@@ -241,7 +251,7 @@ export function useProductFilters(items: StockItem[], presets: string[]) {
 
   return {
     search, setSearch,
-    filterCats, setFilterCats: setFilterCatsExclusive,
+    filterCats, setFilterCats: setFilterCatsExclusive, toggleCatFilter,
     uncategorizedOnly, toggleUncategorizedOnly,
     sortKey, setSortKey,
     stockTab, setStockTab,

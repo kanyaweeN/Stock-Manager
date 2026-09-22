@@ -31,7 +31,7 @@ export default function Home() {
   const { db, setDb } = useStockDB();
   const {
     search, setSearch,
-    filterCats, setFilterCats,
+    filterCats, setFilterCats, toggleCatFilter,
     uncategorizedOnly, toggleUncategorizedOnly,
     sortKey, setSortKey,
     stockTab, setStockTab,
@@ -205,6 +205,8 @@ export default function Home() {
         forecastIds={forecastIds}
         onFilterShop={toggleShopFilter}
         activeShopKey={filterShop}
+        onFilterCat={toggleCatFilter}
+        activeCats={filterCats}
         selectMode={selectMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}

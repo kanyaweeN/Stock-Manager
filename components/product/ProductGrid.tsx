@@ -81,6 +81,10 @@ interface Props {
   onFilterShop?: (shop: string) => void;
   /** `shopKey` ของร้านที่กรองอยู่ — ไว้ไฮไลต์แท็กที่กำลังกรอง */
   activeShopKey?: string;
+  /** กดชื่อหมวดหมู่บนการ์ดแล้วกรองเฉพาะหมวดนั้น (ไม่ส่งมา = หมวดเป็นข้อความเฉยๆ เหมือนเดิม) */
+  onFilterCat?: (cat: string) => void;
+  /** รายชื่อหมวดที่กำลังกรอง — ไว้ไฮไลต์ชื่อหมวดที่กำลังกรอง */
+  activeCats?: string[];
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
@@ -111,7 +115,7 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, selectMode, selectedIds, onToggleSelect, groups, onRenameGroup }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, onFilterCat, activeCats, selectMode, selectedIds, onToggleSelect, groups, onRenameGroup }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   /** id + ชื่อเดิมของกลุ่มที่กำลังแก้ชื่ออยู่ — เก็บชื่อเดิมไว้ให้ modal ใช้เป็น initialValue เพราะกลุ่มอาจถูกลบ/rename ระหว่างเปิด modal */
   const [renaming, setRenaming] = useState<{ id: string; initial: string } | null>(null);
@@ -312,7 +316,23 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
             )}
           </div>
           <div className="product-card__category">
-            {i.cats.length > 0 ? i.cats.join(" · ") : "ไม่มีหมวดหมู่"}
+            {i.cats.length === 0 && "ไม่มีหมวดหมู่"}
+            {i.cats.flatMap((c, idx) => [
+              idx > 0 && <span key={`sep-${idx}`} className="product-card__category-sep"> · </span>,
+              onFilterCat ? (
+                <button
+                  key={c}
+                  type="button"
+                  className={`cat-tag ${activeCats?.includes(c) ? "is-active" : ""}`}
+                  title={`ดูเฉพาะของในหมวด ${c} (กดซ้ำเพื่อเลิกกรอง)`}
+                  onClick={(e) => { e.stopPropagation(); onFilterCat(c); }}
+                >
+                  {c}
+                </button>
+              ) : (
+                <span key={c}>{c}</span>
+              ),
+            ])}
           </div>
           {(sourceLabel(i.source) || i.variant || i.shop) && (
             <div className="product-card__tags">
