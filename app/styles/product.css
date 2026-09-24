@@ -292,3 +292,19 @@
   .product-card__title, .product-card__flags { max-width: calc(100% - 30px); }
 }
 
+
+/* การ์ดที่ถูกลิงก์มาจากหน้าอื่น (`/?item=<id>` เช่นจากรายการในแผนซื้อของ) — วงขอบเด้งขึ้นมาแล้วจางหายเอง
+   ใช้ animation แทน state ที่ต้องตั้งเวลาลบทิ้ง จะได้ไม่มี timer ค้างอยู่ฝั่ง React */
+@keyframes item-highlight {
+  0%, 60% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+.product-card--highlight,
+.product-group--highlight {
+  animation: item-highlight 2.8s ease-out 1;
+}
+.product-group--highlight { border-radius: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .product-card--highlight,
+  .product-group--highlight { animation-duration: 0.01ms; box-shadow: 0 0 0 3px var(--accent); }
+}

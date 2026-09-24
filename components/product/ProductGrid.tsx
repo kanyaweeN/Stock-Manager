@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StockGroup, StockItem } from "@/lib/types";
 import { STATUS_LABELS } from "@/lib/core/statusOptions";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
@@ -92,6 +92,8 @@ interface Props {
   groups?: StockGroup[];
   /** เปลี่ยนชื่อกลุ่ม — ไม่ส่ง = ซ่อนปุ่มแก้ชื่อกลุ่ม */
   onRenameGroup?: (groupId: string, name: string) => void;
+  /** id ของสินค้าที่ถูกลิงก์มาจากหน้าอื่น (`/?item=<id>`) — เลื่อนจอไปหาแล้วไฮไลต์การ์ดให้ */
+  highlightId?: string;
 }
 
 /** จัดกลุ่มรายการที่มี groupId เดียวกันให้อยู่ติดกัน (เรียงตามตำแหน่งที่เจอตัวแรกของกลุ่ม) เพื่อวางเป็นกองเดียวกันในกริด */
@@ -115,7 +117,7 @@ function clusterByGroup(items: StockItem[]): StockItem[][] {
   return clusters;
 }
 
-export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, onFilterCat, activeCats, selectMode, selectedIds, onToggleSelect, groups, onRenameGroup }: Props) {
+export default function ProductGrid({ items, avoidIngredients, skinProfile, onInc, onDec, onIncPiece, onDecPiece, onEdit, onDelete, onToggleFav, onAddToRecipe, onAddToPlan, onToggleForecast, forecastIds, onFilterShop, activeShopKey, onFilterCat, activeCats, selectMode, selectedIds, onToggleSelect, groups, onRenameGroup, highlightId }: Props) {
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   /** id + ชื่อเดิมของกลุ่มที่กำลังแก้ชื่ออยู่ — เก็บชื่อเดิมไว้ให้ modal ใช้เป็น initialValue เพราะกลุ่มอาจถูกลบ/rename ระหว่างเปิด modal */
   const [renaming, setRenaming] = useState<{ id: string; initial: string } | null>(null);
@@ -135,6 +137,20 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [menuId]);
+
+  /**
+   * เลื่อนจอไปหาการ์ดที่ถูกลิงก์มาจากหน้าอื่น — รอจนของในเครื่องโหลดเสร็จก่อน
+   * (ตอนเปิดแอป `items` ยังว่าง การ์ดจึงยังไม่อยู่ใน DOM) และเลื่อนครั้งเดียวต่อ 1 id
+   * ไม่งั้นทุกครั้งที่ db เปลี่ยน (กด +/− สักที) จอจะเด้งกลับไปที่การ์ดเดิม
+   */
+  const scrolledTo = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightId || scrolledTo.current === highlightId) return;
+    const el = document.querySelector(`[data-item-id="${CSS.escape(highlightId)}"]`);
+    if (!el) return;
+    scrolledTo.current = highlightId;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, items]);
 
   const ingredientInfo = useMemo(() => {
     const map = new Map<string, { tags: IngredientTag[]; warnCount: number; skinScore?: number; skinLevel?: string }>();
@@ -251,8 +267,9 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
     const runout = runoutById.get(i.id);
     return (
       <div
-        className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""} ${selected ? "product-card--selected" : ""} ${i.fav ? "product-card--fav" : ""}`}
+        className={`product-card ${outOfStock ? "out-of-stock-row" : low ? "low-row" : ""} ${selected ? "product-card--selected" : ""} ${i.fav ? "product-card--fav" : ""} ${i.id === highlightId ? "product-card--highlight" : ""}`}
         key={i.id}
+        data-item-id={i.id}
         onClick={interactive ? () => onToggleSelect?.(i.id) : undefined}
       >
         {interactive && (
@@ -524,9 +541,15 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
         const groupId = cluster[0].groupId!;
         const totalQty = cluster.reduce((s, i) => s + i.qty, 0);
         const clusterSelected = selectMode && cluster.every((i) => selectedIds?.has(i.id));
+        // สมาชิกที่ไม่ใช่ใบหน้าสุดของกองไม่ได้ถูกเรนเดอร์ ลิงก์ที่ชี้มาหาจึงต้องมาจบที่กองแทน
+        const highlighted = !!highlightId && cluster.some((i) => i.id === highlightId);
 
         return (
-          <div className="product-group" key={groupId}>
+          <div
+            className={`product-group ${highlighted ? "product-group--highlight" : ""}`}
+            key={groupId}
+            data-item-id={highlighted && cluster[0].id !== highlightId ? highlightId : undefined}
+          >
             <button
               className="product-group__label"
               onClick={() => (selectMode ? toggleClusterSelect(cluster) : setOpenGroupId(groupId))}

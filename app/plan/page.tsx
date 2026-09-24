@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import PlanModal from "@/components/plan/PlanModal";
 import { MaterialThumb } from "@/components/ui/MaterialLabel";
@@ -179,6 +180,16 @@ export default function PlanPage() {
                                 >
                                   🔗
                                 </a>
+                              )}
+                              {/* ของที่ผูกกับสต็อกอยู่แล้ว — กระโดดไปหาการ์ดจริงในหน้าแรก (หน้าแรกเลื่อนจอไปหา + ไฮไลต์ให้) */}
+                              {item && (
+                                <Link
+                                  className="link-icon"
+                                  href={`/?item=${encodeURIComponent(item.id)}`}
+                                  title="ดูการ์ดสินค้านี้ในสต็อก"
+                                >
+                                  📦
+                                </Link>
                               )}
                             </span>
                             <small className="plan-item__meta">

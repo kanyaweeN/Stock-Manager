@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FilterChips, { type ChipKey } from "@/components/product/FilterChips";
 import Toolbar from "@/components/product/Toolbar";
 import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
@@ -58,6 +58,19 @@ export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [groupNameOpen, setGroupNameOpen] = useState(false);
+
+  /**
+   * ลิงก์จากหน้าอื่นมาหาการ์ดสินค้าชิ้นเดียว (`/?item=<id>` เช่นจากรายการในแผนซื้อของ)
+   * อ่านจาก `window.location` ตอน mount แทน `useSearchParams` เพราะตัวหลังบังคับให้ต้องห่อทั้งหน้าด้วย <Suspense>
+   * แล้วลบพารามิเตอร์ทิ้งทันที ไม่ให้ค้างบน URL ตอนผู้ใช้รีเฟรชหรือบุ๊กมาร์กหน้านี้ไว้
+   */
+  const [highlightId, setHighlightId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("item");
+    if (!id) return;
+    setHighlightId(id);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   const catEditor = useCatEditor({
     selectedItems,
@@ -212,6 +225,7 @@ export default function Home() {
         onToggleSelect={toggleSelect}
         groups={db.groups}
         onRenameGroup={actions.renameGroup}
+        highlightId={highlightId}
       />
 
       <ProductModal
