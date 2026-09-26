@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import type { StockDB } from "@/lib/db";
 import { requestAccessToken } from "@/lib/sync/googleAuth";
 import { SHEETS_SCOPE, pushToSheet } from "@/lib/sync/googleSheets";
-import { useClientValue } from "@/lib/hooks/useClientValue";
+import { useClientValue } from "@/hooks/useClientValue";
 
 /** client id ใช้ร่วมกับ Google Drive sync — เป็น OAuth client ตัวเดียวกัน (key เก่าไว้รองรับคนที่ตั้งค่าไว้แล้ว) */
 const CLIENT_ID_KEY = "stock_manager_google_client_id";

@@ -10,7 +10,7 @@ import {
   pricingNotes,
   suggestPrice,
 } from "@/lib/domain/pricing";
-import { usePricingSettings } from "@/lib/hooks/usePricingSettings";
+import { usePricingSettings } from "@/hooks/usePricingSettings";
 import type { PriceRounding } from "@/lib/types";
 
 interface Props {

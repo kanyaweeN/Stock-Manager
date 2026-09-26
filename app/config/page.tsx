@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
-import { useGoogleSheetsSync } from "@/lib/hooks/useGoogleSheetsSync";
-import { useProductActions } from "@/lib/hooks/useProductActions";
+import { useStockDB } from "@/hooks/StockDBProvider";
+import { useGoogleSheetsSync } from "@/hooks/useGoogleSheetsSync";
+import { useProductActions } from "@/hooks/useProductActions";
 import StorageTab from "@/components/config/StorageTab";
 import DriveTab from "@/components/config/DriveTab";
 import SheetsTab from "@/components/config/SheetsTab";

@@ -6,8 +6,8 @@ import PlanModal from "@/components/plan/PlanModal";
 import { MaterialThumb } from "@/components/ui/MaterialLabel";
 import { baht } from "@/lib/domain/cost";
 import { daysUntil, formatThaiShortDate } from "@/lib/core/date";
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
-import { usePlanActions } from "@/lib/hooks/usePlanActions";
+import { useStockDB } from "@/hooks/StockDBProvider";
+import { usePlanActions } from "@/hooks/usePlanActions";
 import {
   PLAN_PRESETS,
   boughtHint,

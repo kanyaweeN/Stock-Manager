@@ -5,7 +5,7 @@ import type { StockDB } from "@/lib/db";
 import { countUnits } from "@/lib/domain/stock";
 import { requestAccessToken } from "@/lib/sync/googleAuth";
 import { DRIVE_SCOPE, downloadDb, findDbFile, uploadDb, type DriveFileInfo } from "@/lib/sync/googleDrive";
-import { useClientValue } from "@/lib/hooks/useClientValue";
+import { useClientValue } from "@/hooks/useClientValue";
 
 /** client id ใช้ร่วมกับ Google Sheets sync — เป็น OAuth client ตัวเดียวกัน */
 const CLIENT_ID_KEY = "stock_manager_google_client_id";

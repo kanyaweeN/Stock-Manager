@@ -1,4 +1,4 @@
-import type { useGoogleDriveSync } from "@/lib/hooks/useGoogleDriveSync";
+import type { useGoogleDriveSync } from "@/hooks/useGoogleDriveSync";
 
 type DriveSync = ReturnType<typeof useGoogleDriveSync>;
 

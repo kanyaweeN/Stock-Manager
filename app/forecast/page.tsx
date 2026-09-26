@@ -10,8 +10,8 @@ import { repurchaseStats, sortByDueSoonest, type RepurchaseStats } from "@/lib/d
 import { spendRate, type SpendRate } from "@/lib/domain/spendRate";
 import { buildForecastClusters, type ForecastCluster } from "@/lib/domain/forecast";
 import { groupNameMap } from "@/lib/domain/groups";
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
-import { useProductActions } from "@/lib/hooks/useProductActions";
+import { useStockDB } from "@/hooks/StockDBProvider";
+import { useProductActions } from "@/hooks/useProductActions";
 
 /**
  * หน้าคาดคะเนวันซื้ออีกครั้ง — ผู้ใช้ **เลือกเอง**ว่าจะติดตามชิ้นไหน

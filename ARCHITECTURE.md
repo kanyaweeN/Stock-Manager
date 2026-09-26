@@ -18,9 +18,12 @@ lib/import/        parsers (HTML/text)                              [tested]
 lib/forms/         entity ↔ draft (toX/fromX pair per entity)      [tested]
 lib/db/            schema · migrations · normalize (index.ts = sole gate)
 lib/sync/          network (OAuth, cloud APIs)
-lib/hooks/         React hooks + Provider
 lib/__tests__/     flat; do not mirror folders
+
+hooks/             React hooks + Provider — root level, NOT lib/hooks/
 ```
+`hooks/` sits outside `lib/` (moved 2026-09-26): `lib/` is the pure layer, hooks hold state.
+Matches `PROJECT-STANDARD.md` layering and the other six apps in the workspace.
 
 ## `components/` layout
 ```

@@ -15,7 +15,7 @@ import { amountText, baht, driftNote, duplicateLineIds, emptyLine, lineCost, lin
 import { formatThaiShortDate, todayISO } from "@/lib/core/date";
 import { MaterialThumb } from "@/components/ui/MaterialLabel";
 import PriceAdvisor from "@/components/recipe/PriceAdvisor";
-import { usePricingSettings } from "@/lib/hooks/usePricingSettings";
+import { usePricingSettings } from "@/hooks/usePricingSettings";
 import type { ProductionRun, Recipe, StockItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 

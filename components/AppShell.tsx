@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { useStockDB } from "@/hooks/StockDBProvider";
 import packageJson from "@/package.json";
 import { cn } from "@/lib/utils";
 

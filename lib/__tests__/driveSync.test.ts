@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { overwriteRisks, type DbCounts } from "@/lib/hooks/useGoogleDriveSync";
+import { overwriteRisks, type DbCounts } from "@/hooks/useGoogleDriveSync";
 
 /**
  * ด่านสุดท้ายก่อนเขียนทับไฟล์ **ไฟล์เดียว** ที่มีบน Drive — พลาดคือข้อมูลหายถาวร

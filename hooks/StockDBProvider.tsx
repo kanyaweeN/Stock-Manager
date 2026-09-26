@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
-import { usePersistedStockDB } from "@/lib/hooks/usePersistedDB";
-import { useGoogleDriveSync } from "@/lib/hooks/useGoogleDriveSync";
+import { usePersistedStockDB } from "@/hooks/usePersistedDB";
+import { useGoogleDriveSync } from "@/hooks/useGoogleDriveSync";
 
 type StockDBContextValue = ReturnType<typeof usePersistedStockDB> & {
   /** ซิงก์ขึ้น Google Drive — อยู่ตรงนี้เพื่อให้ทำงานทุกหน้า ไม่ใช่เฉพาะตอนเปิด /config */

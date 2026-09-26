@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { baht } from "@/lib/domain/cost";
 import { daysAgoISO, formatThaiShortDate, todayISO } from "@/lib/core/date";
 import { extrasInRange, orderExtras, orderNet, sortOrders, totalExtras } from "@/lib/domain/orders";
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
-import { useOrderActions } from "@/lib/hooks/useOrderActions";
+import { useStockDB } from "@/hooks/StockDBProvider";
+import { useOrderActions } from "@/hooks/useOrderActions";
 import {
   byCategory,
   byItem,

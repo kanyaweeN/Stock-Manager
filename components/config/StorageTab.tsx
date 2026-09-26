@@ -1,4 +1,4 @@
-import type { DbStatus } from "@/lib/hooks/usePersistedDB";
+import type { DbStatus } from "@/hooks/usePersistedDB";
 
 interface Props {
   status: DbStatus;

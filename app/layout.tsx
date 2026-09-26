@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { StockDBProvider } from "@/lib/hooks/StockDBProvider";
+import { StockDBProvider } from "@/hooks/StockDBProvider";
 import AppShell from "@/components/AppShell";
 import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/core/themeColors";
 

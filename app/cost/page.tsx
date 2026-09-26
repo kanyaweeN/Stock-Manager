@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import RecipeModal from "@/components/recipe/RecipeModal";
 import MaterialLabel from "@/components/ui/MaterialLabel";
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
-import { useRecipeActions } from "@/lib/hooks/useRecipeActions";
+import { useStockDB } from "@/hooks/StockDBProvider";
+import { useRecipeActions } from "@/hooks/useRecipeActions";
 import { baht, driftNote, emptyRecipe, lineCost, lineIssue, recipeTotals, stockDrift } from "@/lib/domain/cost";
 import { DEFAULT_PRICING, pct, suggestPrice } from "@/lib/domain/pricing";
 import type { Recipe } from "@/lib/types";

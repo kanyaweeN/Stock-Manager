@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
 import { TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
-import type { SortKey } from "@/lib/hooks/useProductFilters";
+import type { SortKey } from "@/hooks/useProductFilters";
 import { cn } from "@/lib/utils";
 
 const SORT_LABELS: Record<SortKey, string> = {

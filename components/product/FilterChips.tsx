@@ -1,6 +1,6 @@
 "use client";
 
-import type { StockTab } from "@/lib/hooks/useProductFilters";
+import type { StockTab } from "@/hooks/useProductFilters";
 
 /** คีย์ของชิป = แท็บสต็อก + "uncategorized" ที่เดิมเป็น toggle แยก ตอนนี้รวมเป็นชุดเดียวเลือกได้ทีละอัน */
 export type ChipKey = StockTab | "uncategorized";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { useStockDB } from "@/hooks/StockDBProvider";
 import { DEFAULT_PRICING } from "@/lib/domain/pricing";
 import type { PricingSettings } from "@/lib/types";
 
