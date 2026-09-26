@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState} from "react";
 import { MaterialThumb } from "@/components/ui/MaterialLabel";
 import ModalShell from "@/components/ui/ModalShell";
 import StockPicker, { StockPickerEmpty, StockPickerRow, StockPickerShell } from "@/components/ui/StockPicker";
@@ -25,6 +25,7 @@ import {
   suggestForPlan,
 } from "@/lib/domain/plan";
 import type { PlanPriority, PurchasePlan, StockItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -34,16 +35,17 @@ interface Props {
   onSave: (plan: PurchasePlan) => void;
 }
 
-export default function PlanModal({ open, plan, items, onClose, onSave }: Props) {
-  const [draft, setDraft] = useState<PlanDraft | null>(null);
+export default function PlanModal(props: Props) {
+  // remount ทุกครั้งที่เปิด (และทุกครั้งที่สลับแผน) — state ข้างในจึงเริ่มจากค่าที่ถูกได้เลย
+  // เดิมใช้ `useEffect` เซ็ต draft/ปิด picker ซึ่งเรนเดอร์ซ้อนหนึ่งรอบและเป็น lint error ใน React 19
+  if (!props.open) return null;
+  return <PlanModalBody key={props.plan?.id ?? "new"} {...props} />;
+}
+
+function PlanModalBody({ plan, items, onClose, onSave }: Props) {
+  const [draft, setDraft] = useState<PlanDraft | null>(() => (plan ? toPlanDraft(plan) : null));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
-
-  useEffect(() => {
-    if (open && plan) setDraft(toPlanDraft(plan));
-    setPickerOpen(false);
-    setSuggestOpen(false);
-  }, [open, plan]);
 
   const preview = useMemo(() => (draft ? fromPlanDraft(draft) : null), [draft]);
   const totals = useMemo(() => (preview ? planTotals(preview) : null), [preview]);
@@ -83,7 +85,7 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
 
   return (
     // แผนจากพรีเซ็ตมีชื่อมาให้แล้วแต่ยังไม่เคยบันทึก — ดูที่ updatedAt ที่ usePlanActions.save ประทับให้แทน
-    <ModalShell open={open} title={plan?.updatedAt ? "แก้ไขแผนซื้อของ" : "แผนซื้อของใหม่"} onClose={onClose} wide>
+    <ModalShell open title={plan?.updatedAt ? "แก้ไขแผนซื้อของ" : "แผนซื้อของใหม่"} onClose={onClose} wide>
         <div className="modal-body">
           <div className="field">
             <label>ชื่อแผน</label>
@@ -363,7 +365,7 @@ export default function PlanModal({ open, plan, items, onClose, onSave }: Props)
               <strong>{baht(totals.projected)}</strong>
             </div>
             {totals.budgetLeft != null && (
-              <div className={`cost-summary__row ${totals.overBudget! > 0 ? "cost-summary__row--loss" : "cost-summary__row--profit"}`}>
+              <div className={cn("cost-summary__row", totals.overBudget! > 0 ? "cost-summary__row--loss" : "cost-summary__row--profit")}>
                 <span>{totals.overBudget! > 0 ? "เกินงบที่ตั้งไว้" : "เหลือในงบ (หลังซื้อครบ)"}</span>
                 <strong>{baht(totals.overBudget! > 0 ? totals.overBudget! : preview.budget! - totals.projected)}</strong>
               </div>

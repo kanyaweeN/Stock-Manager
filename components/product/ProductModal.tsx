@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState} from "react";
 import { STATUS_OPTIONS } from "@/lib/core/statusOptions";
 import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
 import IngredientInput from "@/components/ingredient/IngredientInput";
@@ -62,10 +62,15 @@ function Section({
   );
 }
 
-export default function ProductModal({ open, item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup, groupName }: Props) {
-  const [form, setForm] = useState<ProductForm>(() => toProductForm(null));
+export default function ProductModal(props: Props) {
+  // ปิดแล้วถอดออกจากต้นไม้ เปิดใหม่ = mount ใหม่ · `key` กันกรณีสลับสินค้าโดยไม่ปิดก่อน
+  // เดิมเติมฟอร์มด้วย `useEffect` + `setForm` ซึ่งเรนเดอร์ซ้อนหนึ่งรอบ (และเป็น lint error ใน React 19)
+  if (!props.open) return null;
+  return <ProductModalBody key={props.item?.id ?? "new"} {...props} />;
+}
 
-  useEffect(() => setForm(toProductForm(item)), [item, open]);
+function ProductModalBody({ item, categories, avoidIngredients, skinProfile, onClose, onSave, onUngroup, groupName }: Props) {
+  const [form, setForm] = useState<ProductForm>(() => toProductForm(item));
 
   const stats = priceStats(form.priceHistory);
   // ราคาต่อชิ้นย่อยตามที่กรอกค้างอยู่ — แปลงฟอร์มเป็นสินค้าจริงด้วยตัวแปลงตัวเดียวกับตอนกดบันทึก
@@ -116,7 +121,7 @@ export default function ProductModal({ open, item, categories, avoidIngredients,
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === form.status && o.value !== "")?.label;
 
   return (
-    <ModalShell open={open} title={item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"} onClose={onClose}>
+    <ModalShell open title={item ? "แก้ไขสินค้า" : "เพิ่มสินค้า"} onClose={onClose}>
         <div className="modal-body">
         <TextField
           label="ชื่อสินค้า"

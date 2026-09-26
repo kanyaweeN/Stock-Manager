@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { groupCategories, joinCatPath, splitCatPath } from "@/lib/core/cats";
+import { cn } from "@/lib/utils";
 
 interface Props {
   categories: string[];
@@ -30,7 +31,17 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
   const [newParent, setNewParent] = useState("");
   const [newName, setNewName] = useState("");
   const [panelStyle, setPanelStyle] = useState<PanelStyle | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // กางหมวดแม่ของของที่ถูกเลือกไว้ตั้งแต่ตอน mount (เช่นเปิดฟอร์มแก้สินค้าที่มีซับหมวดอยู่แล้ว)
+  // — คำนวณครั้งเดียวตรงนี้ ไม่ใช่ยัดเข้า state ผ่าน effect ทุกครั้งที่ `selected` เปลี่ยน
+  // ท่าเดิมนอกจากจะเรนเดอร์ซ้อนแล้ว ยังทำให้ "ยุบ" หมวดที่มีของเลือกอยู่แล้วมันเด้งกางกลับมาเอง
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const init = new Set<string>();
+    for (const c of selected) {
+      const parts = splitCatPath(c);
+      if (parts) init.add(parts.parent);
+    }
+    return init;
+  });
   const [query, setQuery] = useState("");
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const parentListId = useId();
@@ -85,17 +96,6 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, []);
 
-  // ถ้ามีลูกที่ถูกเลือกไว้อยู่แล้ว (เช่นตอนเปิดฟอร์มแก้ไขสินค้าที่มีซับหมวดหมู่) ให้กางหมวดหลักนั้นไว้ให้เห็นเลย
-  useEffect(() => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      for (const c of selected) {
-        const parts = splitCatPath(c);
-        if (parts) next.add(parts.parent);
-      }
-      return next;
-    });
-  }, [selected]);
 
   const toggle = (cat: string) => {
     if (selected.includes(cat)) {
@@ -155,7 +155,7 @@ export default function CategoryMultiSelect({ categories, selected, onChange, al
   return (
     <details className="cat-multiselect" ref={detailsRef}>
       <summary title={selected.length > 0 ? selected.join(", ") : undefined}>
-        <span className={`cat-multiselect__label${selected.length === 0 ? " is-empty" : ""}`}>{label}</span>
+        <span className={cn("cat-multiselect__label", selected.length === 0 && "is-empty")}>{label}</span>
         {selected.length > 1 && <span className="cat-multiselect__count">+{selected.length - 1}</span>}
         {selected.length > 0 && (
           <span

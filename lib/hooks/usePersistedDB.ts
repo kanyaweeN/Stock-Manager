@@ -168,7 +168,10 @@ export function usePersistedStockDB() {
   // เก็บ db ที่ยังไม่ได้เขียนลงไฟล์ไว้ เผื่อต้องรีบ flush ตอนปิดแท็บ/ออกจากหน้า
   const pendingRef = useRef<StockDB | null>(null);
   const persistRef = useRef(persist);
-  persistRef.current = persist;
+  // เขียน ref ใน effect ไม่ใช่ตอนเรนเดอร์ (React 19 ห้าม — เรนเดอร์ถูกเรียกซ้ำ/ทิ้งได้)
+  useEffect(() => {
+    persistRef.current = persist;
+  }, [persist]);
 
   // รอบแรกหลังโหลดเสร็จคือ "เขียนสิ่งที่เพิ่งอ่านมากลับที่เดิม" — ไม่มีประโยชน์
   // แต่อันตรายมากถ้าโหลดมาไม่ครบ: แค่เปิดหน้าทิ้งไว้ก็เขียนทับของดีด้วยของเปล่า

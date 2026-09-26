@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
 import { TAG_META, type IngredientTag } from "@/lib/domain/ingredients";
 import type { SortKey } from "@/lib/hooks/useProductFilters";
+import { cn } from "@/lib/utils";
 
 const SORT_LABELS: Record<SortKey, string> = {
   "bought-desc": "ซื้อล่าสุด",
@@ -103,7 +104,7 @@ export default function Toolbar(p: Props) {
 
           <div className="menu" ref={menuRef}>
             <button
-              className={`btn-ghost menu__btn ${menuOpen ? "is-open" : ""}`}
+              className={cn("btn-ghost menu__btn", menuOpen && "is-open")}
               title="เพิ่มเติม"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
@@ -149,7 +150,7 @@ export default function Toolbar(p: Props) {
 
           {p.filterTag && (
             <button
-              className={`chip-toggle ${p.excludeTag ? "is-active" : ""}`}
+              className={cn("chip-toggle", p.excludeTag && "is-active")}
               onClick={() => p.onExcludeTag(!p.excludeTag)}
               title="เอาเฉพาะรายการที่ไม่มีส่วนผสมกลุ่มนี้"
             >
@@ -173,7 +174,7 @@ export default function Toolbar(p: Props) {
 
           {/* "เลือกหลายรายการ" เคยอยู่ในเมนู ⋯ — เอาออกมาไว้ท้ายแถวตัวกรองที่ตรึงไว้ จะได้กดทีเดียวติด */}
           <button
-            className={`select-mode-toggle ${p.selectMode ? "is-active" : ""}`}
+            className={cn("select-mode-toggle", p.selectMode && "is-active")}
             onClick={p.onToggleSelectMode}
             aria-pressed={p.selectMode}
             title={p.selectMode ? "ออกจากโหมดเลือกหลายรายการ" : "เลือกหลายรายการพร้อมกัน"}

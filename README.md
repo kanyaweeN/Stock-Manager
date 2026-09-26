@@ -38,7 +38,7 @@ npm install
 npm run dev
 ```
 
-เปิด [http://localhost:3000](http://localhost:3000)
+เปิด **[http://localhost:3001](http://localhost:3001)** — port นี้จองไว้ให้ app นี้ (ตาราง port อยู่ใน `PROJECT-STANDARD.md` ข้อ 8) ข้อมูลผูกกับ origin เปิดผิด port = ไม่เห็นข้อมูลเดิม
 
 ### คำสั่งอื่นๆ
 
@@ -138,7 +138,7 @@ lib/
 
 1. สร้างโปรเจกต์ใน [Google Cloud Console](https://console.cloud.google.com/) แล้วเปิดใช้งาน **Google Drive API** (และ **Google Sheets API** ถ้าจะส่งออกชีตด้วย)
 2. ตั้งค่า **OAuth consent screen** (User type: External) แล้วเพิ่มอีเมลของคุณใน Test users
-3. สร้าง **OAuth Client ID** ประเภท "Web application" แล้วเพิ่ม URL ของแอป (เช่น `http://localhost:3000`) ใน Authorized JavaScript origins
+3. สร้าง **OAuth Client ID** ประเภท "Web application" แล้วเพิ่ม URL ของแอป (เช่น `http://localhost:3001`) ใน Authorized JavaScript origins
 
 ### Google Drive — ซิงก์ข้ามเครื่อง (แนะนำ)
 
@@ -173,10 +173,10 @@ NEXT_PUBLIC_GOOGLE_SHEET_ID=your-spreadsheet-id
 
 ## เทคโนโลยีที่ใช้
 
-- [Next.js](https://nextjs.org/) 15 (App Router)
-- React 19 + TypeScript
-- CSS ธรรมดา (ไม่มี framework CSS เพิ่มเติม)
+- [Next.js](https://nextjs.org/) 16 (App Router)
+- React 19 + TypeScript strict
+- CSS ธรรมดา + design token (CSS track B ตาม [`../PROJECT-STANDARD.md`](../PROJECT-STANDARD.md) ข้อ 1.1) — ไม่มี framework CSS
 
 ## หมายเหตุ
 
-ไฟล์ `index.html` ที่อยู่ใน root เป็นเวอร์ชันเดิมก่อนย้ายมาเป็น Next.js (static single-file) เก็บไว้เผื่อใช้งานแบบไม่ต้องรัน build — ไม่ได้อัปเดตตามฟีเจอร์ใหม่แล้ว
+เดิมมีไฟล์ `index.html` (แอปเวอร์ชันหน้าเดียวก่อนย้ายมา Next.js) ค้างอยู่ที่ root — ลบออกในเวอร์ชัน 0.5.0 เพราะไม่ได้อัปเดตตามฟีเจอร์ใหม่มานานแล้วและทำให้เข้าใจผิดว่ายังใช้ได้ (ถ้าต้องการย้อนดู: `git show ac9550c:index.html`)

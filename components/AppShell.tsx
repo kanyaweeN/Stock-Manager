@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import packageJson from "@/package.json";
+import { cn } from "@/lib/utils";
 
 /** เมนูหลัก — ใช้ทั้งแถบข้าง (จอกว้าง) และแถบล่าง (มือถือ) */
 const NAV = [
@@ -44,7 +45,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav className="shell__nav">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className={`shell__nav-item ${isActive(n.href) ? "is-active" : ""}`}>
+            <Link key={n.href} href={n.href} className={cn("shell__nav-item", isActive(n.href) && "is-active")}>
               <span className="shell__nav-icon">{n.icon}</span>
               <span className="shell__nav-label">{n.label}</span>
               {counts[n.href] ? <span className="shell__nav-count">{counts[n.href]}</span> : null}
@@ -72,7 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <nav className="shell__tabbar">
         {NAV.map((n) => (
-          <Link key={n.href} href={n.href} className={`shell__tab ${isActive(n.href) ? "is-active" : ""}`}>
+          <Link key={n.href} href={n.href} className={cn("shell__tab", isActive(n.href) && "is-active")}>
             <span className="shell__tab-icon">{n.icon}</span>
             {n.short}
           </Link>

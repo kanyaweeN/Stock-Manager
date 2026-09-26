@@ -20,6 +20,7 @@ import {
   sortPlans,
 } from "@/lib/domain/plan";
 import type { PurchasePlan } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 /** ป้ายบอกว่าเหลือเวลาอีกเท่าไร — คืน null ถ้าแผนไม่ได้กำหนดวัน */
 function dueBadge(plan: PurchasePlan, done: boolean) {
@@ -97,7 +98,7 @@ export default function PlanPage() {
             const done = isPlanDone(plan);
             const badge = dueBadge(plan, done);
             return (
-              <div className={`recipe-card plan-card ${done ? "plan-card--done" : ""}`} key={plan.id}>
+              <div className={cn("recipe-card plan-card", done && "plan-card--done")} key={plan.id}>
                 <div className="recipe-card__head">
                   <div>
                     <h3 className="recipe-card__title">
@@ -131,7 +132,7 @@ export default function PlanPage() {
                     <div className="recipe-figure__l">รวมทั้งแผน</div>
                   </div>
                   {plan.budget != null && (
-                    <div className={`recipe-figure ${t.overBudget! > 0 ? "recipe-figure--loss" : ""}`}>
+                    <div className={cn("recipe-figure", t.overBudget! > 0 && "recipe-figure--loss")}>
                       <div className="recipe-figure__n">
                         {t.overBudget! > 0 ? `+${baht(t.overBudget!)}` : baht(plan.budget - t.projected)}
                       </div>
@@ -158,7 +159,7 @@ export default function PlanPage() {
                       const item = l.itemId ? itemById.get(l.itemId) : undefined;
                       const hint = boughtHint(l, item, plan);
                       return (
-                        <li className={`plan-item ${l.bought ? "is-bought" : ""}`} key={l.id}>
+                        <li className={cn("plan-item", l.bought && "is-bought")} key={l.id}>
                           <label className="plan-check" title={l.bought ? "ยกเลิกว่าซื้อแล้ว" : "ทำเครื่องหมายว่าซื้อแล้ว"}>
                             <input
                               type="checkbox"

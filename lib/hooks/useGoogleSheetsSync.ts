@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { StockDB } from "@/lib/db";
 import { requestAccessToken } from "@/lib/sync/googleAuth";
 import { SHEETS_SCOPE, pushToSheet } from "@/lib/sync/googleSheets";
+import { useClientValue } from "@/lib/hooks/useClientValue";
 
 /** client id ใช้ร่วมกับ Google Drive sync — เป็น OAuth client ตัวเดียวกัน (key เก่าไว้รองรับคนที่ตั้งค่าไว้แล้ว) */
 const CLIENT_ID_KEY = "stock_manager_google_client_id";
@@ -15,31 +16,48 @@ const GS_REMEMBER_KEY = "stock_manager_gs_remember";
  * จัดการการส่งออกรายการสินค้าไป Google Sheet — **ส่งขึ้นอย่างเดียว ไม่มีดึงกลับ**
  * ถ้าต้องการซิงก์/กู้คืนข้อมูลจริง ใช้ `useGoogleDriveSync` (เก็บ StockDB ทั้งก้อนเป็น JSON)
  */
-export function useGoogleSheetsSync(db: StockDB) {
-  const [clientId, setClientId] = useState("");
-  const [sheetId, setSheetId] = useState("");
-  const [token, setToken] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [origin, setOrigin] = useState("");
-  const [checking, setChecking] = useState(false);
-
-  useEffect(() => {
-    // ถ้าเคยตั้งค่าไว้ในเบราว์เซอร์นี้แล้วใช้ค่านั้นก่อน ไม่งั้น fallback ไปใช้ค่า default จาก env
-    // (ตั้งใน .env.local เป็น NEXT_PUBLIC_GOOGLE_CLIENT_ID / NEXT_PUBLIC_GOOGLE_SHEET_ID)
-    // เพื่อไม่ต้องกรอกเองทุกครั้งที่เปิดเบราว์เซอร์ใหม่/ล้าง localStorage
-    const savedClientId =
+/**
+ * ค่าที่เคยตั้งไว้ในเบราว์เซอร์นี้มาก่อน ไม่งั้น fallback ไปใช้ค่า default จาก env
+ * (ตั้งใน .env.local เป็น NEXT_PUBLIC_GOOGLE_CLIENT_ID / NEXT_PUBLIC_GOOGLE_SHEET_ID)
+ * เพื่อไม่ต้องกรอกเองทุกครั้งที่เปิดเบราว์เซอร์ใหม่/ล้าง localStorage
+ */
+function readSavedSheetsSettings(): { clientId: string; sheetId: string } {
+  return {
+    clientId:
       localStorage.getItem(CLIENT_ID_KEY) ||
       localStorage.getItem(GS_CLIENT_ID_KEY) ||
       process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-      "";
-    const savedSheetId = localStorage.getItem(GS_SHEET_ID_KEY) || process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID || "";
-    setClientId(savedClientId);
-    setSheetId(savedSheetId);
-    setOrigin(window.location.origin);
+      "",
+    sheetId: localStorage.getItem(GS_SHEET_ID_KEY) || process.env.NEXT_PUBLIC_GOOGLE_SHEET_ID || "",
+  };
+}
+
+const NO_SETTINGS = { clientId: "", sheetId: "" };
+
+export function useGoogleSheetsSync(db: StockDB) {
+  // อ่านตอนเรนเดอร์ (หลัง hydrate) ไม่ใช่ setState ใน effect — ที่ผู้ใช้กรอกเองทีหลังเป็น override
+  const stored = useClientValue(readSavedSheetsSettings, NO_SETTINGS);
+  const [entered, setEntered] = useState<{ clientId: string; sheetId: string } | null>(null);
+  const clientId = entered?.clientId ?? stored.clientId;
+  const sheetId = entered?.sheetId ?? stored.sheetId;
+  const [token, setToken] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const origin = useClientValue(() => window.location.origin, "");
+  const [checking, setChecking] = useState(false);
+
+  // ขอ token เงียบ ๆ ครั้งเดียวตอนเปิดแอป — รอจนอ่านค่าจากเครื่องได้ก่อน
+  const bootstrappedRef = useRef(false);
+  useEffect(() => {
+    const savedClientId = stored.clientId;
+    if (bootstrappedRef.current) return;
 
     // ถ้าเคยเชื่อมต่อสำเร็จมาก่อน ลองขอ token แบบเงียบๆ (ไม่เด้ง popup) — ถ้า session Google ยังอยู่จะไม่ต้อง login ใหม่
     if (savedClientId && localStorage.getItem(GS_REMEMBER_KEY) === "1") {
+      bootstrappedRef.current = true;
+      // effect นี้ "เริ่มงานกับระบบภายนอก" จริง ๆ (ขอ token จาก Google แบบเงียบ ๆ ตอนเปิดแอป)
+      // setState ตัวนี้คือสปินเนอร์ของงานนั้น — ที่เหลือ set ใน callback ของ promise หมดแล้ว
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChecking(true);
       const onSuccess = (t: string) => {
         setToken(t);
@@ -57,12 +75,10 @@ export function useGoogleSheetsSync(db: StockDB) {
       // ถ้า silent มาสำเร็จช้ากว่า timeout ก็ยังอัปเดตให้ภายหลังได้ ไม่ต้องรอ user กดใหม่
       silent.then(onSuccess).catch(() => {});
     }
-     
-  }, []);
+  }, [stored.clientId]);
 
   const saveSettings = (nextClientId: string, nextSheetId: string) => {
-    setClientId(nextClientId);
-    setSheetId(nextSheetId);
+    setEntered({ clientId: nextClientId, sheetId: nextSheetId });
     localStorage.setItem(CLIENT_ID_KEY, nextClientId);
     localStorage.setItem(GS_SHEET_ID_KEY, nextSheetId);
   };

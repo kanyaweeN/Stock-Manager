@@ -8,6 +8,7 @@ import { useRecipeActions } from "@/lib/hooks/useRecipeActions";
 import { baht, driftNote, emptyRecipe, lineCost, lineIssue, recipeTotals, stockDrift } from "@/lib/domain/cost";
 import { DEFAULT_PRICING, pct, suggestPrice } from "@/lib/domain/pricing";
 import type { Recipe } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export default function CostPage() {
   const { db, setDb } = useStockDB();
@@ -93,7 +94,7 @@ export default function CostPage() {
                         <div className="recipe-figure__n">{baht(r.sellPrice)}</div>
                         <div className="recipe-figure__l">ราคาขาย</div>
                       </div>
-                      <div className={`recipe-figure ${t.profitPerUnit! < 0 ? "recipe-figure--loss" : "recipe-figure--profit"}`}>
+                      <div className={cn("recipe-figure", t.profitPerUnit! < 0 ? "recipe-figure--loss" : "recipe-figure--profit")}>
                         <div className="recipe-figure__n">
                           {baht(t.profitPerUnit!)} <small>({t.marginPct!.toFixed(0)}%)</small>
                         </div>

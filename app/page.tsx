@@ -14,6 +14,7 @@ import AddToTargetModal from "@/components/product/AddToTargetModal";
 import GroupNamePromptModal from "@/components/product/GroupNamePromptModal";
 import SelectActionBar from "@/components/product/SelectActionBar";
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
+import { useClientValue } from "@/lib/hooks/useClientValue";
 import { baht, emptyRecipe, lineFromItem, recipeTotals } from "@/lib/domain/cost";
 import { groupNameMap } from "@/lib/domain/groups";
 import { formatThaiShortDate } from "@/lib/core/date";
@@ -26,6 +27,7 @@ import { useTargetDraft } from "@/lib/hooks/useTargetDraft";
 import { useRecipeActions } from "@/lib/hooks/useRecipeActions";
 import { usePlanActions } from "@/lib/hooks/usePlanActions";
 import type { PurchasePlan, Recipe, StockItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export default function Home() {
   const { db, setDb } = useStockDB();
@@ -64,13 +66,16 @@ export default function Home() {
    * อ่านจาก `window.location` ตอน mount แทน `useSearchParams` เพราะตัวหลังบังคับให้ต้องห่อทั้งหน้าด้วย <Suspense>
    * แล้วลบพารามิเตอร์ทิ้งทันที ไม่ให้ค้างบน URL ตอนผู้ใช้รีเฟรชหรือบุ๊กมาร์กหน้านี้ไว้
    */
-  const [highlightId, setHighlightId] = useState<string | undefined>(undefined);
+  // อ่านตอนเรนเดอร์ (หลัง hydrate) ไม่ใช่ setState ใน effect — ฝั่ง server ไม่มี URL ให้อ่านอยู่แล้ว
+  const highlightId = useClientValue(
+    () => new URLSearchParams(window.location.search).get("item") ?? undefined,
+    undefined,
+  );
+  // ลบพารามิเตอร์ทิ้งหลังอ่านแล้ว — แตะ history เป็น side effect จริง จึงยังอยู่ใน effect
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("item");
-    if (!id) return;
-    setHighlightId(id);
+    if (!highlightId) return;
     window.history.replaceState(null, "", window.location.pathname);
-  }, []);
+  }, [highlightId]);
 
   const catEditor = useCatEditor({
     selectedItems,
@@ -135,7 +140,7 @@ export default function Home() {
   };
 
   return (
-    <div className={`page ${selectMode ? "page--with-select-bar" : ""}`}>
+    <div className={cn("page", selectMode && "page--with-select-bar")}>
       <Toolbar
         title="สินค้าทั้งหมด"
         search={search}
@@ -346,7 +351,7 @@ export default function Home() {
                 <button
                   key={m.key}
                   type="button"
-                  className={`chip-toggle${catEditor.mode === m.key ? " is-active" : ""}`}
+                  className={cn("chip-toggle", catEditor.mode === m.key && "is-active")}
                   aria-pressed={catEditor.mode === m.key}
                   onClick={() => catEditor.changeMode(m.key)}
                 >
@@ -370,12 +375,12 @@ export default function Home() {
             </div>
             <div className="cat-preview">
               {catEditor.preview.map(({ item, after, added, removed, changed }) => (
-                <div className={`cat-preview__row${changed ? " is-changed" : ""}`} key={item.id}>
+                <div className={cn("cat-preview__row", changed && "is-changed")} key={item.id}>
                   <span className="cat-preview__name">{item.name}</span>
                   <span className="cat-preview__cats">
                     {after.length === 0 && removed.length === 0 && <span className="cat-preview__none">ไม่มีหมวดหมู่</span>}
                     {after.map((c) => (
-                      <span key={c} className={`cat-preview__chip${added.includes(c) ? " cat-preview__chip--add" : ""}`}>{c}</span>
+                      <span key={c} className={cn("cat-preview__chip", added.includes(c) && "cat-preview__chip--add")}>{c}</span>
                     ))}
                     {removed.map((c) => (
                       <span key={`-${c}`} className="cat-preview__chip cat-preview__chip--del">{c}</span>

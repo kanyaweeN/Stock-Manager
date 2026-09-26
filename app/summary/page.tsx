@@ -18,6 +18,7 @@ import {
   totalSpend,
   type SpendRow,
 } from "@/lib/domain/summary";
+import { cn } from "@/lib/utils";
 
 type RangeMode = "30d" | "90d" | "year" | "all" | "custom";
 
@@ -37,7 +38,11 @@ const TABS: { id: Tab; label: string }[] = [
 const RANGE_TABS: Tab[] = ["category", "shop", "item"];
 
 // ชุดสีจัดหมวดหมู่ (categorical) ที่ผ่านการตรวจสอบว่าแยกแยะได้ชัดทั้งคนตาปกติและตาบอดสี — ใช้ตามลำดับคงที่
-const CAT_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"];
+/**
+ * สีวงกลมนำหน้าหมวดในตารางสรุป — ค่าจริงอยู่ที่ `--cat-1..8` ใน `app/styles/base.css`
+ * (กฎ: ห้าม hardcode hex ใน .tsx รวมถึง palette ของกราฟ)
+ */
+const CAT_COLORS = Array.from({ length: 8 }, (_, i) => `var(--cat-${i + 1})`);
 
 const RANGE_OPTIONS: { value: RangeMode; label: string }[] = [
   { value: "30d", label: "30 วันล่าสุด" },
@@ -164,7 +169,7 @@ export default function SummaryPage() {
         {TABS.map((t) => (
           <button
             key={t.id}
-            className={`tab-btn ${tab === t.id ? "active" : ""}`}
+            className={cn("tab-btn", tab === t.id && "active")}
             onClick={() => setTab(t.id)}
           >
             {t.label}
@@ -216,7 +221,7 @@ export default function SummaryPage() {
               <div className="l">
                 จ่ายเดือนนี้
                 {overview.momPct != null && (
-                  <span className={`summary-delta ${overview.momPct >= 0 ? "is-up" : "is-down"}`}>
+                  <span className={cn("summary-delta", overview.momPct >= 0 ? "is-up" : "is-down")}>
                     {overview.momPct >= 0 ? "▲" : "▼"} {Math.abs(overview.momPct)}%
                   </span>
                 )}
@@ -337,7 +342,7 @@ export default function SummaryPage() {
                       onChange={(e) => orderActions.patchOrder(o.id, { discount: Number(e.target.value) || 0 })}
                     />
                   </label>
-                  <span className={`order-row__net ${orderNet(o) < 0 ? "is-saving" : ""}`}>
+                  <span className={cn("order-row__net", orderNet(o) < 0 && "is-saving")}>
                     {orderNet(o) >= 0 ? "+" : "−"}{baht(Math.abs(orderNet(o)))}
                   </span>
                   <button

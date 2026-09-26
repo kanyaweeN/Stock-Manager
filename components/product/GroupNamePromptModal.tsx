@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState} from "react";
 import ModalShell from "@/components/ui/ModalShell";
 
 interface Props {
@@ -20,12 +20,16 @@ interface Props {
  * โมดัลกรอกชื่อกลุ่มสินค้า — ใช้ทั้งตอนสร้างกลุ่มใหม่ (พร้อมลิสต์รายการเป็น children) และตอนแก้ชื่อกลุ่มเดิม
  * เดิมโค้ดโมดัลเหมือนกันเป๊ะ 2 ที่ (page.tsx + ProductGrid) รวมมาที่นี่จะได้ปรับ UX ครั้งเดียวมีผลทั้งคู่
  */
-export default function GroupNamePromptModal({ open, title, initialValue = "", saveLabel = "บันทึก", children, onSave, onClose }: Props) {
-  const [value, setValue] = useState(initialValue);
-  // รีเซ็ตค่าทุกครั้งที่เปิดโมดัลใหม่ — ไม่งั้นตอนเปิดครั้งถัดไปจะเห็นค่าเก่าค้าง
-  useEffect(() => { if (open) setValue(initialValue); }, [open, initialValue]);
+export default function GroupNamePromptModal(props: Props) {
+  // ปิดแล้วถอดออกจากต้นไม้ไปเลย เปิดใหม่ = mount ใหม่ ค่าจึงเริ่มจาก initialValue เสมอ
+  // (เดิมรีเซ็ตด้วย `useEffect` + `setValue` ซึ่งเรนเดอร์ซ้อนและเป็น lint error ใน React 19)
+  if (!props.open) return null;
+  return <GroupNamePromptBody key={props.initialValue ?? ""} {...props} />;
+}
 
-  if (!open) return null;
+function GroupNamePromptBody({ title, initialValue = "", saveLabel = "บันทึก", children, onSave, onClose }: Props) {
+  const [value, setValue] = useState(initialValue);
+
   const trimmed = value.trim();
   const submit = () => { if (trimmed) onSave(value); };
 

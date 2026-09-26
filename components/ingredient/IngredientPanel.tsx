@@ -10,6 +10,7 @@ import {
   type IngredientWarning,
 } from "@/lib/domain/ingredients";
 import type { SkinProfile } from "@/lib/db";
+import { cn } from "@/lib/utils";
 
 /** ป้ายแท็กส่วนผสมหนึ่งอัน (สีตามระดับ good/neutral/caution) */
 export function TagChip({ tag, count }: { tag: IngredientTag; count?: number }) {
@@ -113,7 +114,7 @@ export default function IngredientPanel({ ingredients, avoidIngredients = [], sk
       {showList && (
         <ol className="ing-list">
           {analysis.list.map((p) => (
-            <li className={`ing-item ${p.defs.length === 0 ? "ing-item--unknown" : ""}`} key={p.key}>
+            <li className={cn("ing-item", p.defs.length === 0 && "ing-item--unknown")} key={p.key}>
               <span className="ing-item__name">
                 {p.raw}
                 {p.pct != null && <span className="ing-item__pct"> {p.pct}%</span>}

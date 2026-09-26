@@ -11,6 +11,7 @@ import CategoriesTab from "@/components/config/CategoriesTab";
 import BackupTab from "@/components/config/BackupTab";
 import { CAT_SEP } from "@/lib/core/cats";
 import packageJson from "@/package.json";
+import { cn } from "@/lib/utils";
 
 type Tab = "storage" | "drive" | "sheets" | "categories" | "backup";
 
@@ -93,7 +94,7 @@ export default function ConfigPage() {
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
-            className={`config-tab ${tab === t.id ? "active" : ""}`}
+            className={cn("config-tab", tab === t.id && "active")}
             onClick={() => setTab(t.id)}
           >
             <span className="config-tab__icon" aria-hidden="true">{t.icon}</span>

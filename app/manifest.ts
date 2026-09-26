@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
+import { THEME_COLOR_LIGHT } from "@/lib/core/themeColors";
 
 /**
  * ไฟล์ manifest สำหรับ "เพิ่มไปที่หน้าจอโฮม" บนมือถือ — ไม่มีผลกับการใช้งานผ่านเบราว์เซอร์ปกติ
  * ไอคอนอยู่ที่ `public/icons/` (ไม่ใช่ `app/icon.svg`) เพราะพาธในไฟล์นี้ต้องคงที่
  * ส่วนไอคอนแบบไฟล์ใน `app/` จะถูกต่อท้ายด้วยแฮชตอน build
- * สีต้องตรงกับ `viewport.themeColor` ใน `app/layout.tsx` ไม่งั้นแถบสถานะตอนเปิดจากหน้าจอโฮมจะคนละสีกับตอนเปิดในเบราว์เซอร์
+ * สีมาจาก `@/lib/core/themeColors` ที่เดียวกับ `viewport.themeColor` ใน `app/layout.tsx` ไม่งั้นแถบสถานะตอนเปิดจากหน้าจอโฮมจะคนละสีกับตอนเปิดในเบราว์เซอร์
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -14,8 +15,8 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "th",
     start_url: "/",
     display: "standalone",
-    background_color: "#f5f6f8",
-    theme_color: "#f5f6f8",
+    background_color: THEME_COLOR_LIGHT,
+    theme_color: THEME_COLOR_LIGHT,
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },

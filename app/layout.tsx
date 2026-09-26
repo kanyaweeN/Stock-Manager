@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { StockDBProvider } from "@/lib/hooks/StockDBProvider";
 import AppShell from "@/components/AppShell";
+import { THEME_COLOR_DARK, THEME_COLOR_LIGHT } from "@/lib/core/themeColors";
 
 export const metadata: Metadata = {
   title: "จัดการสต็อกสินค้า",
@@ -9,8 +10,8 @@ export const metadata: Metadata = {
 
 export const viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#14161a" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOR_LIGHT },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR_DARK },
   ],
   width: "device-width",
   initialScale: 1,

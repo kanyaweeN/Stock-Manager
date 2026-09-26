@@ -5,6 +5,7 @@ import type { StockDB } from "@/lib/db";
 import { countUnits } from "@/lib/domain/stock";
 import { requestAccessToken } from "@/lib/sync/googleAuth";
 import { DRIVE_SCOPE, downloadDb, findDbFile, uploadDb, type DriveFileInfo } from "@/lib/sync/googleDrive";
+import { useClientValue } from "@/lib/hooks/useClientValue";
 
 /** client id ใช้ร่วมกับ Google Sheets sync — เป็น OAuth client ตัวเดียวกัน */
 const CLIENT_ID_KEY = "stock_manager_google_client_id";
@@ -130,50 +131,71 @@ export function overwriteRisks(
  * `ready` = โหลดข้อมูลจากที่เก็บในเครื่องเสร็จแล้ว — ต้องรอเสมอ ไม่งั้นการซิงก์อัตโนมัติอาจส่ง
  * `DEFAULT_DB` (ว่างเปล่า) ขึ้นไปทับไฟล์จริงตั้งแต่แอปยังโหลดไม่เสร็จ
  */
+/** client id ที่บันทึกไว้ในเครื่อง (รองรับ key เก่า) ไม่งั้นใช้ค่าจาก env */
+function readSavedClientId(): string {
+  return (
+    localStorage.getItem(CLIENT_ID_KEY) ||
+    localStorage.getItem(LEGACY_CLIENT_ID_KEY) ||
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    ""
+  );
+}
+
 export function useGoogleDriveSync(
   db: StockDB,
   setDb: (updater: (prev: StockDB) => StockDB) => void,
   ready = true
 ) {
-  const [clientId, setClientId] = useState("");
+  // ค่าตั้งต้นอ่านจาก localStorage/env **ตอนเรนเดอร์** (หลัง hydrate) ไม่ใช่ setState ใน effect
+  // ที่ผู้ใช้กรอกเองทีหลังจะถูกเก็บเป็น override แล้วชนะค่าที่อ่านมา
+  const storedClientId = useClientValue(readSavedClientId, "");
+  const [clientIdOverride, setClientIdOverride] = useState<string | null>(null);
+  const clientId = clientIdOverride ?? storedClientId;
   const [token, setToken] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
   const [remoteTime, setRemoteTime] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [origin, setOrigin] = useState("");
-  const [autoSync, setAutoSyncState] = useState(false);
+  const origin = useClientValue(() => window.location.origin, "");
+  const storedAutoSync = useClientValue(() => localStorage.getItem(AUTOSYNC_KEY) !== "0", false);
+  const [autoSyncOverride, setAutoSyncOverride] = useState<boolean | null>(null);
+  const autoSync = autoSyncOverride ?? storedAutoSync;
   /** มีอะไรแก้ไว้แล้วยังไม่ได้ส่งขึ้น Drive */
   const [dirty, setDirty] = useState(false);
   /** ซิงก์อัตโนมัติถูกหยุดไว้เพราะรอบล่าสุดดูเสี่ยงหรือพลาด — ต้องให้ผู้ใช้ตัดสินใจเอง */
   const [autoPaused, setAutoPaused] = useState(false);
 
   // ค่าล่าสุดสำหรับ callback ที่ไม่อยากผูก dependency (ไม่งั้น timer ของ auto-push จะถูกรีเซ็ตทุกครั้งที่ db เปลี่ยน)
+  // อัปเดตใน effect ไม่ใช่ตอนเรนเดอร์ — React 19 ห้ามเขียน ref ระหว่างเรนเดอร์
+  // (เรนเดอร์ถูกเรียกซ้ำ/ทิ้งได้ การเขียน ref ตรงนั้นจึงไม่มีอะไรรับประกัน)
   const dbRef = useRef(db);
-  dbRef.current = db;
   const tokenRef = useRef<string | null>(null);
-  tokenRef.current = token;
   const clientIdRef = useRef("");
-  clientIdRef.current = clientId;
+  useEffect(() => {
+    dbRef.current = db;
+    tokenRef.current = token;
+    clientIdRef.current = clientId;
+  }, [db, token, clientId]);
   const busyRef = useRef(false);
   /** ก้อนข้อมูลก้อนแรกที่โหลดขึ้นมา — ตัวนี้ไม่ใช่ "การแก้ไข" จึงไม่นับว่าค้างซิงก์ */
   const baselineRef = useRef<StockDB | null>(null);
   /** จำนวนของตอนเปิดแอป (อัปเดตทุกครั้งที่ซิงก์สำเร็จ) — ใช้แยก "ลบเอง" ออกจาก "ข้อมูลในเครื่องหาย" */
   const loadedCountsRef = useRef<DbCounts | null>(null);
 
+  // ขอ token เงียบ ๆ ครั้งเดียวตอนเปิดแอป — รอจนอ่าน client id จากเครื่องได้ก่อน
+  const bootstrappedRef = useRef(false);
   useEffect(() => {
-    const saved =
-      localStorage.getItem(CLIENT_ID_KEY) ||
-      localStorage.getItem(LEGACY_CLIENT_ID_KEY) ||
-      process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
-      "";
-    setClientId(saved);
-    setOrigin(window.location.origin);
-    setAutoSyncState(localStorage.getItem(AUTOSYNC_KEY) !== "0");
+    const saved = storedClientId;
+    if (bootstrappedRef.current) return;
 
     // เคยเชื่อมต่อไว้แล้ว → ลองขอ token เงียบๆ ไม่ต้องให้ผู้ใช้กดเอง
     if (saved && localStorage.getItem(REMEMBER_KEY) === "1") {
+      bootstrappedRef.current = true;
+      // effect นี้ "เริ่มงานกับระบบภายนอก" จริง ๆ (ขอ token จาก Google แบบเงียบ ๆ ตอนเปิดแอป)
+      // setState ตัวนี้คือสปินเนอร์ของงานนั้น ที่เหลือทั้งหมด set ใน callback ของ promise แล้ว
+      // — จะเลี่ยงได้ต้องรื้อ flow การ auth ใหม่ทั้งชุด ซึ่งเป็นเส้นทางที่เสี่ยงต่อข้อมูลผู้ใช้ที่สุดในแอป
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setChecking(true);
       // กันยิงซ้ำ — ทั้ง `Promise.race` และ `silent.then` ข้างล่างต่างก็เรียกตัวนี้ ในกรณีปกติ
       // (silent เสร็จก่อน timeout) มันจะติดทั้งคู่ แล้ว `findDbFile` ถูกเรียกสองรอบทุกครั้งที่เปิดแอป
@@ -203,16 +225,15 @@ export function useGoogleDriveSync(
       // เผื่อ token มาช้ากว่า 4 วิ (timeout ชนะไปแล้ว) — ยังรับไว้ให้เชื่อมต่อสำเร็จ ไม่ต้องกดเอง
       silent.then(onSuccess).catch(() => {});
     }
-     
-  }, []);
+  }, [storedClientId]);
 
   const saveClientId = useCallback((next: string) => {
-    setClientId(next);
+    setClientIdOverride(next);
     localStorage.setItem(CLIENT_ID_KEY, next);
   }, []);
 
   const setAutoSync = useCallback((on: boolean) => {
-    setAutoSyncState(on);
+    setAutoSyncOverride(on);
     localStorage.setItem(AUTOSYNC_KEY, on ? "1" : "0");
     if (on) setAutoPaused(false);
   }, []);

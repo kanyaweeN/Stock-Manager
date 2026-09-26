@@ -23,6 +23,7 @@ import CategoryMultiSelect from "@/components/ui/CategoryMultiSelect";
 import ModalShell from "@/components/ui/ModalShell";
 import { ClearIcon, PasteIcon } from "@/components/ui/icons";
 import type { ImportCandidate, ImportSource, ItemStatus, PurchaseOrder, StockItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -192,7 +193,7 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
                 <button
                   key={s.id}
                   type="button"
-                  className={`import-site ${s.id === source ? "is-active" : ""}`}
+                  className={cn("import-site", s.id === source && "is-active")}
                   aria-pressed={s.id === source}
                   onClick={() => changeSource(s.id)}
                 >
@@ -231,7 +232,7 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
             </button>
 
             {subtotalCheck && (
-              <div className={`import-total-check ${subtotalCheck.ok ? "is-ok" : "is-warn"}`}>
+              <div className={cn("import-total-check", subtotalCheck.ok ? "is-ok" : "is-warn")}>
                 {subtotalCheck.ok ? (
                   <span>
                     ✅ ยอดตรงกับหน้าออเดอร์ — แกะได้ {candidates.length} รายการ รวม ฿
@@ -295,7 +296,7 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
                   </div>
                 )}
                 {payableCheck && (
-                  <div className={`import-extras__check ${payableCheck.ok ? "is-ok" : "is-warn"}`}>
+                  <div className={cn("import-extras__check", payableCheck.ok ? "is-ok" : "is-warn")}>
                     {payableCheck.ok
                       ? `✅ ราคาสินค้า + ค่าส่ง − ส่วนลด = ฿${roundBaht(payableCheck.computed).toLocaleString("th-TH")} ตรงกับยอดชำระบนหน้าออเดอร์`
                       : `⚠️ คิดได้ ฿${roundBaht(payableCheck.computed).toLocaleString("th-TH")} แต่หน้าออเดอร์บอกยอดชำระ ฿${roundBaht(payableCheck.expected).toLocaleString("th-TH")} — ลองแก้ค่าส่ง/ส่วนลดให้ตรง`}
@@ -343,7 +344,7 @@ export default function ImportModal({ open, categories, items, orders, onClose, 
               {candidates.map((c, idx) => {
                 const existingItem = c.existingId ? items.find((i) => i.id === c.existingId) : undefined;
                 return (
-                  <div className={`import-row ${existingItem ? "import-row--dup" : ""}`} key={idx}>
+                  <div className={cn("import-row", existingItem && "import-row--dup")} key={idx}>
                     <input
                       type="checkbox"
                       checked={c.include}

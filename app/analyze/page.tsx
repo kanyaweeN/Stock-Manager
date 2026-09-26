@@ -5,6 +5,7 @@ import IngredientPanel, { TagChip, WarningList } from "@/components/ingredient/I
 import { useStockDB } from "@/lib/hooks/StockDBProvider";
 import { SKIN_TYPE_LABELS, SKIN_CONCERN_LABELS, type SkinType, type SkinConcern } from "@/lib/db";
 import { analyzeIngredients, analyzeSkinCompat, COMPAT_META, compareIngredients, TAG_META } from "@/lib/domain/ingredients";
+import { cn } from "@/lib/utils";
 
 function SkinScoreBadge({ score, level }: { score: number; level: string }) {
   return (
@@ -99,7 +100,7 @@ export default function AnalyzePage() {
         {(Object.entries(SKIN_CONCERN_LABELS) as [SkinConcern, string][]).map(([k, v]) => (
           <button
             key={k}
-            className={`ing-tag ${profile.concerns.includes(k) ? "ing-tag--good" : ""}`}
+            className={cn("ing-tag", profile.concerns.includes(k) && "ing-tag--good")}
             onClick={() => toggleConcern(k)}
           >
             {profile.concerns.includes(k) ? "✓ " : ""}{v}
@@ -155,7 +156,7 @@ export default function AnalyzePage() {
               const warnCount = a.warnings.filter((w) => w.level === "warn").length;
               const compat = analyzeSkinCompat(i.ingredients, profile);
               return (
-                <label className={`ing-picker__row ${selectedIds.includes(i.id) ? "ing-picker__row--on" : ""}`} key={i.id}>
+                <label className={cn("ing-picker__row", selectedIds.includes(i.id) && "ing-picker__row--on")} key={i.id}>
                   <input type="checkbox" checked={selectedIds.includes(i.id)} onChange={() => toggle(i.id)} />
                   <span className="ing-picker__name">
                     {i.name}

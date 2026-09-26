@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState} from "react";
 import ModalShell from "@/components/ui/ModalShell";
 import StockPicker from "@/components/ui/StockPicker";
 import {
@@ -17,6 +17,7 @@ import { MaterialThumb } from "@/components/ui/MaterialLabel";
 import PriceAdvisor from "@/components/recipe/PriceAdvisor";
 import { usePricingSettings } from "@/lib/hooks/usePricingSettings";
 import type { ProductionRun, Recipe, StockItem } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
@@ -42,15 +43,17 @@ interface Props {
   onRemoveRun?: (recipeId: string, runId: string) => void;
 }
 
-export default function RecipeModal({ open, recipe, items, runs, onClose, onSave, onLogRun, onRemoveRun }: Props) {
-  const [draft, setDraft] = useState<RecipeDraft | null>(null);
+export default function RecipeModal(props: Props) {
+  // ปิดแล้วถอดออกจากต้นไม้ เปิดใหม่ = mount ใหม่ · `key` กันกรณีสลับสูตรโดยไม่ปิดก่อน
+  // เดิมเติม draft/ปิด picker ด้วย `useEffect` ซึ่งเรนเดอร์ซ้อนหนึ่งรอบ (และเป็น lint error ใน React 19)
+  if (!props.open) return null;
+  return <RecipeModalBody key={props.recipe?.id ?? "new"} {...props} />;
+}
+
+function RecipeModalBody({ recipe, items, runs, onClose, onSave, onLogRun, onRemoveRun }: Props) {
+  const [draft, setDraft] = useState<RecipeDraft | null>(() => (recipe ? toRecipeDraft(recipe) : null));
   /** กำลังเลือกสินค้าจากสต็อกให้บรรทัดไหน — "new" = เพิ่มบรรทัดใหม่, null = ไม่ได้เปิดตัวเลือก */
   const [pickerFor, setPickerFor] = useState<"new" | string | null>(null);
-
-  useEffect(() => {
-    if (open && recipe) setDraft(toRecipeDraft(recipe));
-    setPickerFor(null);
-  }, [open, recipe]);
 
   const [pricing] = usePricingSettings();
   const preview = useMemo(() => (draft ? fromRecipeDraft(draft) : null), [draft]);
@@ -147,7 +150,7 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
   };
 
   return (
-    <ModalShell open={open} title={recipe?.name ? "แก้ไขสูตรต้นทุน" : "สูตรต้นทุนใหม่"} onClose={onClose} wide>
+    <ModalShell open title={recipe?.name ? "แก้ไขสูตรต้นทุน" : "สูตรต้นทุนใหม่"} onClose={onClose} wide>
         <div className="modal-body">
           <div className="field">
             <label>ชื่อสูตร / ของที่ทำ</label>
@@ -255,7 +258,7 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
                   )}
 
                   {drift && (
-                    <div className={`cost-line__drift text-xs${drift.fillsUnknownPack ? " cost-line__drift--fill" : ""}`}>
+                    <div className={cn("cost-line__drift text-xs", drift.fillsUnknownPack && "cost-line__drift--fill")}>
                       <span>{drift.fillsUnknownPack ? "📦" : "🔄"} {driftNote(drift, line)}</span>
                       <button className="btn-ghost btn-sm" onClick={() => applyDrift(l.id, drift)}>
                         {drift.fillsUnknownPack ? "เติมจากสต็อก" : "ใช้ค่าล่าสุด"}
@@ -404,7 +407,7 @@ export default function RecipeModal({ open, recipe, items, runs, onClose, onSave
             )}
             {totals.profitPerUnit != null && (
               <>
-                <div className={`cost-summary__row ${totals.profitPerUnit < 0 ? "cost-summary__row--loss" : "cost-summary__row--profit"}`}>
+                <div className={cn("cost-summary__row", totals.profitPerUnit < 0 ? "cost-summary__row--loss" : "cost-summary__row--profit")}>
                   <span>กำไรต่อ 1 {preview.yieldUnit}</span>
                   <strong>{baht(totals.profitPerUnit)} ({totals.marginPct!.toFixed(0)}%)</strong>
                 </div>

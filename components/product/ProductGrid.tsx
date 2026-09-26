@@ -16,6 +16,7 @@ import { shopKey } from "@/lib/domain/orders";
 import { sourceLabel } from "@/lib/import/sites";
 import { amountText, bahtPerUnit, perUnitPrice, totalPieces, type PerUnitPrice, type PieceCount } from "@/lib/domain/cost";
 import type { SkinProfile } from "@/lib/db";
+import { cn } from "@/lib/utils";
 
 /** จำนวนแท็กส่วนผสมสูงสุดที่โชว์บนการ์ด (ที่เหลือย่อเป็น +n) */
 const CARD_TAG_LIMIT = 3;
@@ -313,7 +314,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               )}
               {exp && (
                 <span
-                  className={`badge-expiry ${exp.expired ? "badge-expiry--gone" : ""}`}
+                  className={cn("badge-expiry", exp.expired && "badge-expiry--gone")}
                   title={`หมดอายุ ${exp.date}${exp.source === "pao" ? " (นับจากวันที่เปิดใช้)" : " (ตามฉลาก)"}`}
                 >
                   {exp.expired ? "⛔" : "⏰"} {expiryLabel(exp)}
@@ -340,7 +341,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
                 <button
                   key={c}
                   type="button"
-                  className={`cat-tag ${activeCats?.includes(c) ? "is-active" : ""}`}
+                  className={cn("cat-tag", activeCats?.includes(c) && "is-active")}
                   title={`ดูเฉพาะของในหมวด ${c} (กดซ้ำเพื่อเลิกกรอง)`}
                   onClick={(e) => { e.stopPropagation(); onFilterCat(c); }}
                 >
@@ -357,7 +358,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               {i.shop && (onFilterShop ? (
                 <button
                   type="button"
-                  className={`shop-tag shop-tag--btn ${activeShopKey && shopKey(i.shop) === activeShopKey ? "is-active" : ""}`}
+                  className={cn("shop-tag shop-tag--btn", activeShopKey && shopKey(i.shop) === activeShopKey && "is-active")}
                   title={`ดูเฉพาะของจากร้าน ${i.shop} (กดซ้ำเพื่อเลิกกรอง)`}
                   onClick={(e) => { e.stopPropagation(); onFilterShop(i.shop!); }}
                 >
@@ -469,7 +470,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
             {i.min > 0 && !low && <span className="product-card__min">ขั้นต่ำ {i.min}</span>}
             {onToggleFav && (
               <button
-                className={`icon-btn fav-btn ${i.fav ? "fav-btn--on" : ""}`}
+                className={cn("icon-btn fav-btn", i.fav && "fav-btn--on")}
                 title={i.fav ? "เอาออกจากของโปรด" : "เพิ่มเป็นของโปรด"}
                 aria-pressed={!!i.fav}
                 onClick={() => onToggleFav(i.id)}
@@ -546,7 +547,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
 
         return (
           <div
-            className={`product-group ${highlighted ? "product-group--highlight" : ""}`}
+            className={cn("product-group", highlighted && "product-group--highlight")}
             key={groupId}
             data-item-id={highlighted && cluster[0].id !== highlightId ? highlightId : undefined}
           >
@@ -582,7 +583,7 @@ export default function ProductGrid({ items, avoidIngredients, skinProfile, onIn
               </span>
             </button>
             <div
-              className={`product-group__peek ${clusterSelected ? "product-group__peek--selected" : ""}`}
+              className={cn("product-group__peek", clusterSelected && "product-group__peek--selected")}
               onClick={() => (selectMode ? toggleClusterSelect(cluster) : setOpenGroupId(groupId))}
             >
               {selectMode && (
